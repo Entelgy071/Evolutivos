@@ -1,0 +1,59 @@
+/************************************************************************
+* Proyecto:     ETY_ERP_74669
+* Responsable:  Entelgy - Betzy Jaramillo
+* Fecha:        22/09/2017
+* Referencia:	001
+* Descripción:  Se comentarea el codigo porque al momento de guardar no guardaba bien
+                la razón.
+************************************************************************/
+/************************************************************************
+* Proyecto:     ETY_ERP_AP_95381
+* Responsable:  Entelgy - Soraya Higuera
+* Fecha:        09/12/2019
+* Referencia:	002
+* Descripción:  Se agrega validación para que pagos parciales no interfiera con pagos retenidos.
+************************************************************************/
+
+If PYMNT_VCHR_XREF.PYMNT_HOLD = "Y" And
+      None(PYMNT_VCHR_XREF.PYMNT_HOLD_REASON) Then
+   Error MsgGet(7015, 252, "Hold Reason is required.");
+End-If;
+If PYMNT_VCHR_XREF.PYMNT_HOLD = "N" And
+      All(PYMNT_VCHR_XREF.PYMNT_HOLD_REASON) Then
+   REM SetDefault(PYMNT_VCHR_XREF.PYMNT_HOLD_REASON);
+End-If;
+
+/* 001 -> */
+
+If %Component = "VCHR_EXPRESS" Then
+   
+   Local number &Count;
+   Local Row &MyRow = GetRow();
+   
+   SQLExec("SELECT COUNT(*) FROM PS_ETY_VNDRRET_TBL WHERE BUSINESS_UNIT= :1 AND VENDOR_ID = :2", PYMNT_VCHR_XREF.BUSINESS_UNIT, PYMNT_VCHR_XREF.REMIT_VENDOR, &Count);
+   /*Inicio 002*/
+   /*If None(ETY_VOUCHER.ETY_PAG_PAR_ESP.Value) Then*/
+   If &Count > 0 And
+         (PYMNT_VCHR_XREF.PYMNT_SELCT_STATUS.Value <> "P" And
+            PYMNT_VCHR_XREF.PYMNT_SELCT_STATUS.Value <> "X") Then
+      rem If PYMNT_VCHR_XREF.PYMNT_HOLD = "N" Then;
+      &Result = MessageBox(4, "", 30000, 2, "Los pagos de este proveedor deben ser retenidos hasta que exista una orden de pago. Debe ser retenido el pago %1?", PYMNT_VCHR_XREF.PYMNT_CNT.Value);
+      
+      If &Result = 6 Then
+         PYMNT_VCHR_XREF.PYMNT_HOLD = "Y";
+         /*001*/
+         rem PYMNT_VCHR_XREF.PYMNT_HOLD_REASON = "ALC";
+         /*001*/
+      Else
+         PYMNT_VCHR_XREF.PYMNT_HOLD = "N";
+         /*PYMNT_VCHR_XREF.PYMNT_HOLD_REASON = " ";*/
+      End-If;
+      rem End-If;
+   End-If;
+   REM Else
+      ETY_VOUCHER.ETY_PAGO_RETENIDO.Value = "N";
+   rem End-If;
+   /*Fin 002*/
+End-If;
+
+/* <- 001 */

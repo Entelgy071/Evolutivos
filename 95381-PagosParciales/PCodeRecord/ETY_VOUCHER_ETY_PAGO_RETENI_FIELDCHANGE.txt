@@ -1,0 +1,50 @@
+/************************************************************************
+* Proyecto:     ETY_ERP_49064
+* Responsable:  Entelgy - Camilo Trujillo
+* Fecha:        19/09/2016
+* Referencia:	001
+* Descripción:  Se valida si el proveedor está parametrizado para retención
+                de pagos y se actualiza el flag.
+************************************************************************/
+
+/* 001 -> */
+
+
+Local Field &etyFld_PYMNT_HOLD_REASON;
+Local Rowset &etyRst_ETY_VOUCHER, &etyRst_PYMNT_VCHR_XREF;
+Local Row &etyRow_ETY_VOUCHER, &etyRow_PYMNT_VCHR_XREF;
+Local Record &etyRcd_PYMNT_VCHR_XREF;
+
+&etyRst_ETY_VOUCHER = GetLevel0();
+&etyRow_ETY_VOUCHER = &etyRst_ETY_VOUCHER.GetRow(1);
+&etyRst_PYMNT_VCHR_XREF = &etyRow_ETY_VOUCHER.GetRowset(Scroll.PYMNT_VCHR_XREF);
+&etyRow_ETY_VOUCHER = &etyRst_PYMNT_VCHR_XREF.GetRow(1);
+&etyRcd_PYMNT_VCHR_XREF = &etyRow_ETY_VOUCHER.GetRecord(Record.PYMNT_VCHR_XREF);
+&etyRst_PSXLATITEM = CreateRowset(Record.PSXLATITEM);
+
+
+
+
+If %Component = "VCHR_EXPRESS" Then
+   
+   Local number &Count;
+   Local Row &MyRow = GetRow();
+   
+   For &j = 1 To &etyRst_PYMNT_VCHR_XREF.ActiveRowCount
+      
+      SQLExec("SELECT COUNT(*) FROM PS_ETY_VNDRRET_TBL WHERE BUSINESS_UNIT= :1 AND VENDOR_ID = :2", VOUCHER.BUSINESS_UNIT, VOUCHER.VENDOR_ID, &Count);
+      
+      If &Count > 0 And
+            ETY_VOUCHER.ETY_PAGO_RETENIDO.Value = "N" Then
+         If ETY_VOUCHER.ETY_PAG_PAR_ESP.Value = "N" Then
+            &Result = MessageBox(1, "", 0, 0, "Los pagos de este proveedor deben ser retenidos hasta que exista una orden de pago. Está seguro que debe ser procesado el pago %1?", &etyRst_PYMNT_VCHR_XREF.GetRow(&j).GetRecord(1).PYMNT_CNT.Value);
+            If &Result <> 1 Then
+               ETY_VOUCHER.ETY_PAGO_RETENIDO = "Y";
+            Else
+               ETY_VOUCHER.ETY_PAGO_RETENIDO = "N";
+            End-If;
+         End-If;
+      End-If;
+   End-For;
+End-If;
+/* <- 001 */

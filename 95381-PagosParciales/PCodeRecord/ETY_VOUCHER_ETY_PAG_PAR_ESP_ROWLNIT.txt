@@ -1,0 +1,23 @@
+/********************************************************************************
+* Proyecto:     ETY_ERP_AP_95381
+* Responsable:  Entelgy - Soraya Higuera
+* Fecha:        25/10/2019
+* Referencia:	001
+* Descripción:  Si el voucher esta en estado "P" Posteado, se inhabilita el campo
+*********************************************************************************/
+
+/*Inicio 001*/
+If %Mode = "A" Then
+   ETY_VOUCHER.ETY_PAG_PAR_ESP.Value = "N";
+End-If;
+
+
+If VOUCHER.POST_STATUS_AP = "P" Then
+   ETY_VOUCHER.ETY_PAG_PAR_ESP.DisplayOnly = True;
+End-If;
+
+
+
+
+
+/*Fin 001*/

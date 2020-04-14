@@ -1,0 +1,46 @@
+/*******************************************************************
+Proyecto: 		FF_AP_11049_FMB_000
+Fecha:			2013-Dic-04
+Responsable:	DATCO Retos - Federico Betoldi
+Actividad:		001
+Descr: 			Se blanquean los campos Método y Detalle de Pago.
+********************************************************************/
+/***************************************************************************************
+* Proyecto:     ETY_ERP_AP_95381
+* Responsable:  Entelgy - Soraya Higuera
+* Fecha:        05/11/2019
+* Referencia:	002
+* Descripción:  Se modifica la actividad 001 para que no blanquee el detalle del pago
+****************************************************************************************/
+
+
+
+Declare Function hide_ap_drft_lvl PeopleCode FUNCLIB_AP.DFT_SIGHT_CD FieldFormula;
+Declare Function Defl_Bank_Acct_Seq PeopleCode PYMNT_VCHR_XREF.PYMNT_METHOD FieldChange;
+
+If PYMNT_VCHR_XREF.PYMNT_ACTION = "S" And
+      PYMNT_VCHR_XREF.PYMNT_METHOD = "LC" Then
+   UnGray(PYMNT_VCHR_XREF.LC_ID);
+Else
+   Gray(PYMNT_VCHR_XREF.LC_ID);
+End-If;
+
+
+/* AP Draft and EFT Layout  */
+hide_ap_drft_lvl();
+Defl_Bank_Acct_Seq();
+
+
+
+
+/*Inicio #001*/
+rem WinMessage("Metodo " | PYMNT_VCHR_XREF.PYMNT_METHOD.Value);
+If %Mode = "A" Then
+   
+   PYMNT_VCHR_XREF.PYMNT_METHOD.Value = "";
+   /*Inicio #002*/
+   REM Else
+   GetRowset(Scroll.FFPYMNTVCHRXREF).GetRow(1).GetRecord(Record.FFPYMNTVCHRXREF).GetField(Field.FF_DET_PAGO).Value = "";
+   /*Fin #002*/
+End-If;
+/*Fin #001*/

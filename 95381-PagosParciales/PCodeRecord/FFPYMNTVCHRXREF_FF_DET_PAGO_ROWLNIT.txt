@@ -1,0 +1,51 @@
+/*INICIO #001*/
+/*INICIO #005*/
+If FFPYMNTVCHRXREF.FF_DET_PAGO.Value = "N" Or
+      FFPYMNTVCHRXREF.FF_DET_PAGO.Value = "3" Then
+   /*FIN #005*/
+   FF_AP_CHQGR_WRK.FF_IMPRCHQ_PB.Visible = True;
+Else
+   FF_AP_CHQGR_WRK.FF_IMPRCHQ_PB.Visible = False;
+End-If;
+/*FIN #001*/
+
+/* INICIO 002*/
+If FFPYMNTVCHRXREF.FF_DET_PAGO.Value = "P" Then
+   FFPYMNTVCHRXREF.FF_COD_OPERACION.Visible = True;
+Else
+   FFPYMNTVCHRXREF.FF_COD_OPERACION.Visible = False;
+End-If;
+/*FIN 002*/
+
+
+/*Inicio#004*/
+<*
+/*Inicio#003*/
+If (%Component = "VCHR_EXPRESS") Then;
+   If FFPYMNTVCHRXREF.FF_DET_PAGO = "N" Or
+         FFPYMNTVCHRXREF.FF_DET_PAGO = "L" Or
+         FFPYMNTVCHRXREF.FF_DET_PAGO = "K" Then;
+      /*Fin002*/
+      PYMNT_XREF_WRK.BANK_ACCT_PB.Visible = False;
+   Else
+      PYMNT_XREF_WRK.BANK_ACCT_PB.Visible = True;
+      
+   End-If;
+End-If;
+/*Fin#003*/
+*>
+/*Fin#004*/
+
+/*Inicio#006*/
+REM MessageBox(0, "", 0, 0, "PYMNT_VCHR_XREF.PYMNT_METHOD.Value " | PYMNT_VCHR_XREF.PYMNT_METHOD.Value | " FFPYMNTVCHRXREF.FF_DET_PAGO.Value " | FFPYMNTVCHRXREF.FF_DET_PAGO.Value);
+Local Rowset &RowLevel1, &RowLevel2;
+
+&RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.PYMNT_VCHR_XREF);
+&RowLevel2 = &RowLevel1.GetRow(1).GetRowset(Scroll.FFPYMNTVCHRXREF);
+
+For &j = 1 To &RowLevel2.ActiveRowCount
+   If None(&RowLevel1.GetRow(&j).PYMNT_VCHR_XREF.PYMNT_METHOD.Value) Then
+      &RowLevel2.GetRow(&j).FFPYMNTVCHRXREF.FF_DET_PAGO.Value = " ";
+   End-If;
+End-For;
+/*Fin#006*/

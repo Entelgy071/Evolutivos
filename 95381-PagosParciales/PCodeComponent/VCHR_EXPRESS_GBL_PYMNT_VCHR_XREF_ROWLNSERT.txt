@@ -1,0 +1,66 @@
+/***************************************************************************************
+* Proyecto:     ETY_ERP_AP_95381
+* Responsable:  Entelgy - Soraya Higuera
+* Fecha:        25/10/2019
+* Referencia:	001
+* Descripción:  Muestra u Oculta el motivo de la retención segun el flag de pago parcial
+****************************************************************************************/
+
+import AP:Payment:*;
+import AP_PARTIAL224:*;
+
+Component AP:Payment:ScheduleCalc &c_objScheduleCalc;
+Component AP_PARTIAL224:Partial224 &p224;
+
+&c_objScheduleCalc.SyncRowInsert(GetRow(), CurrentRowNumber());
+REM &c_objScheduleCalc.PrintOurStructure();
+
+If Not &p224.IsFederalPayment Then
+   GetRecord(Record.AP_P224_SRCH_WK).VOUCHER_ID_REF.Visible = False;
+   GetRecord(Record.AP_P224_SRCH_WK).VOUCHER_ID_REF.SetDefault();
+   GetRecord(Record.AP_P224_SRCH_WK).PYMNT_CNT_REF.Visible = False;
+   GetRecord(Record.AP_P224_SRCH_WK).PYMNT_CNT_REF.SetDefault();
+End-If;
+
+
+
+/*Inicio 001*/
+Local Field &etyFld_PYMNT_HOLD_REASON, &etyFld_PYMNT_METHOD, &etyFld_PYMNT_TYPE;
+Local Rowset &etyRst_ETY_VOUCHER, &etyRst_PYMNT_VCHR_XREF, &etyRst_PSXLATITEM;
+Local Row &etyRow_ETY_VOUCHER, &etyRow_PYMNT_VCHR_XREF;
+Local Record &etyRcd_PYMNT_VCHR_XREF;
+
+&etyRst_ETY_VOUCHER = GetLevel0();
+&etyRow_ETY_VOUCHER = &etyRst_ETY_VOUCHER.GetRow(1);
+&etyRst_PYMNT_VCHR_XREF = &etyRow_ETY_VOUCHER.GetRowset(Scroll.PYMNT_VCHR_XREF);
+&etyRow_ETY_VOUCHER = &etyRst_PYMNT_VCHR_XREF.GetRow(1);
+&etyRcd_PYMNT_VCHR_XREF = &etyRow_ETY_VOUCHER.GetRecord(Record.PYMNT_VCHR_XREF);
+&etyRst_PSXLATITEM = CreateRowset(Record.PSXLATITEM);
+
+&etyRow_PYMNT_VCHR_XREF = &etyRst_PYMNT_VCHR_XREF.GetRow(1);
+
+For &j = 1 To &etyRst_PYMNT_VCHR_XREF.ActiveRowCount
+   &etyFld_PYMNT_HOLD_REASON = &etyRst_PYMNT_VCHR_XREF.GetRow(&j).GetRecord(1).PYMNT_HOLD_REASON;
+   &etyFld_PYMNT_TYPE = &etyRst_PYMNT_VCHR_XREF.GetRow(&j).GetRecord(1).PYMNT_TYPE;
+   &etyFld_PYMNT_HOLD_REASON.ClearDropDownList();
+   If ETY_VOUCHER.ETY_PAG_PAR_ESP.Value = "Y" Then
+      &etyRst_PSXLATITEM.Fill("WHERE FILL.FIELDNAME = 'PYMNT_HOLD_REASON' AND EFF_STATUS='A'");
+   Else
+      &etyFld_PYMNT_HOLD_REASON.Value = " ";
+      &etyRst_PSXLATITEM.Fill("WHERE FILL.FIELDNAME = 'PYMNT_HOLD_REASON' AND Fill.FIELDVALUE <> 'PPE' AND EFF_STATUS='A'");
+   End-If;
+   
+   &Xlat_Cnt = &etyRst_PSXLATITEM.ActiveRowCount;
+   For &i = 1 To &Xlat_Cnt
+      &Codigo = &etyRst_PSXLATITEM.GetRow(&i).GetRecord(1).FIELDVALUE.Value;
+      &Descripcion = &etyRst_PSXLATITEM.GetRow(&i).GetRecord(1).XLATLONGNAME.Value;
+      &etyFld_PYMNT_HOLD_REASON.AddDropDownItem(&Codigo, &Descripcion);
+   End-For;
+   If &etyFld_PYMNT_TYPE.Value = "W" Then
+      PYMNT_VCHR_XREF.PYMNT_METHOD.Value = "";
+   End-If;
+End-For;
+
+
+
+/*Fin 001*/

@@ -1,0 +1,197 @@
+/******************************************************************************************
+Proyecto: 		FF_AP_11049_FMB_000
+Fecha:			2013-Dic-04
+Responsable:	DATCO Retos - Federico Betoldi
+Actividad:		001
+Descr: 			Se blanquea el campo Detalle de Pago, para evitar error de Valor no Válido.
+*******************************************************************************************
+Proyecto: 		ETY_ERP_AJUSTE_TERCEROS
+Fecha:			29/08/2018
+Responsable:	Laura Zorro
+Actividad:		002
+Descr: 			Se carga la información de la cuenta.
+/*******************************************************************************************/
+/***************************************************************************************
+* Proyecto:     ETY_ERP_AP_95381
+* Responsable:  Entelgy - Soraya Higuera
+* Fecha:        05/11/2019
+* Referencia:	003
+* Descripción:  Se modifica la activdad 001, para que no blanquee el detalle del pago
+****************************************************************************************/
+import AP:Payment:*;
+
+Declare Function setup_doc_seq PeopleCode PYMNT_PNLS_WRK.PB_DOC_SEQ RowInit;
+Declare Function isautonumber PeopleCode FUNCLIB_DOCSEQ.DOC_SEQ FieldFormula;
+Declare Function reqseqnbrchg PeopleCode FUNCLIB_DOCSEQ.DOC_SEQ FieldFormula;
+Declare Function delete_doc_number PeopleCode PYMNT_REMIT_VW.DOC_TYPE FieldChange;
+Declare Function hide_ap_drft_lvl PeopleCode FUNCLIB_AP.DFT_SIGHT_CD FieldFormula;
+
+Component boolean &HIPAA_ChkReq_Flg;
+Component AP:Payment:ScheduleCalc &c_objScheduleCalc;
+
+Function Get_Default_Layout();
+   SQLExec("SELECT EFT_LAYOUT_CD, STL_THROUGH FROM PS_BANK_PYMNT_LYT WHERE SETID = :1 AND BANK_CD = :2 AND BANK_CD_CPTY = :2 AND BANK_ACCT_KEY = :3 AND PYMNT_METHOD = :4 AND DEFAULT_FLG = 'Y'", PYMNT_VCHR_XREF.BANK_SETID.Value, PYMNT_VCHR_XREF.BANK_CD.Value, PYMNT_VCHR_XREF.BANK_ACCT_KEY.Value, PYMNT_VCHR_XREF.PYMNT_METHOD.Value, PYMNT_VCHR_XREF.EFT_LAYOUT_CD.Value, PYMNT_VCHR_XREF.STL_THROUGH.Value);
+End-Function;
+
+Function doc_seq_change
+   If PYMNT_VCHR_XREF.PYMNT_ACTION = "R" Then
+      &DOC_SEQ_NBR_OLD = FetchValue(PYMNT_PNLS_WRK.DOC_SEQ_NBR, CurrentRowNumber());
+      &DOC_SEQ_DATE_OLD = FetchValue(PYMNT_PNLS_WRK.DOC_SEQ_NBR, CurrentRowNumber());
+      &DOC_TYPE_OLD = FetchValue(PYMNT_PNLS_WRK.DOC_TYPE, CurrentRowNumber());
+      If All(&DOC_SEQ_NBR_OLD) And
+            All(&DOC_SEQ_DATE_OLD) Then
+         UpdateValue(PYMNT_PNLS_WRK.DOC_TYPE_OLD, CurrentRowNumber(), &DOC_TYPE_OLD);
+         UpdateValue(PYMNT_PNLS_WRK.ACCOUNTING_DT_OLD, CurrentRowNumber(), VOUCHER.ACCOUNTING_DT);
+         UpdateValue(PYMNT_PNLS_WRK.DOC_SEQ_NBR_OLD, CurrentRowNumber(), &DOC_SEQ_NBR_OLD);
+         &BUSINESS_UNIT = FetchValue(BANK_ACCT_VW.BUSINESS_UNIT, CurrentRowNumber());
+      End-If;
+      setup_doc_seq();
+      &DOC_TYPE = FetchValue(PYMNT_PNLS_WRK.DOC_TYPE, CurrentRowNumber());
+      &DOC_SEQ_NBR = FetchValue(PYMNT_PNLS_WRK.DOC_SEQ_NBR, CurrentRowNumber());
+      If All(&DOC_SEQ_NBR_OLD) And
+            All(&DOC_SEQ_DATE_OLD) Then
+         If reqseqnbrchg(&BUSINESS_UNIT, VOUCHER.ACCOUNTING_DT, &DOC_TYPE_OLD, &DOC_SEQ_NBR_OLD, &BUSINESS_UNIT, VOUCHER.ACCOUNTING_DT, &DOC_TYPE, &DOC_SEQ_NBR) Then
+            delete_doc_number();
+         End-If;
+      End-If;
+   End-If;
+End-Function;
+
+Function Rslv_Bank_Holiday();
+   /* We need to recalculate Scheduled Pay Date */
+   &c_objScheduleCalc.SetDueDateControl(GetField(VOUCHER.DUE_DT_FLG), VOUCHER.DUE_DT.Value, VOUCHER.DSCNT_DUE_DT.Value);
+   If ( Not &c_objScheduleCalc.CheckDueDateControl()) Then
+      SetDefault(PYMNT_VCHR_XREF.SCHEDULED_PAY_DT);
+   End-If;
+   /*  If bank's pymnt method has holiday procoess options, use it */
+   SQLExec("SELECT HOL_PROC_OPT, HOL_PROC_DAYS, HOL_PROC_OVERFL FROM PS_BANK_ACCT_MTHD WHERE SETID = :1 AND BANK_CD = :2 AND BANK_ACCT_KEY = :3 AND PYMNT_METHOD = :4", PYMNT_VCHR_XREF.BANK_SETID, PYMNT_VCHR_XREF.BANK_CD, PYMNT_VCHR_XREF.BANK_ACCT_KEY, PYMNT_VCHR_XREF.PYMNT_METHOD, &TMP_PROC_OPT, &TMP_PROC_DAYS, &TMP_PROC_OVERFL);
+   If &TMP_PROC_OPT <> "N" And
+         All(&TMP_PROC_OPT) Then
+      PYMNT_VCHR_XREF.HOL_PROC_OPT = &TMP_PROC_OPT;
+      PYMNT_VCHR_XREF.HOL_PROC_DAYS = &TMP_PROC_DAYS;
+      PYMNT_VCHR_XREF.HOL_PROC_OVERFL = &TMP_PROC_OVERFL;
+      HOL_PROC_WRK.HOL_PROC_OPT = &TMP_PROC_OPT;
+      HOL_PROC_WRK.HOL_PROC_DAYS = &TMP_PROC_DAYS;
+      HOL_PROC_WRK.HOL_PROC_OVERFL = &TMP_PROC_OVERFL;
+      If PYMNT_VCHR_XREF.HOL_PROC_OPT = "B" Or
+            PYMNT_VCHR_XREF.HOL_PROC_OPT = "N" Then
+         Gray(HOL_PROC_WRK.HOL_PROC_OVERFL);
+      Else
+         UnGray(HOL_PROC_WRK.HOL_PROC_OVERFL);
+      End-If;
+      If PYMNT_VCHR_XREF.HOL_PROC_OPT = "N" Then
+         Gray(HOL_PROC_WRK.HOL_PROC_DAYS);
+      Else
+         UnGray(HOL_PROC_WRK.HOL_PROC_DAYS);
+      End-If;
+   End-If;
+End-Function;
+
+Function Defl_Bank_Acct_Seq();
+   Evaluate PYMNT_VCHR_XREF.PYMNT_METHOD
+   When = "EFT"
+   When = "ACH"
+   When = "BEF"
+   When = "GE"
+      If None(PYMNT_VCHR_XREF.BANK_ACCT_SEQ_NBR) Then
+         PYMNT_VCHR_XREF.BANK_ACCT_SEQ_NBR = 1;
+         /*INICIO 002*/
+         
+         SQLExec("SELECT A.DEFAULT_IND, A.DESCR, A.COUNTRY, A.BENEFICIARY_BANK, A.BENEF_BRANCH, A.BANK_ID_QUAL, A.BANK_ACCT_TYPE, A.BNK_ID_NBR, A.BRANCH_ID, A.BANK_ACCOUNT_NUM, A.CHECK_DIGIT FROM PS_RMT_BANK_SEQ_VW A WHERE A.REMIT_SETID =:1 AND A.REMIT_VENDOR=:2 AND A.VNDR_LOC =:3 AND A.BANK_ACCT_SEQ_NBR=:4", PYMNT_VCHR_XREF.REMIT_SETID.Value, PYMNT_VCHR_XREF.REMIT_VENDOR.Value, PYMNT_VCHR_XREF.VNDR_LOC.Value, PYMNT_VCHR_XREF.BANK_ACCT_SEQ_NBR.Value, &DEFAULT_IND, &DESCR, &COUNTRY, &BENEFICIARY_BANK, &BENEF_BRANCH, &BANK_ID_QUAL, &BANK_ACCT_TYPE, &BNK_ID_NBR, &BRANCH_ID, &BANK_ACCOUNT_NUM, &CHECK_DIGIT);
+         
+         ETY_BANK_SEQ_WK.DEFAULT_IND.Value = &DEFAULT_IND;
+         ETY_BANK_SEQ_WK.DESCR.Value = &DESCR;
+         ETY_BANK_SEQ_WK.COUNTRY.Value = &COUNTRY;
+         ETY_BANK_SEQ_WK.BENEFICIARY_BANK.Value = &BENEFICIARY_BANK;
+         ETY_BANK_SEQ_WK.BENEF_BRANCH.Value = &BENEF_BRANCH;
+         ETY_BANK_SEQ_WK.BANK_ID_QUAL.Value = &BANK_ID_QUAL;
+         ETY_BANK_SEQ_WK.BANK_ACCT_TYPE.Value = &BANK_ACCT_TYPE;
+         ETY_BANK_SEQ_WK.BNK_ID_NBR.Value = &BNK_ID_NBR;
+         ETY_BANK_SEQ_WK.BRANCH_ID = &BRANCH_ID;
+         ETY_BANK_SEQ_WK.BANK_ACCOUNT_NUM.Value = &BANK_ACCOUNT_NUM;
+         ETY_BANK_SEQ_WK.CHECK_DIGIT.Value = &CHECK_DIGIT;
+         
+         
+         SQLExec("SELECT FF_CDBNKSFC FROM PS_FF_RMTBANKSEQVW A WHERE A.REMIT_SETID =:1 AND A.REMIT_VENDOR=:2 AND A.VNDR_LOC =:3 AND A.BANK_ACCT_SEQ_NBR=:4", PYMNT_VCHR_XREF.REMIT_SETID.Value, PYMNT_VCHR_XREF.REMIT_VENDOR.Value, PYMNT_VCHR_XREF.VNDR_LOC.Value, PYMNT_VCHR_XREF.BANK_ACCT_SEQ_NBR.Value, &FF_CDBNKSFC);
+         ETY_BANK_SEQ_WK.FF_CDBNKSFC.Value = &FF_CDBNKSFC;
+         
+         /*FIN 002*/
+      End-If;
+      Break;
+   End-Evaluate;
+End-Function;
+
+
+/*** Main ***/
+If All(PYMNT_VCHR_XREF.BANK_SETID) And
+      All(PYMNT_VCHR_XREF.BANK_CD) And
+      All(PYMNT_VCHR_XREF.BANK_ACCT_KEY) Then
+   Rslv_Bank_Holiday();
+End-If;
+If PYMNT_VCHR_XREF.PYMNT_METHOD = "LC" Then
+   SetDefault(PYMNT_VCHR_XREF.GRP_PYMNT_DT);
+   
+   Evaluate VOUCHER.VOUCHER_STYLE
+   When "PPAY" /* Prepaid Voucher */
+   When "SGLP" /* Single Payment Voucher */
+      rem Don't set default ;
+      Break;
+   When-Other
+      SetDefault(PYMNT_VCHR_XREF.PYMNT_SEPARATE);
+   End-Evaluate;
+   
+   Gray(PYMNT_VCHR_XREF.GRP_PYMNT_DT);
+   Gray(PYMNT_VCHR_XREF.PYMNT_SEPARATE);
+   UnGray(VOUCHER.LC_ID);
+   UnGray(PYMNT_VCHR_XREF.LC_ID);
+   PYMNT_VCHR_XREF.LC_ID = VOUCHER.LC_ID;
+Else
+   SetDefault(PYMNT_VCHR_XREF.LC_ID);
+   Gray(PYMNT_VCHR_XREF.LC_ID);
+   UnGray(PYMNT_VCHR_XREF.GRP_PYMNT_DT);
+   
+   Evaluate VOUCHER.VOUCHER_STYLE
+   When "PPAY" /* Prepaid Voucher */
+   When "SGLP" /* Single Payment Voucher */
+      rem Don't ungray ;
+      Break;
+   When-Other
+      UnGray(PYMNT_VCHR_XREF.PYMNT_SEPARATE);
+   End-Evaluate;
+   
+End-If;
+
+If PYMNT_VCHR_XREF.PYMNT_METHOD <> "BOO" And
+      PYMNT_VCHR_XREF.PYMNT_METHOD <> "DFT" And
+      PYMNT_VCHR_XREF.PYMNT_METHOD <> "BEF" Then
+   SetDefault(PYMNT_VCHR_XREF.DFT_SIGHT_CD);
+   SetDefault(PYMNT_VCHR_XREF.DFT_MAT_DT);
+   SetDefault(PYMNT_VCHR_XREF.DFT_SCHED_MAT_DT);
+   SetDefault(PYMNT_VCHR_XREF.DFT_GROUP_CD);
+   SetDefault(PYMNT_VCHR_XREF.DFT_MASTER_ID);
+   SetDefault(PYMNT_VCHR_XREF.DFT_CREATE_KEY);
+End-If;
+
+hide_ap_drft_lvl();
+Defl_Bank_Acct_Seq();
+&HIPAA_ChkReq_Flg = True;
+SetDefault(PYMNT_VCHR_XREF.EFT_LAYOUT_CD);
+SetDefault(PYMNT_VCHR_XREF.STL_THROUGH);
+
+/* If %Component = Component.EM_MAN_PAYMENT Then  */
+Evaluate PYMNT_VCHR_XREF.PYMNT_METHOD.Value
+When = "EFT"
+When = "ACH"
+When = "WIR"
+When = "GE"
+When = "BEF"
+   Get_Default_Layout();
+   Break;
+End-Evaluate;
+/* End-If;  */
+
+/*Inicio #001*/
+/*Inicio #003*/
+REM GetRowset(Scroll.FFPYMNTVCHRXREF).GetRow(1).GetRecord(Record.FFPYMNTVCHRXREF).GetField(Field.FF_DET_PAGO).Value = "";
+/*Fin #003*/
+/*Fin #001*/
