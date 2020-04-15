@@ -1,0 +1,86 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_2682
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		07/11/2019
+* Descripción:	Generacion de archivos planos desde PSQUERY
+***************************************************************************************************************************/
+/***Inicio #001***/
+import FF_AP_ENCRY_PL_AUTO:FF_CALL_ENCRY_PA;
+
+Local FF_AP_ENCRY_PL_AUTO:FF_CALL_ENCRY_PA &obj_encrypt;
+
+/***Fin #001***/
+Function Set_BatchID(&sPayCycle As string, &nPCSeqNbr As number) Returns string;
+   &sStr1Len = 6 - Len(String(&nPCSeqNbr));
+   &sStr1 = Substring("000000", 1, &sStr1Len) | String(&nPCSeqNbr);
+   &sBatchID = &sPayCycle | "-" | &sStr1;
+   Return &sBatchID;
+End-Function;
+
+/***Inicio #001***/
+Function Psquery_VCHRPAGADOSIMS(&PayFromDt As date, &PayThruDt As date, &PayCycle As string, &PC_SeqNum As number) Returns string;
+   Local string &str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9, &ledger;
+   Local string &strURL, &strFecha, &strCodFideicomiso, &strI;
+   Local number &nbrI, &nbr5;
+   /*create a query API object*/
+   Local ApiObject &aRunQry;
+   /*create a session API object*/
+   Local object &Session = %Session;
+   
+   &obj_encrypt = create FF_AP_ENCRY_PL_AUTO:FF_CALL_ENCRY_PA();
+   
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'CONSULTAS'", &StrText);
+   
+   If &Session <> Null Then
+      &aRunQry = &Session.GetQuery();
+   End-If;
+   
+   If (&aRunQry.Open("TESORERIA_VCHR_PAGADOS_IMS", True, False) <> 0) Then
+      MessageBox(0, "", 0, 0, "Error in opening query");
+   Else
+      &StrDate = Upper(Day(%Date) | Month(%Date) | Year(%Date));
+      &strFile = &StrDate | "_" | PYCYCL_STAT.PAY_CYCLE.Value | "_" | PYCYCL_STAT.PAY_CYCLE_SEQ_NUM.Value;
+      /*&outStrFile = %FilePath | &strFile;
+   &outStrFile = "\\172.16.0.146\ims\Consulta_2\" | &strFile;*/
+      &outStrFile = &StrText | &strFile;
+      
+      /*MessageBox(0, "", 0, 0, "Param: " | AP_PAYSELCT_AET.PAY_FROM_DT.Value | ", " | AP_PAYSELCT_AET.PAY_THRU_DT.Value | ", " | AP_PAYSELCT_AET.PAY_CYCLE.Value | ", " | AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM.Value);*/
+      &aQryPromptRec = &aRunQry.PromptRecord;
+      &aQryPromptRec.DATE_FROM.Value = &PayFromDt;
+      &aQryPromptRec.DATE_TO.Value = &PayThruDt;
+      &aQryPromptRec.PAY_CYCLE.Value = &PayCycle;
+      &aQryPromptRec.PAY_CYCLE_SEQ_NUM.Value = &PC_SeqNum;
+      If &aQryPromptRec <> Null Then
+      End-If;
+      If None(&PayFromDt) Or
+            None(&PayThruDt) Or
+            None(&PayCycle) Or
+            None(&PC_SeqNum) Then
+         /*MessageBox(0, "", 0, 0, "No se pudo ejecutar el conjunto de resultados. Parámetros vacíos y/o incompletos.");*/
+         &ReturnStr = "No se pudo ejecutar el conjunto de resultados. Parámetros vacíos y/o incompletos.";
+      Else
+         If (&aRunQry.RunToFile(&aQryPromptRec, &outStrFile, %Query_TXT, 0) = 0) Then
+            /*MessageBox(0, "", 0, 0, "El conjunto de resultados para TESORERIA_VCHR_PAGADOS_IMS se guardó en el archivo " | &strFile | ", correctamente.");*/
+            &ReturnStr = "El conjunto de resultados para TESORERIA_VCHR_PAGADOS_IMS se guardó en el archivo " | &strFile | ", correctamente."
+         Else
+            /*MessageBox(0, "", 0, 0, "No se pudo guardar el conjunto de resultados en el archivo.");*/
+            &ReturnStr = "El conjunto de resultados para TESORERIA_VCHR_PAGADOS_IMS se guardó en el archivo " | &strFile | ", correctamente.";
+         End-If;
+      End-If;
+   End-If;
+   
+   &strFile = &strFile | ".csv";
+   &StrFilenamePgpNtIms = &outStrFile | ".csv";
+   &StrFilenamePgpImsProc = "\\172.16.0.146\ims\Consulta_2\" | &strFile;
+   /*&recContext = GetRecord(Record.PYCYCL_3_AET);*/
+   &recContext = GetRecord(Record.PS_QUERY_WRK);
+   &recContext.FILENAME.Value = &strFile;
+   MessageBox(0, "", 0, 0, "&strFile" | &strFile);
+   /*&obj_encrypt.fi_MoveArchivo(&recContext, &StrFilenamePgpNtIms, &StrFilenamePgpImsProc);*/
+   &obj_encrypt.fi_EncryptArchivo(&recContext);
+   
+   Return (&ReturnStr);
+End-Function;
+
+/***Fin #001***/

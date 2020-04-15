@@ -1,0 +1,65 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_IMS_4191  			    27-12-2019	Soraya Higuera	-Generación, Encriptación y envió informe de estado de cuentas
+*******************************************************************************************************************************************/
+
+/*Inicio #00001*/
+
+import ETY_AP_ENCRYP_ARCHI:ETY_CALL_DENCRYP_PGP;
+
+/*create a query API object*/
+Local ApiObject &aRunQry;
+/*create a session API object*/
+Local ApiObject &MySession;
+Local Record &aQryPromptRec;
+Local string &fecha, &StrFilenameCsvIms;
+Local Record &recContext;
+Local ETY_AP_ENCRYP_ARCHI:ETY_CALL_DENCRYP_PGP &obj_encrypt;
+
+&obj_dencrypt = create ETY_AP_ENCRYP_ARCHI:ETY_CALL_DENCRYP_PGP();
+
+
+/*The current session*/
+&MySession = %Session;
+If &MySession <> Null Then
+   /*The GetQuery method returns an empty query object. After you have an empty query object, you can use it to open an existing query*/
+   &aRunQry = &MySession.GetQuery();
+End-If;
+
+/*Open query*/
+If (&aRunQry.Open("ETY_CAM_ACTIVIDAD_CUENTA_IMS", False, False) <> 0) Then
+   MessageBox(0, "", 0, 0, "Error opening query");
+Else
+   /*Devuelve la ruta donde se desea generar el archivo*/
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'ESTADOCUENTA'", &outStrFile1);
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'TRN_INF_CNTA'", &outStrFile);
+   /* Run the query output for txt in CSV format */
+   &fecha = DateTimeToLocalizedString(%Date, "dd-MM-yyyy");
+   &recContext = GetRecord(Record.ETY_INFCUEN_AET);
+   &outStrFile1 = &outStrFile1 | "ESTADOCUENTA_" | &fecha;
+   
+   REM &rutaSalida = %FilePath | "ESTADOCUENTA" | "_" | &fecha;
+   If (&aRunQry.RunToFile(&aQryPromptRec, &outStrFile1, %Query_TXT, 0) = 0) Then
+      MessageBox(0, "", 0, 0, "Result set saved into file successfully.");
+   Else
+      MessageBox(0, "", 0, 0, "Failed to save Resultset into file.");
+   End-If;
+   
+   ETY_INFCUEN_AET.FILENAME.Value = "ESTADOCUENTA_" | &fecha | ".csv";
+   ETY_INFCUEN_AET.ATTACHSYSFILENAME.Value = &outStrFile | ".csv";
+   &StrFilenameCsv = ETY_INFCUEN_AET.FILENAME.Value;
+   &StrFilenameCsvpgp = ETY_INFCUEN_AET.FILENAME.Value | ".pgp";
+   
+   
+   /*Se elimina el archivo pgp*/
+   &StrFilenameCsvNtIms = &outStrFile | "\" | &StrFilenameCsvpgp;
+   &obj_dencrypt.fi_ProcessFinArchivo(&recContext, &StrFilenameCsvNtIms);
+   
+   /*Se encripta el archivo*/
+   &obj_dencrypt.fi_EncryptarArchivo(&recContext);
+   
+   /*Se elimina el archivo csv*/
+   &StrFilenameCsvNtIms = &outStrFile | "\" | &StrFilenameCsv;
+   &obj_dencrypt.fi_ProcessFinArchivo(&recContext, &StrFilenameCsvNtIms);
+   
+End-If;

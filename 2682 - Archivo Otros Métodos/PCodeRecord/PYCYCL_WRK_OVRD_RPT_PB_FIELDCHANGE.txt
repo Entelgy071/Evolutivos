@@ -1,0 +1,481 @@
+/*******************************************************************************************************
+PROYECTO                    ACT RESPONSABLE FECHA      DESCR
+********************************************************************************************************
+FF_AP_IMPRESION_CHEQUES_000 001 David Polo  2012-01-03 Se crean los nuevos formatos: FIDUPQ y FIDUGN.
+													   FIDUPQ = Formato Cheque Pequeño.
+													   FIDUGN = Formato Cheque Grande.
+*******************************************************************************************************/
+/*******************************************************************************************************
+PROYECTO                    ACT RESPONSABLE 	FECHA      	DESCR
+********************************************************************************************************
+ETY_ERP_74283           002 		Camilo Trujillo  	2017-09-08 	Se modifica el envio de parametros para el 
+																	proceso APY2021				
+ETY_ERP_AP_EVO_86046_OS 003 		OS					2018-11-29 	Llamado al engine ETY_TRS para la creacion 
+																	del archivo plano de transfterencias
+ETY_ERP_AP_2682         004			David Suarez		2020-01-24	Se incluye funcion para generar reporte a partir de un PSQUERY.													   															   
+*******************************************************************************************************/
+
+import AP:Payment:PayCycle;
+
+Declare Function SET_NEXT_STATUS PeopleCode PYCYCL_STATRPT.PAY_RUN_AP_STATUS RowInit;
+Declare Function EFT_Parm PeopleCode EFT_WRK.PARMLIST FieldFormula;
+/**Inicio #004**/
+Declare Function Psquery_VCHRPAGADOSIMS PeopleCode PYCYCL_WRK_OVRD.PROCESS_RPT_PB FieldFormula;
+
+/**Fin #004**/
+
+Function Run_XMLP_PDF(&RPT_NAME, &Run_Cntl_ID) /* Outputs to PDF format. */
+   
+   Local ProcessRequest &pr;
+   Local string &crystal_server, &orderno;
+   
+   /* Check the Process Definition, use the default server for the report if so defined */
+   SQLExec("SELECT SERVERNAME FROM PS_PRCSDEFN WHERE PRCSTYPE = 'XML Publisher' AND PRCSNAME = :1", &RPT_NAME, &default_server);
+   
+   If None(&crystal_server) Then /* find a running server that supports process type = 'Crystal' */
+      SQLExec("SELECT A.SERVERNAME, B.ORDERNO FROM PS_SERVERCLASS A, PSSERVERSTAT B WHERE A.PRCSTYPE = 'Crystal' AND B.SERVERNAME = A.SERVERNAME AND B.SERVERSTATUS = '3' ORDER BY B.ORDERNO", &crystal_server, &orderno);
+   End-If;
+   
+   &pr = CreateProcessRequest();
+   
+   &pr.ProcessType = "XML Publisher";
+   &pr.ProcessName = &RPT_NAME;
+   &pr.RunControlID = &Run_Cntl_ID;
+   
+   If All(&default_server) Then
+      &pr.RunLocation = &default_server /* assign this request to server we found */
+   Else
+      &pr.RunLocation = "Server" /* couldn't find one, let PeopleTools assign a server */
+   End-If;
+   &pr.OutDestType = "6"; /* Web */
+   &pr.OutDestFormat = "2"; /* Acrobat (*.pdf) */
+   
+   &pr.Schedule();
+   
+End-Function;
+
+Global string &AP_LAST_SETID;
+Global string &AP_LAST_BANK_CD;
+Global string &AP_LAST_BANK_ACCT;
+Global string &AP_LAST_PYMNT_REF;
+Global string &AP_RP_PAY_CYCLE;
+Global number &AP_RP_PAY_SEQ_NUM;
+Global string &AP_RP_BANK_SETID;
+Global string &AP_RP_BANK_CD;
+Global string &AP_RP_BNK_ACCT_KEY;
+Global string &AP_RP_FROM_ID_REF;
+Global string &AP_RP_TO_ID_REF;
+Global ProcessRequest &RQST_XMLP;
+
+/********  Begin Mainline Processing Here  ******************************************/
+
+Local AP:Payment:PayCycle &pC = create AP:Payment:PayCycle();
+If PYCYCL_STATRPT.OUTDESTTYPE = "6" Then
+   PYCYCL_STATRPT.OUTDEST = " ";
+End-If;
+REM MessageBox(0, "", 0, 0, "aca " | &status);
+&status = PYCYCL_STAT.PAY_RUN_AP_STATUS;
+&BANK_STATUS = PYCYCL_STATRPT.PAY_RUN_AP_STATUS;
+REM MessageBox(0, "", 0, 0, "aca " | &status | " " | &BANK_STATUS);
+If &BANK_STATUS = "X" Then
+   PYCYCL_STAT.PAY_RUN_AP_STATUS = " ";
+   PYCYCL_STAT.PAY_RUN_AP_STATUS = &status;
+   &AP_LAST_SETID = PYCYCL_STATRPT.BANK_SETID;
+   &AP_LAST_BANK_CD = PYCYCL_STATRPT.BANK_CD;
+   &AP_LAST_BANK_ACCT = PYCYCL_STATRPT.BANK_ACCT_KEY;
+   &AP_LAST_PYMNT_REF = PYCYCL_STATRPT.FIRST_PYMNT_REF_ID;
+   DoSave();
+   Transfer( False, MenuName.CREATE_PAYMENTS, BarName.USE, ItemName.REFERENCE_CONFIRMATION, Page.CONFIRM_PAYMENT_REFERENCES, "U");
+Else
+   If None(PYCYCL_WRK_OVRD.SERVERNAME) Then
+      If %Page = Page.PYCYCL_MGR Then
+         SetCursorPos(Page.PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_STATRPT, CurrentRowNumber(), PYCYCL_WRK_OVRD.SERVERNAME);
+      Else
+         SetCursorPos(Page.EXP_PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_STATRPT, CurrentRowNumber(), PYCYCL_WRK_OVRD.SERVERNAME);
+      End-If;
+      REM   MessageBox(0, "", 7250, 159, "Process Scheduler Server is Required.");
+   Else
+      If &pC.validateServer(PYCYCL_WRK_OVRD.SERVERNAME, PYCYCL_WRK_OVRD.PRCSTYPE) = 7 Then
+         If %Page = Page.PYCYCL_MGR Then
+            SetCursorPos(Page.PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_STATRPT, CurrentRowNumber(), PYCYCL_WRK_OVRD.SERVERNAME);
+         Else
+            SetCursorPos(Page.EXP_PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_STATRPT, CurrentRowNumber(), PYCYCL_WRK_OVRD.SERVERNAME);
+         End-If;
+         REM MessageBox(0, "", 0, 0, "IF ACA  ");
+      Else
+         REM MessageBox(0, "", 0, 0, "IF ACA 1 " | PYCYCL_WRK_OVRD.PRCSTYPE.Value);
+         Evaluate PYCYCL_WRK_OVRD.PRCSTYPE.Value
+         When = "Application Engine"
+            If PYCYCL_WRK_OVRD.PRCSNAME = "AP_APY2050" Or
+                  PYCYCL_WRK_OVRD.PRCSNAME = "AP_APY2055" Or
+                  PYCYCL_WRK_OVRD.PRCSNAME = "AP_FG_PROC" Or
+                  PYCYCL_WRK_OVRD.PRCSNAME = "AP_EMAIL_ADV" Then
+               PYCYCL_WRK_OVRD.PROCESS_RPT_PB = "P";
+               PYCYCL_PNL_WRK4.RUNCNTLID = PYCYCL_STAT.PAY_CYCLE;
+               
+               &status = PYCYCL_STAT.PAY_RUN_AP_STATUS;
+               PYCYCL_STAT.PAY_RUN_AP_STATUS = " ";
+               PYCYCL_STAT.PAY_RUN_AP_STATUS = &status;
+               
+               PYCYCL_PNL_WRK4.BANK_SETID = PYCYCL_STATRPT.BANK_SETID;
+               PYCYCL_PNL_WRK4.BANK_CD = PYCYCL_STATRPT.BANK_CD;
+               PYCYCL_PNL_WRK4.BANK_ACCT_KEY = PYCYCL_STATRPT.BANK_ACCT_KEY;
+               PYCYCL_PNL_WRK4.PYMNT_METHOD = PYCYCL_STATRPT.PYMNT_METHOD;
+               PYCYCL_PNL_WRK4.PYMNT_FILENAME = PYCYCL_STATRPT.PYMNT_FILENAME;
+               
+               
+               If PYCYCL_WRK_OVRD.PRCSNAME = "AP_APY2055" Then
+                  If None(PYCYCL_STATRPT.OUTDEST) And
+                        (PYCYCL_STATRPT.OUTDESTTYPE = "2" Or
+                           PYCYCL_STATRPT.OUTDESTTYPE = "3") Then
+                     If %Page = Page.PYCYCL_MGR Then
+                        UnHide(PYCYCL_WRK_OVRD.PROCESS_RPT_PB);
+                        SetCursorPos(Page.PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_STATRPT, CurrentRowNumber(), PYCYCL_STATRPT.OUTDEST);
+                     Else
+                        SetCursorPos(Page.EXP_PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_STATRPT, CurrentRowNumber(), PYCYCL_STATRPT.OUTDEST);
+                     End-If;
+                     MessageBox(0, "", 7015, 211, "A Printer or File Directory is required to initiate process %1.", PYCYCL_WRK_OVRD.PRCSNAME);
+                  Else
+                     PYCYCL_PNL_WRK4.OUTPUTDEST = PYCYCL_STATRPT.OUTDEST;
+                  End-If;
+                  
+                  
+               End-If;
+               PYCYCL_PNL_WRK4.RUNLOCATION = "2";
+               DoSave();
+            End-If;
+            Break;
+         When-Other
+            If None(PYCYCL_STATRPT.OUTDEST) And
+                  (PYCYCL_STATRPT.OUTDESTTYPE = "2" Or
+                     PYCYCL_STATRPT.OUTDESTTYPE = "3") Then
+               If %Page = Page.PYCYCL_MGR Then
+                  UnHide(PYCYCL_WRK_OVRD.PROCESS_RPT_PB);
+                  SetCursorPos(Page.PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_STATRPT, CurrentRowNumber(), PYCYCL_STATRPT.OUTDEST);
+               Else
+                  SetCursorPos(Page.EXP_PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_STATRPT, CurrentRowNumber(), PYCYCL_STATRPT.OUTDEST);
+               End-If;
+               MessageBox(0, "", 7015, 211, "A Printer or File Directory is required to initiate process %1.", PYCYCL_WRK_OVRD.PRCSNAME);
+            Else
+               PYCYCL_PNL_WRK4.BANK_SETID = PYCYCL_STATRPT.BANK_SETID;
+               PYCYCL_PNL_WRK4.BANK_CD = PYCYCL_STATRPT.BANK_CD;
+               PYCYCL_PNL_WRK4.BANK_ACCT_KEY = PYCYCL_STATRPT.BANK_ACCT_KEY;
+               PYCYCL_PNL_WRK4.PYMNT_METHOD = PYCYCL_STATRPT.PYMNT_METHOD;
+               PYCYCL_PNL_WRK4.PYMNT_FILENAME = PYCYCL_STATRPT.PYMNT_FILENAME;
+               If PYCYCL_WRK_OVRD.PRCSTYPE = "Crystal Check" Or
+                     PYCYCL_WRK_OVRD.PRCSTYPE = "Crystal" Then
+                  &prcstype = "Crystal Check";
+               Else
+                  If PYCYCL_WRK_OVRD.PRCSTYPE = "SQR Report" Or
+                        PYCYCL_WRK_OVRD.PRCSTYPE = "SQR Process" Then
+                     &prcstype = "SQR Process";
+                     PYCYCL_PNL_WRK4.OUTPUTDEST = PYCYCL_STATRPT.OUTDEST;
+                  End-If;
+               End-If;
+               &PAY_CYCLE = PYCYCL_STAT.PAY_CYCLE;
+               &OPRID = %OperatorId;
+               PYCYCL_PNL_WRK4.RUNCNTLID = &PAY_CYCLE;
+               EFT_WRK.RUNCNTLID = &PAY_CYCLE;
+               EFT_WRK.PARM2 = &PAY_CYCLE;
+               &Result = EFT_Parm(&PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM, &ParmList);
+               If &Result = 0 Then
+                  EFT_WRK.PARMLIST = &ParmList;
+               Else
+                  Error MsgGet(7250, 309, "Error loading parameter list");
+               End-If;
+               PYCYCL_PNL_WRK4.RUNLOCATION = "2";
+               PYCYCL_PNL_WRK4.OUTDESTTYPE = PYCYCL_STATRPT.OUTDESTTYPE;
+               PYCYCL_PNL_WRK4.SERVERNAME = PYCYCL_WRK_OVRD.SERVERNAME;
+               If PYCYCL_PNL_WRK4.OUTDESTTYPE = "2" Then
+                  PYCYCL_PNL_WRK4.SRVRDESTFILE = PYCYCL_STATRPT.OUTDEST;
+               Else
+                  PYCYCL_PNL_WRK4.SRVRDESTPRINTER = PYCYCL_STATRPT.OUTDEST;
+               End-If;
+               PYCYCL_WORK.RUN_LEVEL = "B";
+               PYCYCL_PNL_WRK4.PAY_CYCLE = PYCYCL_STAT.PAY_CYCLE;
+               PYCYCL_PNL_WRK4.PAY_CYCLE_SEQ_NUM = PYCYCL_STAT.PAY_CYCLE_SEQ_NUM;
+               PYCYCL_PNL_WRK4.OPRID = %OperatorId;
+               EFT_WRK.OPRID = %OperatorId;
+               SQLExec("SELECT REPORT_OUTPUT FROM PS_PYCYCL WHERE PAY_CYCLE = :1", PYCYCL_STAT.PAY_CYCLE, &REPORT_OUTPUT);
+               REM  MessageBox(0, "", 0, 0, "IF ACA 2 " | &REPORT_OUTPUT);
+               If PYCYCL_WRK_OVRD.PRCSNAME = "FIN2025" Then
+                  REM  MessageBox(0, "", 0, 0, "IF ACA 6 ");
+                  PYCYCL_WRK_OVRD.REPROCESS_RPT_PB = "S";
+                  /**Inicio #004**/
+                  SQLExec("SELECT PAY_FROM_DT FROM PS_PYCYCL WHERE PAY_CYCLE = :1", PYCYCL_STAT.PAY_CYCLE, &PayFromDt);
+                  &MsgPSquery = Psquery_VCHRPAGADOSIMS(&PayFromDt, PYCYCL_STAT.PAY_THRU_DT, PYCYCL_STAT.PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM);
+                  MessageBox(0, "", 0, 0, &MsgPSquery);
+                  /**Fin #004**/
+               Else
+                  If PYCYCL_WRK_OVRD.PRCSTYPE = "Crystal Check" And
+                        PYCYCL_WRK_OVRD.PRCSNAME = "APY2021-" Then
+                     If &AP_RP_PAY_CYCLE <> "" And
+                           &AP_RP_PAY_CYCLE = &PAY_CYCLE And
+                           &AP_RP_PAY_SEQ_NUM = PYCYCL_STAT.PAY_CYCLE_SEQ_NUM And
+                           &AP_RP_BANK_SETID = PYCYCL_STATRPT.BANK_SETID And
+                           &AP_RP_BANK_CD = PYCYCL_STATRPT.BANK_CD And
+                           &AP_RP_BNK_ACCT_KEY = PYCYCL_STATRPT.BANK_ACCT_KEY Then
+                        PYCYCL_PNL_WRK4.FROM_PYMNT_ID_REF = &AP_RP_FROM_ID_REF;
+                        PYCYCL_PNL_WRK4.TO_PYMNT_ID_REF = &AP_RP_TO_ID_REF;
+                        &AP_RP_PAY_CYCLE = "";
+                        &AP_RP_PAY_SEQ_NUM = 0;
+                        &AP_RP_BANK_SETID = "";
+                        &AP_RP_BANK_CD = "";
+                        &AP_RP_BNK_ACCT_KEY = "";
+                        &AP_RP_FROM_ID_REF = "";
+                        &AP_RP_TO_ID_REF = "";
+                     Else
+                        PYCYCL_PNL_WRK4.FROM_PYMNT_ID_REF = PYCYCL_STATRPT.FIRST_PYMNT_REF_ID;
+                        SQLExec("select max(pymnt_id_ref) from ps_payment_tbl where pay_cycle=:1 and pay_cycle_seq_num=:2 and bank_setid=:3 and bank_cd=:4 and bank_acct_key=:5 and pymnt_method=:6", &PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM, PYCYCL_STATRPT.BANK_SETID, PYCYCL_STATRPT.BANK_CD, PYCYCL_STATRPT.BANK_ACCT_KEY, PYCYCL_STATRPT.PYMNT_METHOD, &TO_PYMNT_ID_REF);
+                        PYCYCL_PNL_WRK4.TO_PYMNT_ID_REF = &TO_PYMNT_ID_REF;
+                     End-If;
+                     /*--------------------------------------------------------------------------------*/
+                     SQLExec("SELECT FORM_ID FROM PS_BANK_MTHD_VW WHERE BANK_SETID = :1 AND BANK_CD = :2 AND BANK_ACCT_KEY = :3 AND PYMNT_METHOD = :4", PYCYCL_PNL_WRK4.BANK_SETID.Value, PYCYCL_PNL_WRK4.BANK_CD.Value, PYCYCL_PNL_WRK4.BANK_ACCT_KEY.Value, PYCYCL_PNL_WRK4.PYMNT_METHOD.Value, &FORM_ID);
+                     
+                     Local Record &recPrcsRunCntl;
+                     Local number &nbrPrcsInstance, &nbrStatus;
+                     
+                     If &FORM_ID = "CHECK1" Or
+                           &FORM_ID = "CHECK2" Or
+                           &FORM_ID = "CHECK3"
+                           /* Inicio #001 */
+                           Or
+                           &FORM_ID = "FIDUPQ" Or
+                           &FORM_ID = "FIDUGN"
+                        /* Fin #001 */
+                        Then
+                        If &REPORT_OUTPUT <> "C" Then
+                           /*Code to run the XMLP Report*/
+                           /* Inicio #002 */
+                           &Randum = Int(Rand() * 10);
+                           &runcntlid = "APY2021X" | &Randum;
+                           SQLExec("DELETE FROM PS_XPQRYRUNPARM WHERE OPRID =:1 AND RUN_CNTL_ID =:2 AND BNDNAME=:3", %OperatorId, &runcntlid, "APY2021X");
+                           &Run_parm = CreateRecord(Record.XPQRYRUNPARM);
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = "1";
+                           &Run_parm.FIELDNAME.Value = "PAY_CYCLE";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = PYCYCL_STAT.PAY_CYCLE;
+                           rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                           &Run_parm.insert();
+                           /*bind value 2*/
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = "2";
+                           &Run_parm.FIELDNAME.Value = "PAY_CYCLE_SEQ_NUM";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.PAY_CYCLE_SEQ_NUM.Value;
+                           rem inMessage(&Run_parm.BNDVALUE.Value, 64);
+                           &Run_parm.insert();
+                           /* bind value 3*/
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = "3";
+                           &Run_parm.FIELDNAME.Value = "BANK_SETID";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.BANK_SETID.Value;
+                           rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                           &Run_parm.insert();
+                           /*bind value 4*/
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = "4";
+                           &Run_parm.FIELDNAME.Value = "BANK_CD";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.BANK_CD.Value;
+                           rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                           &Run_parm.insert();
+                           
+                           /*bind value 5*/
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = "5";
+                           &Run_parm.FIELDNAME.Value = "BANK_ACCT_KEY";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.BANK_ACCT_KEY.Value;
+                           rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                           &Run_parm.insert();
+                           /*bind value 6*/
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = "6";
+                           &Run_parm.FIELDNAME.Value = "PYMNT_METHOD";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.PYMNT_METHOD.Value;
+                           rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                           &Run_parm.insert();
+                           /*bind value 7*/
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = "7";
+                           &Run_parm.FIELDNAME.Value = "FROM_PYMNT_ID_REF";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.FROM_PYMNT_ID_REF.Value;
+                           rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                           &Run_parm.insert();
+                           /*bind value 8*/
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = "8";
+                           &Run_parm.FIELDNAME.Value = "TO_PYMNT_ID_REF";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.TO_PYMNT_ID_REF.Value;
+                           
+                           rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                           &Run_parm.insert();
+                           
+                           /*bind value 9*/
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = 9;
+                           &Run_parm.FIELDNAME.Value = "FORM_ID";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = &FORM_ID;
+                           &Run_parm.insert();
+                           
+                           /*bind value 10*/
+                           
+                           &Run_parm.OPRID.Value = %OperatorId;
+                           &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                           &Run_parm.BNDNUM.Value = 10;
+                           &Run_parm.FIELDNAME.Value = "PYMNT_OVERFLOW_ID";
+                           &Run_parm.BNDNAME.Value = "APY2021X";
+                           &Run_parm.BNDVALUE.Value = PYCYCL_WORK.PYMNT_FILE_DESCR.Value;
+                           &Run_parm.insert();
+                           
+                           Run_XMLP_PDF("APY2021X1", &runcntlid);
+                           REM MessageBox(0, "", 0, 0, "IF ACA 6 " | PYCYCL_STATRPT.PAY_RUN_AP_STATUS);
+                           &status = PYCYCL_STATRPT.PAY_RUN_AP_STATUS;
+                           PYCYCL_STATRPT.PAY_RUN_AP_STATUS = SET_NEXT_STATUS(&status);
+                           /* Fin #002 */
+                        End-If;
+                        
+                     Else
+                        If &FORM_ID = "LC1" Then
+                           REM        MessageBox(0, "", 0, 0, "IF ACA 3 " | &REPORT_OUTPUT);
+                           If &REPORT_OUTPUT <> "C" Then
+                              &Randum = Int(Rand() * 10);
+                              &runcntlid = "APY2028X" | &Randum;
+                              SQLExec("DELETE FROM PS_XPQRYRUNPARM WHERE OPRID =:1 AND RUN_CNTL_ID =:2 AND BNDNAME=:3", %OperatorId, &runcntlid, "APY2028X");
+                              &Run_parm = CreateRecord(Record.XPQRYRUNPARM);
+                              &Run_parm.OPRID.Value = %OperatorId;
+                              &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                              &Run_parm.BNDNUM.Value = "1";
+                              &Run_parm.FIELDNAME.Value = "PAY_CYCLE";
+                              &Run_parm.BNDNAME.Value = "APY2028X";
+                              &Run_parm.BNDVALUE.Value = PYCYCL_STAT.PAY_CYCLE;
+                              rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                              &Run_parm.insert();
+                              /*bind value 2*/
+                              &Run_parm.OPRID.Value = %OperatorId;
+                              &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                              &Run_parm.BNDNUM.Value = "2";
+                              &Run_parm.FIELDNAME.Value = "PAY_CYCLE_SEQ_NUM";
+                              &Run_parm.BNDNAME.Value = "APY2028X";
+                              &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.PAY_CYCLE_SEQ_NUM.Value;
+                              rem inMessage(&Run_parm.BNDVALUE.Value, 64);
+                              &Run_parm.insert();
+                              /* bind value 3*/
+                              &Run_parm.OPRID.Value = %OperatorId;
+                              &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                              &Run_parm.BNDNUM.Value = "3";
+                              &Run_parm.FIELDNAME.Value = "BANK_SETID";
+                              &Run_parm.BNDNAME.Value = "APY2028X";
+                              &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.BANK_SETID.Value;
+                              rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                              &Run_parm.insert();
+                              /*bind value 4*/
+                              &Run_parm.OPRID.Value = %OperatorId;
+                              &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                              &Run_parm.BNDNUM.Value = "4";
+                              &Run_parm.FIELDNAME.Value = "BANK_CD";
+                              &Run_parm.BNDNAME.Value = "APY2028X";
+                              &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.BANK_CD.Value;
+                              rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                              &Run_parm.insert();
+                              
+                              /*bind value 5*/
+                              &Run_parm.OPRID.Value = %OperatorId;
+                              &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                              &Run_parm.BNDNUM.Value = "5";
+                              &Run_parm.FIELDNAME.Value = "BANK_ACCT_KEY";
+                              &Run_parm.BNDNAME.Value = "APY2028X";
+                              &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.BANK_ACCT_KEY.Value;
+                              rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                              &Run_parm.insert();
+                              /*bind value 6*/
+                              &Run_parm.OPRID.Value = %OperatorId;
+                              &Run_parm.RUN_CNTL_ID.Value = &runcntlid;
+                              &Run_parm.BNDNUM.Value = "6";
+                              &Run_parm.FIELDNAME.Value = "PYMNT_METHOD";
+                              &Run_parm.BNDNAME.Value = "APY2028X";
+                              &Run_parm.BNDVALUE.Value = PYCYCL_PNL_WRK4.PYMNT_METHOD.Value;
+                              rem WinMessage(&Run_parm.BNDVALUE.Value, 64);
+                              &Run_parm.insert();
+                              Run_XMLP_PDF("APY2028X", &runcntlid);
+                              &status = PYCYCL_STATRPT.PAY_RUN_AP_STATUS;
+                              PYCYCL_STATRPT.PAY_RUN_AP_STATUS = SET_NEXT_STATUS(&status);
+                           End-If;
+                        End-If;
+                     End-If;
+                  End-If;
+                  
+                  
+                  REM MessageBox(0, "", 0, 0, "IF ACA 4 " | &REPORT_OUTPUT);
+                  
+                  &SELECT_STR = "(SELECT INVOICE_ID1 FROM PS_PMNT_ADV_TMP TMP WHERE TMP.PAY_CYCLE = PS_PYMNT_ADVICE.PAY_CYCLE AND TMP.PAY_CYCLE_SEQ_NUM =  PS_PYMNT_ADVICE.PAY_CYCLE_SEQ_NUM AND TMP.BANK_SETID = PS_PYMNT_ADVICE.BANK_SETID AND TMP.BANK_CD = PS_PYMNT_ADVICE.BANK_CD AND TMP.BANK_ACCT_KEY = PS_PYMNT_ADVICE.BANK_ACCT_KEY AND TMP.PYMNT_METHOD = PS_PYMNT_ADVICE.PYMNT_METHOD AND TMP.PYMNT_SEPARATE = PS_PYMNT_ADVICE.PYMNT_SEPARATE AND TMP.PAY_DOC_SEQ = PS_PYMNT_ADVICE.PAY_DOC_SEQ AND TMP.PYMNT_ID_REF = PS_PYMNT_ADVICE.PYMNT_ID_REF AND TMP.PYMNT_OVERFLOW_ID = PS_PYMNT_ADVICE.PYMNT_OVERFLOW_ID AND TMP.SOURCE_TXN = PS_PYMNT_ADVICE.SOURCE_TXN AND TMP.BUSINESS_UNIT = PS_PYMNT_ADVICE.BUSINESS_UNIT AND TMP.PAY_DOC_ID = PS_PYMNT_ADVICE.PAY_DOC_ID AND TMP.REMIT_LINE_TYPE = PS_PYMNT_ADVICE.REMIT_LINE_TYPE AND TMP.PYMNT_ADVICE_COMBO = PS_PYMNT_ADVICE.PYMNT_ADVICE_COMBO)";
+                  &EXISTS_STR = " AND EXISTS (SELECT TMP1.INVOICE_ID FROM PS_PMNT_ADV_TMP TMP1 WHERE TMP1.PAY_CYCLE = PS_PYMNT_ADVICE.PAY_CYCLE AND TMP1.PAY_CYCLE_SEQ_NUM = PS_PYMNT_ADVICE.PAY_CYCLE_SEQ_NUM AND TMP1.BANK_SETID = PS_PYMNT_ADVICE.BANK_SETID AND TMP1.BANK_CD = PS_PYMNT_ADVICE.BANK_CD AND TMP1.BANK_ACCT_KEY = PS_PYMNT_ADVICE.BANK_ACCT_KEY AND TMP1.PYMNT_METHOD = PS_PYMNT_ADVICE.PYMNT_METHOD AND TMP1.PYMNT_SEPARATE = PS_PYMNT_ADVICE.PYMNT_SEPARATE AND TMP1.PAY_DOC_SEQ = PS_PYMNT_ADVICE.PAY_DOC_SEQ AND TMP1.PYMNT_ID_REF = PS_PYMNT_ADVICE.PYMNT_ID_REF AND TMP1.PYMNT_OVERFLOW_ID = PS_PYMNT_ADVICE.PYMNT_OVERFLOW_ID AND TMP1.SOURCE_TXN = PS_PYMNT_ADVICE.SOURCE_TXN AND TMP1.BUSINESS_UNIT = PS_PYMNT_ADVICE.BUSINESS_UNIT AND TMP1.PAY_DOC_ID = PS_PYMNT_ADVICE.PAY_DOC_ID and tmp1.remit_line_type = ps_pymnt_advice.remit_line_type and tmp1.pymnt_advice_combo = ps_pymnt_advice.pymnt_advice_combo)";
+                  SQLExec("UPDATE PS_PYMNT_ADVICE SET INVOICE_ID = " | &SELECT_STR | " WHERE PAY_CYCLE = :1 AND PAY_CYCLE_SEQ_NUM = :2 AND PYMNT_METHOD = 'CHK' AND SOURCE_TXN = 'EXPN' " | &EXISTS_STR | " ", &PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM);
+                  
+                  If &REPORT_OUTPUT <> "X" Then
+                     &prcsinstance = &pC.FinishRequest();
+                     &status = PYCYCL_STATRPT.PAY_RUN_AP_STATUS;
+                     REM MessageBox(0, "", 0, 0, "IF ACA 5 " | &status);
+                     PYCYCL_STATRPT.PAY_RUN_AP_STATUS = SET_NEXT_STATUS(&status);
+                     &pC.insertJobTbl("P", PYCYCL_STAT.PAY_RUN_AP_STATUS, &prcsinstance, PYCYCL_WRK_OVRD.PRCSTYPE, PYCYCL_WRK_OVRD.PRCSNAME, "", "", "");
+                  End-If;
+                  If &REPORT_OUTPUT <> "C" Then
+                     If PYCYCL_WRK_OVRD.PRCSTYPE = "Crystal Check" And
+                           PYCYCL_WRK_OVRD.PRCSNAME = "APY2027-" Then
+                        &RQST_XMLP = CreateProcessRequest();
+                        &RQST_XMLP.ProcessType = "XML Publisher";
+                        &RQST_XMLP.ProcessName = "APX2027";
+                        &RQST_XMLP.RunControlID = PYCYCL_PNL_WRK4.RUNCNTLID;
+                        &RQST_XMLP.RunLocation = PYCYCL_WRK_OVRD.SERVERNAME;
+                        &RQST_XMLP.OutDestType = PYCYCL_STATRPT.OUTDESTTYPE;
+                        &RQST_XMLP.OutDest = PYCYCL_STATRPT.OUTDEST;
+                        &RQST_XMLP.RunDateTime = %Datetime;
+                        &RQST_XMLP.RunControlID = Substring(PYCYCL_PNL_WRK4.RUNCNTLID | &RQST_XMLP.RunDateTime, 1, 30);
+                        &RQST_XMLP.Schedule();
+                        &pC.insertJobTbl("P", PYCYCL_STAT.PAY_RUN_AP_STATUS, &RQST_XMLP.ProcessInstance, &RQST_XMLP.ProcessType, &RQST_XMLP.ProcessName, "", "", "");
+                        &status = PYCYCL_STATRPT.PAY_RUN_AP_STATUS;
+                        PYCYCL_STATRPT.PAY_RUN_AP_STATUS = SET_NEXT_STATUS(&status);
+                        /*inicio 003*/
+                        &RQST_ETY_TRS = CreateProcessRequest();
+                        &RQST_ETY_TRS.ProcessType = "Application Engine";
+                        &RQST_ETY_TRS.ProcessName = "ETY_TRS";
+                        &RQST_ETY_TRS.RunControlID = PYCYCL_PNL_WRK4.RUNCNTLID;
+                        &RQST_ETY_TRS.RunLocation = PYCYCL_WRK_OVRD.SERVERNAME;
+                        &RQST_ETY_TRS.OutDestType = PYCYCL_STATRPT.OUTDESTTYPE;
+                        &RQST_ETY_TRS.OutDest = PYCYCL_STATRPT.OUTDEST;
+                        &RQST_ETY_TRS.RunDateTime = %Datetime;
+                        &RQST_ETY_TRS.RunControlID = Substring(PYCYCL_PNL_WRK4.RUNCNTLID | &RQST_XMLP.RunDateTime, 1, 30);
+                        &RQST_ETY_TRS.Schedule();
+                        &pC.insertJobTbl("P", PYCYCL_STAT.PAY_RUN_AP_STATUS, &RQST_ETY_TRS.ProcessInstance, &RQST_ETY_TRS.ProcessType, &RQST_ETY_TRS.ProcessName, "", "", "");
+                        &status = PYCYCL_STATRPT.PAY_RUN_AP_STATUS;
+                        PYCYCL_STATRPT.PAY_RUN_AP_STATUS = SET_NEXT_STATUS(&status);
+                        /*fin 003*/
+                     End-If;
+                  End-If;
+               End-If;
+               &status = PYCYCL_STAT.PAY_RUN_AP_STATUS;
+               REM MessageBox(0, "", 0, 0, "IF ACA 5 " | &status);
+               PYCYCL_STAT.PAY_RUN_AP_STATUS = " ";
+               PYCYCL_STAT.PAY_RUN_AP_STATUS = &status;
+               DoSave();
+            End-If;
+         End-Evaluate;
+      End-If;
+   End-If;
+End-If;

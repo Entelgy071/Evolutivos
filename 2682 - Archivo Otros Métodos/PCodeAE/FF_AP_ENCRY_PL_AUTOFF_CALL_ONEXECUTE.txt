@@ -1,0 +1,153 @@
+/*********************************************************************
+* Proyecto:		ETY_ERP_AP_2682
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		01Dic2019
+* Descripción:	clase que . 
+*********************************************************************/
+import FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS;
+import FI_IAA_CODE_MAPPING:fi_valCodes;
+import FI_IAA_CODE_MAPPING:fi_mappingGroup;
+import EOEN_EVENT_MANAGER:Base:baseEvent;
+import EOEN_EVENT_MANAGER:Base:Types:ExceptionType;
+
+class FF_CALL_ENCRY_PA
+   /** Dummy Constructor. */
+   method FF_CALL_ENCRYP_PGP();
+   method fi_MoveArchivo(&ContextRecord As Record, &StrFilenamePgpNtIms As string, &StrFilenamePgpImsProc As string);
+   method fi_EncryptArchivo(&ContextRecord As Record);
+private
+   method fi_llamarLineaComandos(&ContextRecord As Record, &str_comando As string);
+end-class;
+
+
+method FF_CALL_ENCRYP_PGP
+end-method;
+
+method fi_MoveArchivo
+   /+ &ContextRecord as Record, +/
+   /+ &StrFilenamePgpNtIms as String, +/
+   /+ &StrFilenamePgpImsProc as String +/
+   
+   Local string &str_comando;
+   
+   
+   &str_comando = "cmd;/c;" | """move " | &StrFilenamePgpNtIms | " " | &StrFilenamePgpImsProc | """";
+   MessageBox(0, "", 0, 0, "Comando " | &str_comando);
+   
+   %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+   
+   If &ContextRecord.ERROR_CODE.Value <> "0" Then
+      MessageBox(0, "", 0, 0, "Fallo al mover los archivos Ims: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.CP_ERROR_TEXT.Value);
+   Else
+      MessageBox(0, "", 0, 0, &ContextRecord.ERROR_CODE.Value);
+   End-If;
+   
+   /*MessageBox(0, "", 0, 0, "&StrFilenameCsvNtIms - " | &StrFilenameCsvNtIms);
+   &str_comando = "cmd;/c;del;" | &StrFilenameCsvNtIms;
+   
+   %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+   
+   If &ContextRecord.ERROR_CODE.Value <> "0" Then
+      MessageBox(0, "", 0, 0, "Fallo al eliminar archivo Ims: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+   Else
+      MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+   End-If;*/
+   
+end-method;
+
+method fi_EncryptArchivo
+   /+ &ContextRecord as Record +/
+   
+   Local string &StrFilename, &StrPathPgp, &StrKeyIms, &StrTestCryptPS, &StrExtPgp, &StrPathDestinoIms, &StrPassWord, &str_comando;
+   
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'CONSULTASH'", &StrTestCryptPS);
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'CONSULTASH'", &StrPathDestinoIms);
+   
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'PATHPGP' ", &StrPathPgp);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMSOK' ", &StrKeyIms);
+   
+   /*&StrFilename = "Prueba_20191226.csv";*/
+   &StrFilename = &ContextRecord.FILENAME.Value;
+   &StrTestCryptPS = &StrTestCryptPS | &StrFilename;
+   &StrExtPgp = ".pgp";
+   &StrPathDestinoIms = &StrPathDestinoIms | &StrFilename | &StrExtPgp;
+   &StrPassWord = "fiduprevisora";
+   
+   /*&StrTestCryptPS = "\\172.16.0.146\ims\Consulta_4\" | &StrFilename;
+   &StrPathDestinoIms = "\\172.16.0.146\ims\Consulta_4\" | &StrFilename | &StrExtPgp;*/
+   
+   /*MessageBox(0, "", 0, 0, "&StrTestCryptPS - " | &StrTestCryptPS);
+   MessageBox(0, "", 0, 0, "&StrPathDestinoIms - " | &StrPathDestinoIms);*/
+   
+   &str_comando = """" | &StrPathPgp | """;--encrypt;""" | &StrTestCryptPS | """;--recipient;""" | &StrKeyIms | """;--output;""" | &StrPathDestinoIms | """";
+   /*&str_comando = """" | &StrPathPgp | """;--encrypt;""" | &StrTestCryptPS | """;--recipient;""" | &StrKeyIms | """;--passphrase;""" | &StrPassWord | """;--output;""" | &StrPathDestinoIms | """";*/
+   
+   %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+   
+   If &ContextRecord.ERROR_CODE.Value <> "0" Then
+      MessageBox(0, "", 0, 0, "Fallo al encriptar archivo Ims: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.CP_ERROR_TEXT.Value);
+   Else
+      /*MessageBox(0, "", 0, 0, &ContextRecord.ERROR_CODE.Value);*/
+   End-If;
+   
+end-method;
+
+method fi_llamarLineaComandos
+   /+ &ContextRecord as Record, +/
+   /+ &str_comando as String +/
+   
+   Local string &str_GroupId;
+   Local FI_IAA_CODE_MAPPING:fi_mappingGroup &obj_mapping;
+   Local number &nbr_conta, &nbr_seqno;
+   Local Record &rcd_id;
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_parametros;
+   Local FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS &obj_Utils = create FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS("Y");
+   
+   Local string &str_errNum, &str_errDescr;
+   
+   Local string &str_MapaId;
+   
+   
+   &obj_mapping = create FI_IAA_CODE_MAPPING:fi_mappingGroup(&obj_Utils.GroupId, False);
+   
+   Local string &str_nombreDestino, &str_nombreCampo, &str_Valor;
+   Local SQL &sql_param = CreateSQL("SELECT MAPPING_FIELD_NAME, FI_NOMBRE_DESTINO,FI_NOMBRE_PARAMETR FROM PS_FI_PARAM_WS WHERE FI_CALLING_WS = 'Y' AND FI_TIPO_PARAMETRO = 'S'");
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_codes;
+   Local FI_IAA_CODE_MAPPING:fi_valCodes &obj_codes;
+   While &sql_param.Fetch(&str_MapaId, &str_nombreDestino, &str_nombreCampo)
+      Evaluate &str_nombreCampo
+      When "COMANDOPGP"
+         /*Extrae el path del pgp*/
+         &str_Valor = &str_comando;
+         Break;
+      End-Evaluate;
+      &obj_codes = create FI_IAA_CODE_MAPPING:fi_valCodes(&str_nombreDestino, &str_Valor);
+      If &arr_parametros = Null Then
+         &arr_parametros = CreateArrayRept(&obj_codes, 1);
+      Else
+         &arr_parametros.Push(&obj_codes);
+      End-If;
+   End-While;
+   
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_respuesta;
+   &arr_respuesta = &obj_Utils.fi_ConsumirWebService(&arr_parametros);
+   If &arr_respuesta = Null Then
+      rem      Error MsgGet(29000, 23, "Mensaje no Encontrado: El servicio web no generó respuesta");
+      &str_errNum = "1";
+      &str_errDescr = "Mensaje no Encontrado: El servicio web no generó respuesta";
+   Else
+      &str_errNum = "0";
+      For &nbr_conta = 1 To &arr_respuesta.Len
+         Evaluate &arr_respuesta [&nbr_conta].NombreCampo
+         When "RETURN"
+            &str_errDescr = &arr_respuesta [&nbr_conta].ValorCampo;
+            Break;
+         End-Evaluate;
+      End-For;
+   End-If;
+   
+   &ContextRecord.ERROR_CODE.Value = &str_errNum;
+   &ContextRecord.CP_ERROR_TEXT.Value = &str_errDescr;
+end-method;
+

@@ -1,0 +1,3 @@
+If Len(&coments) > 300 Then
+   MessageBox(0, "Error", 0, 0, "¡Comentario demasiado largos!");
+End-If;

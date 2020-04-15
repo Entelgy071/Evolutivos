@@ -1,0 +1,40 @@
+/*create a query API object*/
+Local ApiObject &aRunQry;
+/*create a session API object*/
+Local ApiObject &MySession;
+Local Record &aQryPromptRec;
+Local string &fecha;
+
+/*Local ProcessRequest &MYRQST;
+
+&MYAppName = "ETY_REPO_SUC";
+&MYRQST = CreateProcessRequest("Application Engine", &MYAppName);
+&MYRQST.RunControlID = ETY_REPOSUC_AET.RUNCONTROLID;
+&MYRQST.RunLocation = "PSUNX";
+&MYRQST.Schedule();
+
+/*The current session*/
+&MySession = %Session;
+If &MySession <> Null Then
+   /*The GetQuery method returns an empty query object. After you have an empty query object, you can use it to open an existing query*/
+   &aRunQry = &MySession.GetQuery();
+End-If;
+&aRunQry = &MySession.GetQuery();
+/*Open query*/
+If (&aRunQry.Open("FP_CM_SUCURSALES_BANCARIAS_IMS", True, False) <> 0) Then;
+   MessageBox(0, "", 0, 0, "Error opening query");
+Else
+   /*Devuelve la ruta donde se desea generar el archivo*/
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'INFORMACIONSUCURSA'", &rutaSalida);
+   
+   /* Run the query output for txt in CSV format */
+   &fecha = DateTimeToLocalizedString(%Date, "dd-MM-yyyy");
+   REM &rutaSalida = %FilePath | &aRunQry.Name | "-" | &fecha;
+   &rutaSalida = &rutaSalida | &aRunQry.Name | "-" | &fecha;
+   
+   If (&aRunQry.RunToFile(&aQryPromptRec, &rutaSalida, %Query_TXT, 0) = 0) Then
+      MessageBox(0, "", 0, 0, "Result set saved into file successfully.");
+   Else
+      MessageBox(0, "", 0, 0, "Failed to save Resultset into file.");
+   End-If;
+End-If;
