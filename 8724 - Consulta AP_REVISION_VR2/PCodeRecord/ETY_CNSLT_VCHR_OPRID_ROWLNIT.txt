@@ -1,0 +1,2 @@
+ETY_CNSLT_VCHR.OPRID.Value = %OperatorId;
+ETY_CNSLT_VCHR.OPRID.Visible = False;

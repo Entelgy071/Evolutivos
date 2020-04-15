@@ -1,0 +1,96 @@
+/***********************************************************************************************************************************
+PROYECTO				FECHA		SEQNO	AUTOR				DESCRIPCIÓN
+************************************************************************************************************************************
+ETY_ERP_AP_8724_YV		09/03/20	001		Yordan Velandia		Ejecutar la consulta ETY_GENERAR_CNSLT_VCHR
+***********************************************************************************************************************************/
+
+/*INICIO #001*/
+Function CheckSessionMessages(&bDisplayErrors As boolean) Returns number;
+   Local ApiObject &PSMessages;
+   Local number &i, &MsgSetNbr, &MsgNbr, &NbrErrors;
+   
+   &PSMessages = %Session.PSmessages;
+   &NbrErrors = &PSMessages.Count;
+   
+   If &NbrErrors > 0 Then
+      For &i = 1 To &NbrErrors
+         &MsgSetNbr = &PSMessages.Item(&i).MessageSetNumber;
+         &MsgNbr = &PSMessages.Item(&i).MessageNumber;
+         If &bDisplayErrors Then
+            MessageBox(0, "", &MsgSetNbr, &MsgNbr, "Message Not Found : " | &MsgSetNbr | "," | &MsgNbr);
+         End-If;
+      End-For;
+      &PSMessages.DeleteAll();
+   End-If;
+   
+   Return &NbrErrors;
+   
+End-Function; /* CheckSessionMessages */
+
+
+
+Function ExecQuery() Returns boolean;
+   Local string &sOutFile;
+   Local Record &rcdQryRunParms;
+   Local Record &rcdQryPrompts;
+   Local SQL &sqlSelectQryParms;
+   Local number &cnt, &i, &Result;
+   Local ApiObject &aQry, &QryRunTimePrompts;
+   Local boolean &bPublic;
+   Local number &nOrigPSMessagesMode;
+   
+   Local ApiObject &PSMessages;
+   Local number &MsgSetNbr, &MsgNbr;
+   Local boolean &bResult;
+   
+   
+   &nOrigPSMessagesMode = %Session.PSMessagesMode;
+   %Session.PSMessagesMode = 1;
+   
+   &sOutFile = %FilePath | "ETY_APREVI";
+   &aQry = %Session.GetQuery();
+   
+   &bPublic = True;
+   
+   &etyQry_name = "ETY_GENERAR_CNSLT_VCHR";
+   
+   If &aQry.Open(&etyQry_name, &bPublic, False) = 0 Then
+      
+      &rcdQryPrompts = &aQry.PromptRecord;
+      If &rcdQryPrompts <> Null Then
+         &QryRunTimePrompts = &aQry.RunTimePrompts;
+         &rcdQryPrompts.GetField(1).Value = %OperatorId;
+         &rcdQryPrompts.GetField(2).Value = ETY_CSLTVCH_AET.RUN_CNTL_ID;
+      End-If;
+      
+      &Result = &aQry.RunToFile(&rcdQryPrompts, &sOutFile, %Query_XLS, 0);
+   End-If;
+   &aQry.Close();
+   
+   %Session.PSMessagesMode = &nOrigPSMessagesMode;
+   
+   If %Session.PSmessages.Count = 0 Then
+      Return True;
+   Else
+      /* ICE ReportID:1159031000 - Check message type before returning "No Success(False)" */
+      /* If Message Type = Cancel(0) or Message Type = Error (1) then return false */
+      &bResult = True;
+      &PSMessages = %Session.PSmessages;
+      For &i = 1 To &PSMessages.Count
+         If (&PSMessages.Item(&i).MessageType <= 1) Then
+            &bResult = False;
+            Break;
+         End-If;
+      End-For;
+      Return &bResult;
+   End-If;
+   
+End-Function; /* ExecQuery */
+
+
+If ExecQuery() = True Then
+   Exit (0);
+Else
+   Exit (1);
+End-If;
+/*FIN #001*/

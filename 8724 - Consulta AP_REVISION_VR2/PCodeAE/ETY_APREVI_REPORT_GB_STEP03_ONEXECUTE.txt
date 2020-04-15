@@ -1,0 +1,97 @@
+/***********************************************************************************************************************************
+PROYECTO				FECHA		SEQNO	AUTOR				DESCRIPCIÓN
+************************************************************************************************************************************
+ETY_ERP_AP_8724_YV		09/03/20	001		Yordan Velandia		Filtrar por las unidades de negocio seledcionadas como parametros
+***********************************************************************************************************************************/
+
+/*INICIO #001*/
+If All(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT.Value) Then
+   
+   SQLExec(SQL.ETY_CNSLT_VCHR_1_SQL, ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT.Value);
+   
+   MessageBox(0, "", 0, 0, "UN1 = " | ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT.Value);
+   
+   
+End-If;
+
+If All(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT2.Value) Then
+   
+   SQLExec(SQL.ETY_CNSLT_VCHR_1_SQL, ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT2.Value);
+   
+   MessageBox(0, "", 0, 0, "UN2 = " | ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT2.Value);
+   
+   
+End-If;
+
+If All(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT3.Value) Then
+   
+   SQLExec(SQL.ETY_CNSLT_VCHR_1_SQL, ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT3.Value);
+   
+   MessageBox(0, "", 0, 0, "UN3 = " | ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT3.Value);
+   
+   
+End-If;
+
+If All(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT4.Value) Then
+   
+   SQLExec(SQL.ETY_CNSLT_VCHR_1_SQL, ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT4.Value);;
+   
+   MessageBox(0, "", 0, 0, "UN4 = " | ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT4.Value);
+   
+   
+End-If;
+
+If All(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT5.Value) Then
+   
+   SQLExec(SQL.ETY_CNSLT_VCHR_1_SQL, ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT5.Value);
+   
+   MessageBox(0, "", 0, 0, "UN5 = " | ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT5.Value);
+   
+   
+End-If;
+
+If All(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT6.Value) Then
+   
+   SQLExec(SQL.ETY_CNSLT_VCHR_1_SQL, ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT6.Value);
+   
+   MessageBox(0, "", 0, 0, "UN6 = " | ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT6.Value);
+   
+   
+End-If;
+
+If All(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT7.Value) Then
+   
+   SQLExec(SQL.ETY_CNSLT_VCHR_1_SQL, ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT7.Value);
+   
+   MessageBox(0, "", 0, 0, "UN7 = " | ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT7.Value);
+   
+   
+End-If;
+
+If All(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT8.Value) Then
+   
+   SQLExec(SQL.ETY_CNSLT_VCHR_1_SQL, ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT8.Value);
+   
+   MessageBox(0, "", 0, 0, "UN8 = " | ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT8.Value);
+   
+   
+End-If;
+
+
+
+If None(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT.Value) And
+      None(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT2.Value) And
+      None(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT3.Value) And
+      None(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT4.Value) And
+      None(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT5.Value) And
+      None(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT6.Value) And
+      None(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT7.Value) And
+      None(ETY_CSLTVCH_AET.ETY_BUSINESS_UNIT8.Value) Then
+   
+   SQLExec(SQL.ETY_CNSLT_VCHR_2_SQL, ETY_CSLTVCH_AET.PROCESS_INSTANCE.Value);
+   
+   MessageBox(0, "", 0, 0, "UN = TODAS LAS UNIDADES DE NEGOCIO");
+   
+   
+End-If;
+/*FIN #001*/
