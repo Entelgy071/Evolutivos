@@ -1,0 +1,28 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_CM_FLT_EVO_5266			11-12-2019	Edwin Quesada	-Nuevo campo switch para IMS.
+*******************************************************************************************************************************************/
+
+Local Record &rc_ETY_EFT_LYT_TBL;
+
+&rc_ETY_EFT_LYT_TBL = CreateRecord(Record.ETY_EFT_LYT_TBL);
+
+&rc_ETY_EFT_LYT_TBL.EFT_LAYOUT_CD.Value = EFT_LAYOUT_TBL.EFT_LAYOUT_CD.Value;
+
+If &rc_ETY_EFT_LYT_TBL.SelectByKey() Then
+   &rc_ETY_EFT_LYT_TBL.EFT_LAYOUT_CD.Value = EFT_LAYOUT_TBL.EFT_LAYOUT_CD.Value;
+   &rc_ETY_EFT_LYT_TBL.ETY_CHEQUE_EFT.Value = ETY_EFT_LYT_WRK.ETY_CHEQUE_EFT.Value;
+   &rc_ETY_EFT_LYT_TBL.ETY_NUM_ARC.Value = ETY_EFT_LYT_WRK.ETY_NUM_ARC.Value;
+   /*Inicio #00001*/
+   &rc_ETY_EFT_LYT_TBL.ETY_FLAG_IMS.Value = ETY_EFT_LYT_WRK.ETY_FLAG_IMS.Value;
+   /*Fin #00001*/
+   &rc_ETY_EFT_LYT_TBL.Update();
+Else
+   &rc_ETY_EFT_LYT_TBL.EFT_LAYOUT_CD.Value = EFT_LAYOUT_TBL.EFT_LAYOUT_CD.Value;
+   &rc_ETY_EFT_LYT_TBL.ETY_CHEQUE_EFT.Value = ETY_EFT_LYT_WRK.ETY_CHEQUE_EFT.Value;
+   &rc_ETY_EFT_LYT_TBL.ETY_NUM_ARC.Value = ETY_EFT_LYT_WRK.ETY_NUM_ARC.Value;
+   /*Inicio #00001*/
+   &rc_ETY_EFT_LYT_TBL.ETY_FLAG_IMS.Value = ETY_EFT_LYT_WRK.ETY_FLAG_IMS.Value;
+   /*Fin #00001*/
+   &rc_ETY_EFT_LYT_TBL.Insert();
+End-If;

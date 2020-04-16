@@ -1,0 +1,520 @@
+/*********************************************************************
+* Proyecto:		FI_IAA_PRE_CANCEL_000
+* Actividad:  	001
+* Responsable: 	Quanam RETOS – César Hernán 
+* Fecha:		23Nov2011
+* Descripción:	clase que invoca el servicio web PRECANCELAR de FLEXIFON  para informar a 
+				FLEXIFON de realizar la precancelación del embargo. 
+*********************************************************************/
+
+/*********************************************************************
+* Proyecto:		FI_CM_INC_20789_000
+* Actividad:  	002
+* Responsable: 	DATCO – César Hernán García
+* Fecha:		21may2014
+* Descripción:	Se dan permisos a los usuarios parametrizados
+*********************************************************************/
+
+/********************************************************************************************
+Actividad: 	Tipo: 	PROYECTO: 					Autor: 				Fecha: 		
+#00003 		Actlz. 	ETY_ERP_AP_FLP_OPTI_AP001 	Alexandro Pachón 	24 Abr 2015 
+Descripción: Se realiza cambio para incluir carpetas de destino por ciudad e encriptación de  
+			 archivos diferentes bancos.
+*********************************************************************************************
+Actividad: 	Tipo: 	PROYECTO: 					Autor: 				Fecha: 		
+#00004 		Actlz. 	ETY_ERP_AP_FLP_OPTI_AP001 	Alexandro Pachón 	04 Abr 2016 
+Descripción: Se realiza cambio para comprimir los archivos encriptados de Banco Colpatria.
+********************************************************************************************
+Actividad: 	Tipo: 	PROYECTO: 					Autor: 				Fecha: 		
+#00005 		Actlz. 	ETY_ERP_AP_FLP_OPTI_AP008 	Yovanny Santos A. 	17 Oct 2018 
+Descripción: Se realiza cambio para enviar los archivos del BBVA directamente a la carpeta
+			 Segura.
+********************************************************************************************
+Actividad: 	Tipo: 	PROYECTO: 					Autor: 				Fecha: 		
+#00006 		Actlz. 	ETY_CASO_99253      	Yovanny Santos A. 	  12 Marzo 2018 
+Descripción: Al momento de realizar el cifrado, se incluye el formateo ascci para la salida
+			 del archivo plano del banco ITAU.
+********************************************************************************************
+Actividad: 	Tipo: 	PROYECTO: 					Autor: 				Fecha: 		
+#00007 		Actlz. 	ETY_CASO_10423      	Yovanny Santos A. 	  17 Diciembre 2019 
+Descripción: Cifrado para el banbo Davivienda, se usa un nuevo PGP.
+********************************************************************************************/
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00008		ETY_ERP_CM_FLT_EVO_5266			11-10-2019	Edwin Quesada	-Nuevo repositorio para IMS.
+*******************************************************************************************************************************************/
+
+import FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS;
+import FI_IAA_CODE_MAPPING:fi_valCodes;
+import FI_IAA_CODE_MAPPING:fi_mappingGroup;
+import EOEN_EVENT_MANAGER:Base:baseEvent;
+import EOEN_EVENT_MANAGER:Base:Types:ExceptionType;
+
+class FF_CALL_ENCRYP_PGP
+   /** Dummy Constructor. */
+   method FF_CALL_ENCRYP_PGP();
+   method fi_encriptar_archivo(&ContextRecord As Record);
+   
+private
+   method fi_llamarLineaComandos(&ContextRecord As Record, &str_comando As string);
+   
+end-class;
+
+
+method FF_CALL_ENCRYP_PGP
+end-method;
+
+method fi_encriptar_archivo
+   /+ &ContextRecord as Record +/
+   
+   
+   /* Inicio Rutina de llamado Web Service */
+   Local string &str_codigo;
+   Local string &str_key, &str_path, &str_path_pgp, &str_run_id, &str_path_batch, &str_path_pitagoras, &str_Filename, &strLayoutDes, &str_Hora, &strExisteLayoutDes;
+   Local string &str_SIGNER, &str_PASSPHRASE, &str_path_destino_sign, &str_pgp_ext, &str_encrypt, &StrSwitchIms;
+   Local number &nbr_seqno, &num_ProcessInstance;
+   Local boolean &bolGlobal;
+   /*Inicio #00006 YSA*/
+   Local string &str_ARMOR;
+   /*Fin #00006 YSA*/
+   /*Inicio #00007 YSA*/
+   Local string &str_GNUPG, &str_loop;
+   /*Fin #00007 YSA*/
+   
+   &nbr_seqno = &ContextRecord.SEQNO.Value;
+   &str_run_id = &ContextRecord.RUN_CNTL_ID.Value;
+   &str_key = &ContextRecord.KEY_CHAR_50.Value;
+   &str_path = &ContextRecord.FILEPATHCONCAT.Value;
+   
+   &str_Filename = &ContextRecord.FILENAME.Value;
+   REM &num_ProcessInstance = &ContextRecord.PROCESS_INSTANCE.Value;
+   
+   SQLExec("SELECT PROCESS_INSTANCE FROM PS_FF_ENCR_RUN_TBL WHERE OPRID = :1 AND RUN_CNTL_ID = :2 AND SEQNO = :3", %OperatorId, &str_run_id, &nbr_seqno, &num_ProcessInstance);
+   
+   &bolGlobal = False;
+   
+   Local string &str_numeroEncargo, &str_errNum, &str_errDescr, &str_path_destino, &str_path_destino2, &str_comando, &str_path_zip, &str_path_destino_zip;
+   /*Inicio #00008*/
+   Local string &StrPathDestinoIms, &StrPathDestinoIms2, &StrKeyIms, &StrPathCopyIms, &StrPathIms, &StrLayDestino;
+   /*Fin #00008*/
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'FFENCRYP' AND STRING_ID = 'PATHPGP'", &str_path_pgp);
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'FFENCRYP' AND STRING_ID = 'PATHDESTINO'", &str_path_destino);
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'FFENCRYP' AND STRING_ID = 'PATHBATCH'", &str_path_batch);
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'FFENCRYP' AND STRING_ID = 'PATHPITAGORAS'", &str_path_pitagoras);
+   
+   /* Inicio Actividad #00004 */
+   MessageBox(0, "", 0, 0, "&str_Filename - " | &str_Filename);
+   SQLExec(SQL.ETY_LAYOUT_DES_SQL, &num_ProcessInstance, &str_Filename, &strLayoutDes);
+   MessageBox(0, "", 0, 0, "&strLayoutDes - " | &strLayoutDes);
+   
+   REM SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'FFENCRYP' AND STRING_ID = 'PATHZIP'", &str_path_zip);
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'PATHZIP'", &strLayoutDes, &str_path_zip);
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'PGPEXT'", &strLayoutDes, &str_pgp_ext);
+   
+   If None(&str_pgp_ext) Then
+      &str_pgp_ext = ".pgp";
+   End-If;
+   
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'SIGNER'", &strLayoutDes, &str_SIGNER);
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'PASSPHRASE'", &strLayoutDes, &str_PASSPHRASE);
+   /*Inicio #00006 YSA*/
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'PGPARMOR'", &strLayoutDes, &str_ARMOR);
+   /*Fin #00006 YSA*/
+   
+   /*Inicio #00007 YSA*/
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'GNUPG'", &strLayoutDes, &str_GNUPG);
+   /*Fin #00007 YSA*/
+   
+   /* Fin Actividad #00004 */
+   /*   &str_comando = """" | &str_path_batch | """;""" | &str_path | """;fiduprevisora.com.co";
+   %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);*/
+   
+   /* Inicio Actividad #00003 */
+   Local string &strCity, &strFilename;
+   Local number &numProcessInstance = &ContextRecord.PROCESS_INSTANCE2.Value;
+   
+   SQLExec("SELECT FILENAME, CITY FROM PS_ETY_ENC_RUN_TBL WHERE OPRID = :1 AND RUN_CNTL_ID = :2 AND SEQNO = :3", %OperatorId, &str_run_id, &nbr_seqno, &strFilename, &strCity);
+   MessageBox(0, "", 0, 0, "&strCity - " | &strCity);
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'PATHDESTINO'", &strCity, &str_path_destino);
+   
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = :2 || 'ENCRYPT'", &strCity, &strLayoutDes, &str_encrypt);
+   
+   If All(&str_encrypt) And
+         &str_encrypt <> "Y" Then
+      &str_key = "0";
+      &str_SIGNER = " ";
+      &str_PASSPHRASE = " ";
+   End-If;
+   
+   
+   <*
+   SQLExec(SQL.ETY_LAYOUT_DES_SQL, &num_ProcessInstance, &str_Filename, &strLayoutDes);
+   If All(&strLayoutDes) Then
+      SQLExec("SELECT 'X' FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = :2", &strCity, &strLayoutDes, &strExisteLayoutDes);
+      If All(&strExisteLayoutDes) Then
+         SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'HORA'", &strLayoutDes, &str_Hora);
+         If None(&str_Hora) Or
+               TimePart(%Datetime) < Time3(Value(Substring(&str_Hora, 1, 2)), Value(Substring(&str_Hora, 3, 2)), 0) Then
+            /*GLOBAL*/
+            SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'PATHDESTINO'", &strLayoutDes, &str_path_destino);
+            &bolGlobal = True;
+         Else
+            /*PORTAL*/
+            SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'PATHDESTINO2'", &strLayoutDes, &str_path_destino);
+         End-If;
+      End-If;
+   End-If;
+   *>
+   
+   
+   /*Inicio #00008*/
+   
+   SQLExec(SQL.ETY_FLAG_IMS_LAYOUT_FORMATO, &strLayoutDes, &StrSwitchIms);
+   
+   If &StrSwitchIms = "Y" Then
+      If &strLayoutDes = "CAJASOCIAL" Then
+         SQLExec(SQL.ETY_LAYDESTINO_CAJASOCI, &strLayoutDes, &strLayoutDes);
+      End-If;
+      
+      SQLExec("Select STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'PATHDESTINOIMS'", &strCity, &StrPathDestinoIms);
+      SQLExec("Select STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'FFENCRYP' AND STRING_ID = 'KEYIMS'", &StrKeyIms);
+      SQLExec("Select STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = 'PATHPITAGORAS'", &strLayoutDes, &StrPathCopyIms);
+      
+      REM &str_path es la ruta homologada de sharepsoft + el nombre del archivo ;
+      /*MessageBox(0, "", 0, 0, "&strFilename - " | &strFilename);
+      MessageBox(0, "", 0, 0, "&StrPathCopyIms - " | &StrPathCopyIms);
+      MessageBox(0, "", 0, 0, "&StrPathDestinoIms - " | &StrPathDestinoIms);*/
+      
+      &StrPathDestinoIms2 = &StrPathDestinoIms;
+      &StrPathCopyIms = &StrPathCopyIms | &str_Filename;
+      
+      &str_comando = "cmd;/c;" | """copy " | &StrPathCopyIms | " " | &StrPathDestinoIms | """";
+      
+      %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+      
+      If &ContextRecord.ERROR_CODE.Value <> "0" Then
+         MessageBox(0, "", 0, 0, "Fallo al copiar archivo Ims: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+      Else
+         MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+      End-If;
+      REM ruta archivo con extension .TXT y .PGP;
+      &StrPathDestinoIms = &StrPathDestinoIms | &strFilename | &str_pgp_ext;
+      &StrPathIms = &StrPathDestinoIms2 | &str_Filename;
+      /*MessageBox(0, "", 0, 0, "&strFilename - " | &strFilename);
+      MessageBox(0, "", 0, 0, "&str_path - " | &str_path);
+      MessageBox(0, "", 0, 0, "&StrPathIms - " | &StrPathIms);
+      MessageBox(0, "", 0, 0, "&str_path_destino - " | &str_path_destino);
+      MessageBox(0, "", 0, 0, "&StrPathDestinoIms - " | &StrPathDestinoIms);*/
+      &str_comando = """" | &str_path_pgp | """;--encrypt;""" | &StrPathIms | """;--recipient;""" | &StrKeyIms | """;--output;""" | &StrPathDestinoIms | """";
+      /*&str_comando = """" | &str_path_pgp | """;--encrypt;""" | &StrPathIms | """;--recipient;""" | &StrKeyIms | """;--passphrase;""" | &str_PASSPHRASE | """;--output;""" | &StrPathDestinoIms | """";*/
+      
+      %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+      
+      If &ContextRecord.ERROR_CODE.Value <> "0" Then
+         MessageBox(0, "", 0, 0, "Fallo al encriptar archivo Ims: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+      Else
+         MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+      End-If;
+      
+      /* Borramos los archivos que quedan sin extension */
+      &str_comando = "cmd;/c;del;" | &StrPathIms;
+      
+      %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+      
+      If &ContextRecord.ERROR_CODE.Value <> "0" Then
+         MessageBox(0, "", 0, 0, "Fallo al eliminar archivo Ims: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+      Else
+         MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+      End-If;
+   End-If;
+   
+   /*Fin #00008*/
+   
+   
+   Rem If &bolGlobal = False Then;
+   
+   /*Inicio 00005 YSA*/
+   REM YSA &str_path_destino = &str_path_destino | &numProcessInstance | "\";
+   If &strCity = "BBVA" Then
+      &str_path_destino = &str_path_destino | "\";
+   Else
+      &str_path_destino = &str_path_destino | &numProcessInstance | "\";
+   End-If;
+   /*Fin 00005 YSA*/
+   
+   &str_comando = "cmd;/c;" | """md " | &str_path_destino | """";
+   %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+   
+   If &ContextRecord.ERROR_CODE.Value <> "0" Then
+      MessageBox(0, "", 0, 0, "Fallo creación carpeta: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+   Else
+      MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+   End-If;
+   
+   rem End-If;
+   
+   If All(&str_key) And
+         &str_key <> "0" Then
+      
+      If All(&str_SIGNER) And
+            All(&str_PASSPHRASE) Then
+         
+         rem &str_path_destino_zip = &str_path_destino | ".zip";
+         rem &str_path_destino_sign = &str_path_destino2 | &ContextRecord.FILENAME.Value | ".gpg";
+         rem &str_path_destino_sign = &str_path_destino2 | &strFilename | "_F" | ".gpg";
+         rem &str_path_destino_sign = &str_path_destino2 | &strFilename | &str_pgp_ext;
+         &str_path_destino_sign = &str_path_destino | &strFilename | &str_pgp_ext;
+         &str_path_destino2 = &str_path_destino;
+         
+         /*Inicio 00007 YSA*/
+         /* &str_comando = """" | &str_path_pgp | """;--encrypt;--armor;""" | &str_path | """;--recipient;""" | &str_key | """;-s;--signer;""" | &str_SIGNER | """;--passphrase;""" | &str_PASSPHRASE | """;-o;""" | &str_path_destino_sign | """";*/
+         If &str_ARMOR <> "Y" Then
+            If &str_GNUPG = "Y" Then
+               
+               &str_loop = "loopback";
+               SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'FFENCRYP' AND STRING_ID = 'PATHPGP1'", &str_path_pgp);
+               &str_comando = """" | &str_path_pgp | """;--sign;--encrypt;--recipient;""" | &str_key | """;--pinentry-mode;""" | &str_loop | """;--passphrase;""" | &str_PASSPHRASE | """;-o;""" | &str_path_destino_sign | """;""" | &str_path | """";
+            Else
+               &str_comando = """" | &str_path_pgp | """;--encrypt;--armor;""" | &str_path | """;--recipient;""" | &str_key | """;-s;--signer;""" | &str_SIGNER | """;--passphrase;""" | &str_PASSPHRASE | """;-o;""" | &str_path_destino_sign | """";
+            End-If;
+         Else
+            &str_comando = """" | &str_path_pgp | """;--encrypt;--armor;""" | &str_path | """;--recipient;""" | &str_key | """;-s;--signer;""" | &str_SIGNER | """;--passphrase;""" | &str_PASSPHRASE | """;-o;""" | &str_path_destino_sign | """";
+         End-If;
+         /*Fin 00007 YSA*/
+         
+         %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+         
+         If &ContextRecord.ERROR_CODE.Value <> "0" Then
+            MessageBox(0, "", 0, 0, "Fallo al firmar archivo: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+         Else
+            MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+         End-If;
+         
+         &str_path_destino = &str_path_destino_sign;
+         
+         /* 
+         &str_comando = "cmd;/c;del;" | &str_path_destino2;
+         
+         %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+         
+         If &ContextRecord.ERROR_CODE.Value <> "0" Then
+            MessageBox(0, "", 0, 0, "Fallo al eliminar archivo: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+         Else
+            MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+         End-If;
+         */
+         
+      Else
+         
+         /* Inicio Actividad #00004 */
+         REM &str_path_destino = &str_path_destino | &ContextRecord.FILENAME.Value | ".gpg";
+         &str_path_destino2 = &str_path_destino;
+         rem &str_path_destino = &str_path_destino | &ContextRecord.FILENAME.Value | ".txt.gpg";
+         rem &str_path_destino = &str_path_destino | &strFilename | ".gpg";
+         &str_path_destino = &str_path_destino | &strFilename | &str_pgp_ext;
+         
+         If All(&str_SIGNER) And
+               All(&str_PASSPHRASE) Then
+            &str_path_destino = &str_path_pitagoras | &strFilename | &str_pgp_ext;
+         End-If;
+         
+         /* Inicio Actividad #00004 */
+         /*Inicio #00006 YSA*/
+         /*         &str_comando = """" | &str_path_pgp | """;--encrypt;""" | &str_path | """;--recipient;""" | &str_key | """;--output;""" | &str_path_destino | """";*/
+         If &str_ARMOR <> "Y" Then
+            &str_comando = """" | &str_path_pgp | """;--encrypt;""" | &str_path | """;--recipient;""" | &str_key | """;--output;""" | &str_path_destino | """";
+         Else
+            &str_comando = """" | &str_path_pgp | """;--encrypt;--armor;""" | &str_path | """;--recipient;""" | &str_key | """;--output;""" | &str_path_destino | """";
+         End-If;
+         /*Fin #00006 YSA*/
+         
+         %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+         
+         If &ContextRecord.ERROR_CODE.Value <> "0" Then
+            MessageBox(0, "", 0, 0, "Fallo al encriptar archivo: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+         Else
+            MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+         End-If;
+         
+      End-If;
+   Else
+      &str_path_destino = &str_path_destino | &strFilename;
+      &str_comando = "cmd;/c;" | """move " | &str_path | " " | &str_path_destino | """";
+      
+      %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+      
+      If &ContextRecord.ERROR_CODE.Value <> "0" Then
+         MessageBox(0, "", 0, 0, "Fallo al mover archivo: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+      Else
+         MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+      End-If;
+   End-If;
+   
+   
+   /* Inicio Actividad #00004 */
+   If All(&str_key) And
+         &str_key <> "0" Then
+      If All(&str_path_zip) Then
+         
+         rem &str_path_destino_zip = &str_path_destino | ".zip";
+         rem &str_path_destino_zip = &str_path_destino2 | &ContextRecord.FILENAME.Value | ".txt.zip";
+         &str_path_destino_zip = &str_path_destino2 | &strFilename | ".zip";
+         
+         &str_comando = """" | &str_path_zip | """;a;""" | &str_path_destino_zip | """;""" | &str_path_destino | """";
+         
+         %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+         
+         If &ContextRecord.ERROR_CODE.Value <> "0" Then
+            MessageBox(0, "", 0, 0, "Fallo al comprimir archivo: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+         Else
+            MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+         End-If;
+         
+         &str_comando = "cmd;/c;del;" | &str_path_destino;
+         &str_path_destino = &str_path_destino_zip;
+         
+         %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+         
+         If &ContextRecord.ERROR_CODE.Value <> "0" Then
+            MessageBox(0, "", 0, 0, "Fallo al eliminar archivo: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+         Else
+            MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+         End-If;
+      End-If;
+   End-If;
+   /* Fin Actividad #00004 */
+   
+   If &strCity <> "BBVA" Then
+      Local Record &recStringTbl;
+      Local Rowset &rsStringTbl = CreateRowset(Record.STRINGS_TBL);
+      Local number &j;
+      &rsStringTbl.Fill("WHERE PROGRAM_ID = :1 AND STRING_ID NOT IN ('PATHDESTINO', 'BBVAENCRYPT', 'BBVA')", &strCity);
+      
+      For &j = 1 To &rsStringTbl.ActiveRowCount
+         
+         &str_comando = "cmd;/c;c:\WINDOWS\system32\cacls.exe;" | &str_path_destino | ";/E;/G;" | &rsStringTbl(&j).STRINGS_TBL.STRING_TEXT.Value | ":R";
+         /*&str_comando = """" | &str_path_batch | """;""" | &str_path_destino | """;" | &rsStringTbl(&j).STRINGS_TBL.STRING_TEXT.Value;*/
+         
+         %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+         
+         If &ContextRecord.ERROR_CODE.Value <> "0" Then
+            MessageBox(0, "", 0, 0, "Fallo permisos usuario: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+         Else
+            MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+         End-If;
+      End-For;
+   End-If;
+   <*
+   &str_path_destino = &str_path_destino | &ContextRecord.FILENAME.Value | ".gpg";
+   &str_comando = """" | &str_path_pgp | """;--encrypt;""" | &str_path | """;--recipient;""" | &str_key | """;--output;""" | &str_path_destino | """";
+
+   %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+   
+   If &ContextRecord.ERROR_CODE.Value <> "0" Then
+      MessageBox(0, "", 0, 0, "Fallo la encriptación del archivo: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+   Else
+      MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+   End-If;
+
+   /*Inicio CHGA 002*/
+   Local Record &rec_string;
+   Local Rowset &rst_string = CreateRowset(Record.STRINGS_TBL);
+   Local number &nbr_user;
+   &rst_string.Fill("WHERE PROGRAM_ID = 'USRENCRI'");
+   
+   For &nbr_user = 1 To &rst_string.ActiveRowCount
+      
+      /*comentado by chga 002   &str_comando = """" | &str_path_batch | """;""" | &str_path_destino | """;ISEGURA";*/
+      
+      &str_comando = """" | &str_path_batch | """;""" | &str_path_destino | """;" | &rst_string(&nbr_user).GetRecord(1).STRING_TEXT.Value;
+      /*FIN CHGA 002*/
+      
+      %This.fi_llamarLineaComandos(&ContextRecord, &str_comando);
+      
+      
+      
+      If &ContextRecord.ERROR_CODE.Value <> "0" Then
+         MessageBox(0, "", 0, 0, "Fallo la encriptación del archivo: " | &ContextRecord.ERROR_CODE.Value | " " | &ContextRecord.ERROR_DTL.Value);
+      Else
+         MessageBox(0, "", 0, 0, &ContextRecord.ERROR_DTL.Value);
+      End-If;
+      /*Inicio CHGA 002*/
+      
+   End-For;
+   
+   /*FIN CHGA 002*/
+
+   *>
+   
+   
+   /* Fin actividad #00003 */
+   
+   /* Fin Rutina de llamado Web Service */
+   
+   rem   Return &ContextRecord;
+end-method;
+
+method fi_llamarLineaComandos
+   /+ &ContextRecord as Record, +/
+   /+ &str_comando as String +/
+   
+   
+   /* Inicio Rutina de llamado Web Service */
+   Local string &str_GroupId, &str_run_id;
+   Local FI_IAA_CODE_MAPPING:fi_mappingGroup &obj_mapping;
+   Local number &nbr_conta, &nbr_seqno;
+   Local Record &rcd_id;
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_parametros;
+   Local FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS &obj_Utils = create FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS("Y");
+   
+   Local string &str_errNum, &str_errDescr;
+   
+   Local string &str_MapaId;
+   
+   
+   &obj_mapping = create FI_IAA_CODE_MAPPING:fi_mappingGroup(&obj_Utils.GroupId, False);
+   
+   Local string &str_nombreDestino, &str_nombreCampo, &str_Valor;
+   Local SQL &sql_param = CreateSQL("SELECT MAPPING_FIELD_NAME, FI_NOMBRE_DESTINO,FI_NOMBRE_PARAMETR FROM PS_FI_PARAM_WS WHERE FI_CALLING_WS = 'Y' AND FI_TIPO_PARAMETRO = 'S'");
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_codes;
+   Local FI_IAA_CODE_MAPPING:fi_valCodes &obj_codes;
+   While &sql_param.Fetch(&str_MapaId, &str_nombreDestino, &str_nombreCampo)
+      Evaluate &str_nombreCampo
+      When "COMANDOPGP"
+         /*Extrae el path del pgp*/
+         &str_Valor = &str_comando;
+         Break;
+      End-Evaluate;
+      &obj_codes = create FI_IAA_CODE_MAPPING:fi_valCodes(&str_nombreDestino, &str_Valor);
+      If &arr_parametros = Null Then
+         &arr_parametros = CreateArrayRept(&obj_codes, 1);
+      Else
+         &arr_parametros.Push(&obj_codes);
+      End-If;
+   End-While;
+   
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_respuesta;
+   &arr_respuesta = &obj_Utils.fi_ConsumirWebService(&arr_parametros);
+   If &arr_respuesta = Null Then
+      rem      Error MsgGet(29000, 23, "Mensaje no Encontrado: El servicio web no generó respuesta");
+      &str_errNum = "1";
+      &str_errDescr = "Mensaje no Encontrado: El servicio web no generó respuesta";
+   Else
+      &str_errNum = "0";
+      For &nbr_conta = 1 To &arr_respuesta.Len
+         Evaluate &arr_respuesta [&nbr_conta].NombreCampo
+         When "RETURN"
+            &str_errDescr = &arr_respuesta [&nbr_conta].ValorCampo;
+            Break;
+         End-Evaluate;
+      End-For;
+   End-If;
+   
+   &ContextRecord.ERROR_CODE.Value = &str_errNum;
+   &ContextRecord.ERROR_DTL.Value = &str_errDescr;
+   
+   /* Fin Rutina de llamado Web Service */
+   
+   rem   Return &ContextRecord;
+end-method;
+
