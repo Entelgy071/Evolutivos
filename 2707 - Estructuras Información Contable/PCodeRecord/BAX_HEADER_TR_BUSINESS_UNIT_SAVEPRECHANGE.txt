@@ -1,0 +1,189 @@
+/****************************************************************************************
+Proyecto   : FF_CM_DISPONIBLE_000
+Fecha      : 2012-Sept-03
+Responsable: QUANAM Retos - David Polo
+Actividad  : 001
+Descr      : Validar el disponible
+****************************************************************************************/
+/****************************************************************************************
+Proyecto   : FF_CM_DISPONIBLE_000
+Fecha      : 2013-Dec-26
+Responsable: DATCO Retos - Federico Betoldi
+Actividad  : 002
+Descr      : Se sustituye el campo FF_VAL_DISP_WRK.AMOUNT, por el campo FF_DISPONIBLE.
+****************************************************************************************/
+/****************************************************************************************
+Proyecto   : FF_CM_INC_30696_000
+Fecha      : 2014-Dec-18
+Responsable: DATCO Retos - César García
+Actividad  : 003
+Descr      : La validación del presupuesto se salta cuando es a través de component interface
+****************************************************************************************/
+
+/* Inicio #001 */
+import FF_CM_DISPONIBLE:ff_DisponibleCuenta;
+import EOEN_MVC:EOEN_MODEL:EOENInterface:*;
+import SCM_UTILITIES:Portal:portalURL:*;
+
+import PT_WF_NOTIFICATION:NotificationAddress;
+import PT_WF_NOTIFICATION:Notification;
+import PT_WF_NOTIFICATION:NotificationTemplate;
+
+Local string &str_bank_id_nbr, &str_bank_account_num, &fecha_extracto;
+
+Local array of string &aryValues;
+Local array of PT_WF_NOTIFICATION:NotificationAddress &mynotifyto;
+Local PT_WF_NOTIFICATION:NotificationAddress &mynotifyaddress;
+Local PT_WF_NOTIFICATION:Notification &mynotification;
+
+SQLExec("SELECT FF_DSP_PAGO_TRANSF FROM PS_FF_BUS_UNIT_GL WHERE BUSINESS_UNIT = :1", BAX_HEADER_TR.BUSINESS_UNIT.Value, &str_ValDisp);
+
+If &str_ValDisp = "Y" Then
+   
+   /*Se extrae el código externo del banco*/
+   SQLExec("SELECT BNK_ID_NBR,DESCR FROM PS_BANK_CD_TBL A WHERE A.SETID = :1 AND A.BANK_CD = :2", BAX_HEADER_TR.SETID.Value, BAX_HEADER_TR.BANK_CD.Value, &str_bank_id_nbr, &str_bnk_descr);
+   /*Se extrae el número de cuenta bancaria.*/
+   SQLExec("SELECT BANK_ACCOUNT_NUM FROM PS_BANK_ACCT_DEFN A WHERE A.SETID = :1 AND A.BANK_CD = :2 AND A.BANK_ACCT_KEY = :3", BAX_HEADER_TR.SETID.Value, BAX_HEADER_TR.BANK_CD.Value, BAX_HEADER_TR.BANK_ACCT_KEY.Value, &str_bank_account_num);
+   
+   Local FF_CM_DISPONIBLE:ff_DisponibleCuenta &obj_disponible = create FF_CM_DISPONIBLE:ff_DisponibleCuenta( True, &str_bank_id_nbr, &str_bank_account_num, %Date, "C", "P", BAX_HEADER_TR.BUSINESS_UNIT.Value);
+   If &obj_disponible.VALIDAR_DISPONIBLE Then
+      
+      /*Inicio #002*/
+      rem FF_VAL_DISP_WRK.AMOUNT.Value = &obj_disponible.DISPONIBLE;
+      FF_VAL_DISP_WRK.FF_DISPONIBLE.Value = &obj_disponible.DISPONIBLE;
+      
+      rem If (FF_VAL_DISP_WRK.AMOUNT.Value) < BAX_HEADER_TR.AMOUNT.Value Then;
+      If (FF_VAL_DISP_WRK.FF_DISPONIBLE.Value) < BAX_HEADER_TR.AMOUNT.Value Then
+         /*Fin #002*/
+         /*Inicio chga 003*/
+         If %CompIntfcName <> "BANK_TRANSFER_CI" Then
+            /*Fin chga 003*/
+            &RETURN = DoModal(Page.FF_VALIDA_DISP_PNL, "Disponible", - 1, - 1, 0);
+            
+            Evaluate &RETURN
+            When 1 /* Aprobar */
+               Break;
+            When 2 /* Notificar */
+               
+               &mynotifytemplate = create PT_WF_NOTIFICATION:NotificationTemplate("", "", "FP_PLNT_MAIL_NO_DISPONIBILIDAD", "G");
+               
+               /* Populate an array to contain the values needed by the template */
+               
+               &aryValues = CreateArrayRept("", 0);
+               
+               /* Consulta Nombre del Beneficiario */
+               
+               Local string &str_SetIdDest, &str_BnkCdDest, &str_BnkAcctKeyDest;
+               
+               &str_SetIdDest = GetLevel0()(1).GetRowset(Scroll.BAX_LINE_VW).GetRow(1).BAX_LINE_VW.SETID.Value;
+               &str_BnkCdDest = GetLevel0()(1).GetRowset(Scroll.BAX_LINE_VW).GetRow(1).BAX_LINE_VW.BANK_CD.Value;
+               &str_BnkAcctKeyDest = GetLevel0()(1).GetRowset(Scroll.BAX_LINE_VW).GetRow(1).BAX_LINE_VW.BANK_ACCT_KEY.Value;
+               
+               SQLExec("SELECT DESCR FROM PS_BANK_ACCT_DEFN WHERE SETID = :1 AND BANK_CD = :2 AND BANK_ACCT_KEY = :3", &str_SetIdDest, &str_BnkCdDest, &str_BnkAcctKeyDest, &str_DescrDest);
+               
+               &aryValues.Push(%UserDescription); /* Descripción Usuario */
+               &aryValues.Push(BAX_HEADER_TR.BUSINESS_UNIT.Value); /* Unidad de Negocio */
+               &aryValues.Push(BAX_HEADER_TR.TRANSACTION_DT.Value); /* Fecha Pago */
+               &aryValues.Push(&str_bnk_descr); /* Banco Origen */
+               &aryValues.Push(&str_DescrDest); /* Nombre Beneficiario */
+               &aryValues.Push(NumberToString("%23.2v", BAX_HEADER_TR.AMOUNT.Value)); /* Importe */
+               &aryValues.Push(BAX_HEADER_TR.CURRENCY_CD.Value); /* Moneda */
+               
+               &xmlVars = &mynotifytemplate.SetupGenericVars(&aryValues);
+               
+               &mynotifytemplate.GetAndExpandTemplate(%Language, &xmlVars);
+               
+               &oEwnInterface = create EOEN_MVC:EOEN_MODEL:EOENInterface("FF_DISPONIBLE_NOTIF", Int(Rand() * 100000000));
+               &objPortalURL = create SCM_UTILITIES:Portal:portalURL();
+               
+               Local array of string &ArrayOfBindVals;
+               &ArrayOfBindVals = CreateArray(" ");
+               
+               &ContextRec = CreateRecord(Record.FF_ASI_BAT_CTX);
+               
+               &menu = "PROCESSMONITOR";
+               &component = "PROCESSMONITOR";
+               &page = "PMN_PRCSLIST";
+               &action = "U";
+               &keys = CreateArray();
+               &keys [1] = " ";
+               &keys [2] = " ";
+               
+               &ContextRec.EOEN_PRCS_NAME.Value = "FF_DISPONIBLE_NOTIF";
+               &ContextRec.EOEN_CATEGORY.Value = "FF_DISPONIBLE_NOTIF";
+               
+               &oEwnInterface.EOENCategory = "FF_DISPONIBLE_NOTIF";
+               &oEwnInterface.AddContextRecord(&ContextRec);
+               
+               Local SQL &Emails;
+               Local SQL &RutasAsociadas;
+               Local string &TipoControlRuta;
+               Local number &ExistenEmail;
+               Local number &ExisteRolNotif;
+               Local number &strError_msg_cat, &strError_msg_num;
+               
+               &TipoControlRuta = "FP_UNIDAD_NEGOCIO";
+               &BU = BAX_HEADER_TR.BUSINESS_UNIT.Value;
+               
+               &RutasAsociadas = CreateSQL("SELECT DISTINCT ROLENAME FROM PS_RTE_CNTL_LN LN JOIN ps_rte_cntl_ruser PROF ON PROF.rte_cntl_profile = LN.rte_cntl_profile JOIN PS_RTE_CNTL_HDR HDR ON hdr.rte_cntl_profile = ln.rte_cntl_profile AND hdr.rte_cntl_type = '" | &TipoControlRuta | "'");
+               
+               While &RutasAsociadas.Fetch(&RoleNotif)
+                  
+                  If All(&RoleNotif) Then
+                     &ExisteRolNotif = &ExisteRolNotif + 1;
+                  End-If;
+                  
+                  &oEwnInterface.GenerateWL( True, "", &RoleNotif);
+                  &oEwnInterface.EOENRedirectURL = GenerateComponentPortalURL(%Portal, %Node, MenuName.PROCESSMONITOR, %Market, Component.PROCESSMONITOR, "", &action);
+                  &oEwnInterface.GenerateEmail( True);
+                  
+                  &Emails = GetSQL(SQL.SQL_CONS_EMAIL_BU_X_RUTA_SQL, &BU, &TipoControlRuta, &RoleNotif);
+                  
+                  While &Emails.Fetch(&emailid)
+                     &mynotifyto = CreateArrayRept(&mynotifyaddress, 0);
+                     &mynotifyaddress = create PT_WF_NOTIFICATION:NotificationAddress("", "", "", &emailid, "Email");
+                     &mynotifyto.Push(&mynotifyaddress);
+                     
+                     If All(&emailid) Then
+                        &ExistenEmail = &ExistenEmail + 1;
+                        &mynotification = create PT_WF_NOTIFICATION:Notification(&emailid, %Date + %PerfTime, %Language);
+                        &mynotification.NotifyTo = &mynotifyto;
+                        &mynotification.Subject = &mynotifytemplate.Subject;
+                        &mynotification.Message = &mynotifytemplate.Text;
+                        &mynotification.Send();
+                        
+                        &strError_msg_cat = 22500;
+                        &strError_msg_num = 30;
+                        
+                     End-If;
+                  End-While;
+                  
+                  &Emails.Close();
+                  
+                  &oEwnInterface.Log(0, 0, "No hay disponibilidad para Transferencia", &ArrayOfBindVals);
+                  
+               End-While;
+               
+               /* At this point, the &mynotifytemplate should have every value resolved */
+               
+               If &ExisteRolNotif = 0 Then
+                  &strError_msg_cat = 22500;
+                  &strError_msg_num = 28;
+               End-If;
+               
+               If &ExistenEmail = 0 Then
+                  &strError_msg_cat = 22500;
+                  &strError_msg_num = 29;
+               End-If;
+               
+               Error MsgGet(&strError_msg_cat, &strError_msg_num, "Mensaje de notificación no configurado: Catalogo:" | &strError_msg_cat | " &strError_msg_num: " | &strError_msg_num);
+            When 0 /* Cancelar */
+               Error MsgGet(22500, 31, "Se ha cancelado la transferencia");
+            End-Evaluate;
+            /*Inicio chga 003*/
+         End-If;
+         /*Fin chga 003*/
+      End-If;
+   End-If;
+End-If;
+/* Fin #001 */
