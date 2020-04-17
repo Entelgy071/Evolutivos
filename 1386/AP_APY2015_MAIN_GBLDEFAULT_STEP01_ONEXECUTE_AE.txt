@@ -1,0 +1,6 @@
+If AP_PAYSELCT_AET.PYCYCL_PROC_OPTION = "A" Or
+      AP_PAYSELCT_AET.PYCYCL_PROC_OPTION = "D" Then
+   Exit 0;
+Else
+   Exit 1;
+End-If;

@@ -1,0 +1,11 @@
+/* Check whether User Approval (TRIAL_REG_FLG) is enable, and set pay_run_ap_status  accordingly */
+If AP_PAYSELCT_AET.PAY_RUN_AP_STATUS.Value = "U" Or
+      AP_PAYSELCT_AET.PAY_RUN_AP_STATUS.Value = "V" Then
+   If PYCYCL_3_AET.TRIAL_REG_FLG.Value = "U" Then
+      AP_PAYSELCT_AET.DUMMY_FIELD.Value = "U";
+   Else
+      AP_PAYSELCT_AET.DUMMY_FIELD.Value = "V";
+   End-If;
+Else
+   AP_PAYSELCT_AET.DUMMY_FIELD.Value = AP_PAYSELCT_AET.PAY_RUN_AP_STATUS.Value;
+End-If;

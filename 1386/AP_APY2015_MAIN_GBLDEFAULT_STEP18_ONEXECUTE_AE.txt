@@ -1,0 +1,28 @@
+/**********************************************************************************************
+Actividad: 	  Tipo: 	PROYECTO: 					Autor: 				Fecha: 		
+#00001 		  Actlz. 	ETY_ERP_AP_FLP_OPTI_AP001 	Alexandro Pachón 	30 Abr 2015 
+Descripción:  Se realiza cambio para que despues de terminar la creación de los pagos en el 
+              Ciclo de Pago, los pagos queden por defecto separado.
+***********************************************************************************************/
+/* Inicio Actividad #00001 */
+
+SQLExec("SELECT SEPARATE_PAY_OPT FROM PS_ETY_PYCYCL_STAT WHERE PAY_CYCLE = :1 AND PAY_CYCLE_SEQ_NUM = :2", AP_PAYSELCT_AET.PAY_CYCLE, AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM, &SeparatePayOpt);
+
+If &SeparatePayOpt = "Y" Then
+   If AP_PAYSELCT_AET.PYCYCL_PROC_OPTION = "D" Then
+      
+      SQLExec("update ps_pycycl_data set pymnt_separate = 'Y' where pay_cycle = :1 and pay_cycle_seq_num = :2", AP_PAYSELCT_AET.PAY_CYCLE, AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM);
+      
+      SQLExec("select MAX(SOURCE_TXN) from ps_pycycl_data where pay_cycle = :1 and pay_cycle_seq_num = :2", AP_PAYSELCT_AET.PAY_CYCLE, AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM, &str_SOURCE_TXN);
+      If &str_SOURCE_TXN = "VCHR" Then
+         SQLExec("UPDATE PS_PYMNT_VCHR_XREF SET PYMNT_SEPARATE = 'Y' WHERE pay_cycle = :1 and pay_cycle_seq_num = :2", AP_PAYSELCT_AET.PAY_CYCLE, AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM);
+      End-If;
+      
+      SQLExec("select count(*) from ps_pycycl_data where pay_cycle = :1 and pay_cycle_seq_num = :2", AP_PAYSELCT_AET.PAY_CYCLE, AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM, &count);
+      If &count = 0 Then
+         SQLExec("UPDATE PS_PYCYCL_STAT SET PAY_RUN_AP_STATUS = '2' WHERE PAY_CYCLE = :1 AND PAY_CYCLE_SEQ_NUM = :2", AP_PAYSELCT_AET.PAY_CYCLE, AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM);
+      End-If;
+      
+   End-If;
+End-If;
+/* Fin Actividad #00001 */

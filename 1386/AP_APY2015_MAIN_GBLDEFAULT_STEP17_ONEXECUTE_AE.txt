@@ -1,0 +1,5 @@
+If PYCYCL_4_AET.REJECTED_FLG = "Y" Then
+   Exit 0;
+Else
+   Exit 1;
+End-If;

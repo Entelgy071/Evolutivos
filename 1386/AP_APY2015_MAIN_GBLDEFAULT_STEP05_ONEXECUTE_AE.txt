@@ -1,0 +1,29 @@
+/* If pay cycle is automatically initiated from a schedule jobset for pay cycle job 'APPCJOB', */
+/* insert a new AP_PCJOB_STAT record. Pay cycle submitted from the online pay cycle job page   */
+/* already has the AP_PCJOB_STAT record created.                                               */
+
+SQLExec("SELECT JOBINSTANCE, PRCSJOBNAME, SERVERNAMERUN, OPRID, %DateTimeOut(RUNDTTM), SCHEDULENAME FROM PSPRCSRQST WHERE PRCSINSTANCE = :1", AP_PAYSELCT_AET.PROCESS_INSTANCE, &JOBINSTANCE, &PRCSJOBNAME, &SERVERNAMERUN, &OPRID, &RUNDTTM, &SCHEDULENAME);
+
+If &JOBINSTANCE <> 0 And
+      &PRCSJOBNAME = "APPCJOB" And
+      All(&SCHEDULENAME) Then
+   
+   SQLExec("SELECT X.JOB_STATUS FROM PS_AP_PCJOB_STAT X WHERE X.PRCSJOBNAME = :1 AND X.PAY_CYCLE = :2 AND X.PRCSJOBSEQ = (SELECT MAX(Y.PRCSJOBSEQ) FROM PS_AP_PCJOB_STAT Y WHERE Y.PRCSJOBNAME = X.PRCSJOBNAME AND Y.PAY_CYCLE = X.PAY_CYCLE)", &PRCSJOBNAME, AP_PAYSELCT_AET.PAY_CYCLE, &JOB_STATUS);
+   
+   /* If previous run of pay cycle job is not finalized, display message and exit pay cycle. */
+   If &JOB_STATUS = "C" Or
+         &JOB_STATUS = "N" Or
+         &JOB_STATUS = "R" Or
+         &JOB_STATUS = "F" Then
+      SQLExec("SELECT MAX(PRCSJOBSEQ) FROM PS_AP_PCJOB_STAT WHERE PRCSJOBNAME = :1", &PRCSJOBNAME, &PRCSJOBSEQ);
+      If None(&PRCSJOBSEQ) Then
+         &PRCSJOBSEQ = 1;
+      Else
+         &PRCSJOBSEQ = &PRCSJOBSEQ + 1;
+      End-If;
+      SQLExec("INSERT INTO PS_AP_PCJOB_STAT (PRCSJOBNAME, PRCSJOBSEQ, PROCESS_INSTANCE, RUNDTTM, JOB_STATUS, OPRID, SERVERNAME, PAY_CYCLE, PAY_CYCLE_SEQ_NUM, MESSAGE_TEXT) VALUES (:1, :2, :3, %DateTimeIn(:4), :5, :6, :7, :8, :9, :10)", &PRCSJOBNAME, &PRCSJOBSEQ, &JOBINSTANCE, &RUNDTTM, "P", &OPRID, &SERVERNAMERUN, AP_PAYSELCT_AET.PAY_CYCLE, 0, " ");
+   Else
+      MessageBox(0, "", 7250, 403, "Message not found.", AP_PAYSELCT_AET.PAY_CYCLE);
+      Exit (1);
+   End-If;
+End-If;

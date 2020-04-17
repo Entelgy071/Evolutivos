@@ -1,0 +1,6 @@
+/* Call get_rate logic if the base currency of the bank is not equal to the payment currency.*/
+If PYCYCL_2_AET.BASE_CURR_GL_BNK <> PYCYCL_2_AET.PYMNT_CURRENCY Then
+   Exit 0
+Else
+   Exit 1
+End-If;
