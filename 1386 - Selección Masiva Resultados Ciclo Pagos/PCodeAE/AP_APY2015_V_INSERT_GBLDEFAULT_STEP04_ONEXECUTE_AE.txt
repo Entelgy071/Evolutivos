@@ -1,0 +1,5 @@
+If None(AP_PAYSELCT_AET.PYCYCL_KEY_FIELD2) Then
+   Exit 0;
+Else
+   Exit 1;
+End-If;

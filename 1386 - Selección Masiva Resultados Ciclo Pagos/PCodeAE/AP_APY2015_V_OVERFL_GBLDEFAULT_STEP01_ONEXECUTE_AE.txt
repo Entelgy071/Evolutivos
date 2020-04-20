@@ -1,0 +1,51 @@
+Local boolean &createOverflow;
+
+&createOverflow = False;
+
+/* These form type requires checking 'overflow' */
+Evaluate AP_PAYSELCT_AET.FORM_TYPE
+When = "CSO"
+When = "SCO"
+   If (AP_PAYSELCT_AET.REMIT_COUNT + 1) > AP_PAYSELCT_AET.REMIT_MAX_LINES Then
+      AP_PAYSELCT_AET.REMIT_COUNT = 0;
+      If PYCYCL_2_AET.FIRST_REMIT = "N" Then
+         PYCYCL_2_AET.FIRST_REMIT = "Y";
+      End-If;
+      &createOverflow = True;
+   End-If;
+   Break;
+When = "SCA"
+When = "CSA"
+   If AP_PAYSELCT_AET.REMIT_LINE_TYPE = "A" And
+         ((AP_PAYSELCT_AET.REMIT_COUNT + AP_PAYSELCT_AET.TMP_REMIT_COUNT) > AP_PAYSELCT_AET.REMIT_MAX_LINES) Then
+      AP_PAYSELCT_AET.REMIT_COUNT = 0;
+      If PYCYCL_2_AET.FIRST_ADVICE = "N" Then
+         PYCYCL_2_AET.FIRST_ADVICE = "Y";
+         If AP_PAYSELCT_AET.COUNT_LINES > 0 Then
+            PYCYCL_2_AET.PAY_PYMNT_ID_REF = "ADVICE";
+            Break;
+         Else
+            AP_PAYSELCT_AET.CALC_LINE_NBR_FLG = "Y";
+            Break;
+         End-If;
+      End-If;
+   End-If;
+   
+   If (AP_PAYSELCT_AET.REMIT_COUNT + 1) > AP_PAYSELCT_AET.REMIT_MAX_LINES Then
+      AP_PAYSELCT_AET.REMIT_COUNT = 0;
+      If PYCYCL_2_AET.FIRST_ADVICE = "N" Then
+         PYCYCL_2_AET.FIRST_ADVICE = "Y";
+         PYCYCL_2_AET.PAY_PYMNT_ID_REF = "ADVICE";
+      End-If;
+   End-If;
+   
+   Break;
+End-Evaluate;
+
+AP_PAYSELCT_AET.COUNT_LINES = AP_PAYSELCT_AET.COUNT_LINES + 1;
+
+If &createOverflow Then
+   Exit (0);
+Else
+   Exit (1);
+End-If;

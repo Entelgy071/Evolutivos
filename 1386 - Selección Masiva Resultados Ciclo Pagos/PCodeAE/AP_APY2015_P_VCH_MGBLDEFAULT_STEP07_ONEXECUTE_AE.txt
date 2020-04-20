@@ -1,0 +1,5 @@
+If PYCYCL_2_AET.TOTAL_PAID_AMT < 0 Then
+   Exit 0;
+Else
+   Exit 1;
+End-If;

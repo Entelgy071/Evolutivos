@@ -1,0 +1,13 @@
+/* Set up special label for prepaid msg */
+
+&MessageTemp = MsgGetText(7015, 307, "Prepayment") | ": " | String(PYCYCL_2_AET.APPLIED_AMT_PPAY);
+&MessageTemp = &MessageTemp | ", " | MsgGetText(18052, 148, "Invoice") | ": " | LTrim(RTrim(AP_PAYSELCT_AET.INVOICE_ID));
+/*
+&MsgLen = Len(&MessageTemp);
+&NewInvoiceID = &MessageTemp | PYCYCL_2_AET.APPLIED_AMT_PPAY | ",  " | Left(&InvoiceTemp, 22 - &MsgLen);
+*/
+AP_PAYSELCT_AET.PYMNT_MESSAGE.Value = &MessageTemp;
+AP_PAYSELCT_AET.PYMNT_OVRD_AMT = AP_PAYSELCT_AET.PYMNT_OVRD_AMT + (PYCYCL_2_AET.APPLIED_AMT_PPAY * - 1);
+AP_PAYSELCT_AET.DISCOUNT_TAKEN = 0;
+AP_PAYSELCT_AET.PAID_AMT_DSCNT = 0;
+AP_PAYSELCT_AET.PAID_AMT_GROSS = PYCYCL_2_AET.APPLIED_AMT_PPAY;

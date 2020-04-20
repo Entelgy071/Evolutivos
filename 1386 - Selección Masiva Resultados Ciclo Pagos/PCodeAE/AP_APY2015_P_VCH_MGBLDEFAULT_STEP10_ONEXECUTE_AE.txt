@@ -1,0 +1,10 @@
+PYCYCL_2_AET.PYMNT_AMT = PYCYCL_2_AET.TOTAL_PAID_AMT;
+If PYCYCL_2_AET.TOTAL_PAID_AMT < 0 Then
+   Exit 1;
+Else
+   /* Initialze BU, pay_doc_id. This is for printing PO advice Msg line */
+   PYCYCL_4_AET.BUSINESS_UNIT.Value = "XXX";
+   PYCYCL_4_AET.PAY_DOC_ID.Value = "XXX";
+   Exit 0;
+End-If;
+
