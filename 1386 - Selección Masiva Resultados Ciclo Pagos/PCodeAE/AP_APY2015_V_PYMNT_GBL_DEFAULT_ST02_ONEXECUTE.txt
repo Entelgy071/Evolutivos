@@ -1,0 +1,27 @@
+AP_PAYSELCT_AET.PRINT_PAYMENT = "Y";
+Evaluate AP_PAYSELCT_AET.FORM_TYPE
+When = "CSO" /* Check-Over-Stub-with-Overflow */
+When = "SCO" /* Stub-Over-Check-with-Overflow */
+   PYCYCL_2_AET.FIRST_REMIT = "N";
+   Break;
+When = "SCA" /* Stub-Over-Check-with-Advice */
+   Break;
+When = "CSA" /* Check-Over-Stub-with-Advice */
+   PYCYCL_2_AET.PAY_PYMNT_ID_REF = PYCYCL_2_AET.CK_PYMNT_REF_NUM;
+   Break;
+When = "CAV"
+   PYCYCL_2_AET.PAY_PYMNT_ID_REF = PYCYCL_2_AET.CK_PYMNT_REF_NUM;
+   Break;
+When = "CRA" /* Check-with-Separate-Advice */
+When = "CRW"
+When = "ADV"
+When = "LCA"
+When = "EFA" /** Check for EFT Advice Print **/
+   If PYCYCL_2_AET.NEW_ADVICE_FLAG = "Y" Then
+      PYCYCL_2_AET.PAY_PYMNT_ID_REF = "ADVICE";
+   End-If;
+   If PYCYCL_2_AET.NEW_ADVICE_FLAG <> "Y" Then
+      PYCYCL_2_AET.PAY_PYMNT_ID_REF = PYCYCL_2_AET.CK_PYMNT_REF_NUM;
+   End-If;
+   Break;
+End-Evaluate;

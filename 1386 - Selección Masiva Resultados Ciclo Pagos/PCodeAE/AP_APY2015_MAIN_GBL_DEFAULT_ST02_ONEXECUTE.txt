@@ -1,0 +1,18 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_EVO_1386
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		03/01/2020
+* Descripción:	Peoplecode que llama psjob de proceso de contabilización de pagos (FFCNTPAG), con sus parametros.
+***************************************************************************************************************************/
+/*If AP_PAYSELCT_AET.PYCYCL_PROC_OPTION = "B" Then
+   Exit 0;
+Else
+   Exit 1;
+End-If;*/
+If AP_PAYSELCT_AET.PYCYCL_PROC_OPTION = "B" Or
+      AP_PAYSELCT_AET.PYCYCL_PROC_OPTION = "G" Then
+   Exit 0;
+Else
+   Exit 1;
+End-If;

@@ -1,5 +1,0 @@
-If None(PYCYCL_2_AET.DFT_MAT_DT) Then
-   Exit 0;
-Else
-   Exit 1;
-End-If;

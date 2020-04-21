@@ -1,0 +1,5 @@
+If All(AP_PAYSELCT_AET.STTLMNT_DT_EST) Then
+   Exit 0;
+Else
+   Exit 1;
+End-If;

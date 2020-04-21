@@ -1,0 +1,51 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_2682
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		07/11/2019
+* Descripción:	Generacion de archivos planos
+***************************************************************************************************************************/
+
+Local string &str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9, &ledger;
+Local string &strURL, &strFecha, &strCodFideicomiso, &strI;
+Local number &nbrI, &nbr5;
+/*create a query API object*/
+Local ApiObject &aRunQry;
+/*create a session API object*/
+Local object &Session = %Session;
+
+SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'CONS_IMS' AND STRING_ID = 'CICLOPAGOS'", &StrText);
+
+If &Session <> Null Then
+   &aRunQry = &Session.GetQuery();
+End-If;
+
+If (&aRunQry.Open("TESORERIA_TRANS_PAG_IMS", True, False) <> 0) Then
+   MessageBox(0, "", 0, 0, "Error in opening query");
+Else
+   /* Output File */
+   &StrDate = Upper(Day(%Date) | Month(%Date) | Year(%Date));
+   &strFile = &StrDate | "_" | AP_PAYSELCT_AET.PAY_CYCLE.Value;
+   &outStrFile = %FilePath | &strFile;
+   /*&outStrFile = &StrText | &strFile;*/
+   
+   &aQryPromptRec = &aRunQry.PromptRecord;
+   /*&aQryPromptRec.BUS_UNIT_GL_W.Value = AP_PAYSELCT_AET.BUSINESS_UNIT.Value;
+   &aQryPromptRec.DATE_FROM.Value = AP_PAYSELCT_AET.PAY_FROM_DT.Value;
+   &aQryPromptRec.DATE_TO.Value = AP_PAYSELCT_AET.PAY_THRU_DT.Value;
+   &aQryPromptRec.PAY_CYCLE_SEQ_NUM.Value = AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM.Value;*/
+   &aQryPromptRec.BUS_UNIT_GL_W.Value = "GLFID";
+   &aQryPromptRec.DATE_FROM.Value = "2014-01-01";
+   &aQryPromptRec.DATE_TO.Value = "2014-03-30";
+   &aQryPromptRec.PAY_CYCLE_SEQ_NUM.Value = 77;
+   If &aQryPromptRec <> Null Then
+      /*&nResult = Prompt(&strQryName | " Prompts", "", &aQryPromptRec);
+      MessageBox(0, "", 0, 0, "Prompts");*/
+   End-If;
+   /*MessageBox(0, "", 0, 0, "Ruta: " | &outStrFile);*/
+   If (&aRunQry.RunToFile(&aQryPromptRec, &outStrFile, %Query_TXT, 0) = 0) Then
+      MessageBox(0, "", 0, 0, "Resultset saved into file successfully.");
+   Else
+      MessageBox(0, "", 0, 0, "Failed to save Resultset into file.");
+   End-If;
+End-If;

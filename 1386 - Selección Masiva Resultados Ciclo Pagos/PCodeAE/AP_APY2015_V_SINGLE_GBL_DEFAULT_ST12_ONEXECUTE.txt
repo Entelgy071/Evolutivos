@@ -1,0 +1,11 @@
+PYCYCL_2_AET.ADVICE_SEQ_NBR = 0;
+PYCYCL_2_AET.ADVICE_SEQ_CHAR = "";
+
+If AP_PAYSELCT_AET.PAID_AMT < 0 Then
+   Exit 1;
+Else
+   /* Initialze BU, pay_doc_id. This is for printing PO advice Msg line */
+   PYCYCL_4_AET.BUSINESS_UNIT.Value = "XXX";
+   PYCYCL_4_AET.PAY_DOC_ID.Value = "XXX";
+   Exit 0;
+End-If;

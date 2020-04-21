@@ -1,0 +1,57 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_2682
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		07/11/2019
+* Descripción:	Generacion de archivos planos
+***************************************************************************************************************************/
+import FF_AP_ENCRY_PL_AUTO:FF_CALL_ENCRY_PA;
+
+Local FF_AP_ENCRY_PL_AUTO:FF_CALL_ENCRY_PA &obj_encrypt;
+
+Local string &str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9, &ledger;
+Local string &strURL, &strFecha, &strCodFideicomiso, &strI;
+Local number &nbrI, &nbr5;
+/*create a query API object*/
+Local ApiObject &aRunQry;
+/*create a session API object*/
+Local object &Session = %Session;
+
+&obj_encrypt = create FF_AP_ENCRY_PL_AUTO:FF_CALL_ENCRY_PA();
+
+SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'INFORMACIONSUCURSA'", &StrText);
+
+If &Session <> Null Then
+   &aRunQry = &Session.GetQuery();
+End-If;
+
+If (&aRunQry.Open("TESORERIA_VCHR_PAGADOS_IMS", True, False) <> 0) Then
+   MessageBox(0, "", 0, 0, "Error in opening query");
+Else
+   &StrDate = Upper(Day(%Date) | Month(%Date) | Year(%Date));
+   &strFile = &StrDate | "_" | AP_PAYSELCT_AET.PAY_CYCLE.Value;
+   &outStrFile = %FilePath | &strFile;
+   /*&outStrFile = &StrText | &strFile;*/
+   
+   
+   &aQryPromptRec = &aRunQry.PromptRecord;
+   &aQryPromptRec.DATE_FROM.Value = AP_PAYSELCT_AET.PAY_FROM_DT.Value;
+   &aQryPromptRec.DATE_TO.Value = AP_PAYSELCT_AET.PAY_THRU_DT.Value;
+   &aQryPromptRec.PAY_CYCLE.Value = AP_PAYSELCT_AET.PAY_CYCLE.Value;
+   &aQryPromptRec.PAY_CYCLE_SEQ_NUM.Value = AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM.Value;
+   If &aQryPromptRec <> Null Then
+   End-If;
+   If (&aRunQry.RunToFile(&aQryPromptRec, &outStrFile, %Query_TXT, 0) = 0) Then
+      MessageBox(0, "", 0, 0, "El conjunto de resultados para TESORERIA_VCHR_PAGADOS_IMS se guardó en el archivo " | &strFile | ", correctamente.");
+   Else
+      MessageBox(0, "", 0, 0, "No se pudo guardar el conjunto de resultados en el archivo.");
+   End-If;
+End-If;
+
+&strFile = &strFile | ".csv";
+&StrFilenamePgpNtIms = &outStrFile | ".csv";
+&StrFilenamePgpImsProc = "\\democrito\TestCryptPS\1635000\" | &strFile;
+&recContext = GetRecord(Record.PYCYCL_3_AET);
+&recContext.SELECTPHRASE.Value = &strFile;
+/*&obj_encrypt.fi_MoveArchivo(&recContext, &StrFilenamePgpNtIms, &StrFilenamePgpImsProc);*/
+&obj_encrypt.fi_EncryptArchivo(&recContext);

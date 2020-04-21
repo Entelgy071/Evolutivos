@@ -1,0 +1,41 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_EVO_1386
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		03/01/2020
+* Descripción:	Peoplecode que llama psjob de proceso de contabilización de pagos (Job: FFCNTPAG), con sus parametros.
+***************************************************************************************************************************/
+Local Record &stateRec, &stateRec1;
+
+&stateRec = CreateRecord(Record.PST_PYMT_AET);
+&stateRec1 = CreateRecord(Record.PST_PYMT_RUN_BK);
+
+&stateRec.REQUEST_ID.Value = AP_PAYSELCT_AET.PAY_CYCLE.Value;
+&stateRec.DESCR.Value = "Contab. Automática Ciclo Pagos";
+&stateRec.POST_PYMNT_OPTION.Value = "B";
+
+Local SQL &SQL = CreateSQL(SQL.ETY_INF_PYMTRUNAP_SQL, AP_PAYSELCT_AET.PAY_CYCLE, AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM, AP_PAYSELCT_AET.BANK_SETID, AP_PAYSELCT_AET.BANK_CD, AP_PAYSELCT_AET.BANK_ACCT_KEY);
+
+While &SQL.Fetch(&BankSetId, &BankCd, &BankAcctKey, &PymntMethod, &PymntIdRef)
+   /*MessageBox(0, "", 0, 0, "Entro: " | &BankSetId | ", " | &BankCd | ", " | &BankAcctKey | ", " | &PymntMethod | ", " | &PymntIdRef);*/
+   &stateRec1.OPRID.Value = %UserId;
+   &stateRec1.RUN_CNTL_ID.Value = &strRunCntlId;
+   &stateRec1.REQUEST_ID.Value = AP_PAYSELCT_AET.PAY_CYCLE.Value;
+   &stateRec1.PROCESS_INSTANCE.Value = AP_PAYSELCT_AET.PROCESS_INSTANCE.Value;
+   &stateRec1.SETID.Value = &BankSetId;
+   &stateRec1.BANK_CD.Value = &BankCd;
+   &stateRec1.BANK_ACCT_KEY.Value = &BankAcctKey;
+   &stateRec1.Insert();
+End-While;
+&stateRec.Insert();
+/*CommitWork();*/
+
+/**Ejecutar App Engine Contabilizacion**/
+Local ProcessRequest &rqstCont;
+&rqstCont = CreateProcessRequest("PSJob", "FFCNTPAG");
+
+&rqstCont.RunControlID = "DIAN";
+&rqstCont.JobName = "FFCNTPAG";
+&rqstCont.RunDateTime = %Datetime;
+&rqstCont.TimeZone = %ServerTimeZone;
+&rqstCont.Schedule();

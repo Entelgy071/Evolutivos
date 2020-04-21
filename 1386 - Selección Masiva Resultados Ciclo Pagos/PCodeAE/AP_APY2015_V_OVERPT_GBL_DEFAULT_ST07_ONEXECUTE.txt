@@ -1,0 +1,5 @@
+&ID_CHAR = RTrim(String((Value(PYCYCL_2_AET.OLD_PYMNT_ID_REF) + AP_PAYSELCT_AET.LAST_FORM_NBR_USED)));
+
+&ID_CHAR1 = Rept("0", PYCYCL_2_AET.CK_NBR_LEN - Len(&ID_CHAR)) | &ID_CHAR;
+
+PYCYCL_2_AET.CK_ADDRESS1 = MsgGetText(7250, 379, "-Overflow from") | " " | RTrim(&ID_CHAR1);

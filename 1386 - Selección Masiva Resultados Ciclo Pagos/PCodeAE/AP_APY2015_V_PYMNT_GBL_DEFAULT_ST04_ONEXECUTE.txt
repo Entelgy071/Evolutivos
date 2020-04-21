@@ -1,0 +1,23 @@
+Evaluate AP_PAYSELCT_AET.FORM_TYPE
+When = "CSO" /* Check-Over-Stub-with-Overflow */
+When = "SCO" /* Stub-Over-Check-with-Overflow */
+   PYCYCL_2_AET.PAY_PYMNT_ID_REF = PYCYCL_2_AET.CK_PYMNT_REF_NUM;
+   PYCYCL_2_AET.OLD_PYMNT_ID_REF = PYCYCL_2_AET.CK_PYMNT_REF_NUM;
+   Break;
+When = "SCA" /* Stub-Over-Check-with-Advice */
+   AP_PAYSELCT_AET.REMIT_COUNT = 0;
+   PYCYCL_2_AET.FIRST_ADVICE = "N";
+   PYCYCL_2_AET.PAY_PYMNT_ID_REF = PYCYCL_2_AET.CK_PYMNT_REF_NUM;
+   Break;
+When = "CSA" /* Check-Over-Stub-with-Advice */
+   AP_PAYSELCT_AET.REMIT_COUNT = 0;
+   PYCYCL_2_AET.FIRST_ADVICE = "N";
+   Break;
+When = "CAV" /* Check-with-Separate-Advice */
+When = "CRA"
+When = "CRW"
+When = "ADV"
+When = "LCA"
+   AP_PAYSELCT_AET.REMIT_COUNT = 0;
+   Break;
+End-Evaluate;

@@ -1,6 +1,0 @@
-If None(PYCYCL_2_AET.EFT_KEY_FIELD1) Or
-      PYCYCL_2_AET.EFT_KEY_FIELD1 = " " Then
-   Exit 1;
-Else
-   Exit 0;
-End-If;

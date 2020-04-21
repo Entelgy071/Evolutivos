@@ -1,0 +1,6 @@
+If None(PYCYCL_2_AET.EFT_KEY_FIELD1) Or
+      PYCYCL_2_AET.EFT_KEY_FIELD1 = " " Then
+   Exit 0;
+Else
+   Exit 1;
+End-If;

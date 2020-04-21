@@ -1,0 +1,16 @@
+Evaluate AP_PAYSELCT_AET.FORM_TYPE
+When = "CSO"
+When = "SCO"
+   If AP_PAYSELCT_AET.REMIT_COUNT = AP_PAYSELCT_AET.REMIT_MAX_LINES Then
+      PYCYCL_2_AET.FIRST_REMIT = "Y";
+   End-If;
+   Break;
+When = "SCA"
+When = "CSA"
+   /*
+   If AP_PAYSELCT_AET.REMIT_COUNT = AP_PAYSELCT_AET.REMIT_MAX_LINES Then
+      PYCYCL_2_AET.FIRST_ADVICE = "Y";
+   End-If;
+*/
+   Break;
+End-Evaluate;

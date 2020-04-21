@@ -1,0 +1,15 @@
+import AP:Payment:PayCycle;
+
+Local AP:Payment:PayCycle &pycycl = create AP:Payment:PayCycle();
+
+PYCYCL_3_AET.SELECT_WHERE = &pycycl.getPycyclBu(AP_PAYSELCT_AET.PAY_CYCLE);
+
+If Len(RTrim(AP_PAYSELCT_AET.PAY_CYCLE)) >= 5 Then
+   If Substring(AP_PAYSELCT_AET.PAY_CYCLE, 1, 5) = "RSTRT" Then
+      AP_PAYSELCT_AET.RESTART_MODE_FLG = "Y";
+   Else
+      AP_PAYSELCT_AET.RESTART_MODE_FLG = "N";
+   End-If;
+Else
+   AP_PAYSELCT_AET.RESTART_MODE_FLG = "N";
+End-If;
