@@ -1,0 +1,16 @@
+import AP:Payment:PayCycle;
+
+Declare Function GRAY_ADVICE PeopleCode PYCYCL_WORK.PYCYCL_REFRESH_STS RowInit;
+Declare Function SHOW_PROCESSINSTANCE PeopleCode PYCYCL_WORK.PYCYCL_REFRESH_STS FieldFormula;
+
+Local AP:Payment:PayCycle &pc = create AP:Payment:PayCycle();
+
+If PYCYCL_WORK.ACTION_CHANGED = "Y" Then
+   &pc.serverupd();
+End-If;
+
+&pc.refreshAll();
+PYCYCL_WORK.ACTION_CHANGED = "N";
+
+GRAY_ADVICE();
+SHOW_PROCESSINSTANCE();

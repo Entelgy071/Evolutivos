@@ -1,0 +1,28 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_EVO_1386
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		02/01/2020
+* Descripción:	Inicializar la cantidad de pagos excluidos por cta bancaria inactiva.
+***************************************************************************************************************************/
+Evaluate PYCYCL_STAT.PAY_RUN_AP_STATUS
+When = "N"
+When = "C"
+When = "D"
+   PYCYCL_WORK.NUM_OF_VOUCHERS = 0;
+   Break;
+When-Other
+   &PAY_CYCLE_5 = Substring(PYCYCL_STAT.PAY_CYCLE, 1, 5);
+   Evaluate &PAY_CYCLE_5
+   When = "POSPY"
+      PYCYCL_WORK.NUM_OF_VOUCHERS = 0;
+      Break;
+      /*When = "RSTRT"
+      SQLExec("select count(*) from ps_pymnt_rstrt_tmp where pay_cycle = :1 and pay_cycle_seq_num = :2", PYCYCL_STAT.PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM, PYCYCL_WORK.NUM_OF_VOUCHERS);
+      Break;*/
+   When-Other
+      SQLExec("select count(*) FROM ps_pycycl_data A where pay_cycle =:1 and pay_cycle_seq_num =:2 AND pymnt_selct_status NOT IN ('N','D','V') AND BANK_ACCT_KEY IN (SELECT B.BANK_ACCT_KEY FROM PS_BANK_ACCT_DEFN B WHERE B.SETID = A.BANK_SETID AND B.BANK_CD = A.BANK_CD AND B.BANK_ACCT_KEY = A.BANK_ACCT_KEY AND B.ACCT_STATUS = 'I')", PYCYCL_STAT.PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM, PYCYCL_WORK.NUM_OF_VOUCHERS1);
+      Break;
+   End-Evaluate;
+   Break;
+End-Evaluate;

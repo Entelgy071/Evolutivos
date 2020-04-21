@@ -1,0 +1,295 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_EVO_1386
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		22/01/2020
+* Descripción:	Peoplecode para poner ciertos datos en la grid y excluir el pago por cta bancaria inactiva.
+***************************************************************************************************************************/
+Declare Function ReinstantiateLevel0 PeopleCode FUNCLIB_AP_INQ.REINSTATE_LEVEL0 FieldFormula;
+
+Global string &GBL_PAY_CYCLE1, &GBL_BANK_SETID, &GBL_BANK_CD, &GBL_BANK_ACCT_KEY, &GBL_PYMNT_METHOD, &GBL_CURRENCY_PYMNT;
+
+/*- Level 0 Rowset -*/
+Component Rowset &rsLevel0;
+/*- Row of Level 0 row 1 -*/
+Component Row &rwLevel0Row1;
+/*- Record of Level 0 row 1 -*/
+Component Record &rdLevel0;
+Component string &pg_sSearchKey;
+Component string &STAT_STATUS;
+
+Local Rowset &rsVchrInq;
+Local Record &rdVchrInq;
+
+Local string &sBuffer, &sWhere, &sFromBU, &sPcBind, &sDocBind, &sInvBind, &sRsBind, &sRvBind, &multCurr, &currency_pymnt;
+Local string &sRaBind, &sVenLocBind, &sBsBind, &sBcdBind, &sBakBind, &sPmBind, &sPhdBind, &sPcuBind;
+Local boolean &bNoError;
+Local number &total_paid, &total_gross, &total_dscnt;
+
+Function RestoreGlobalContext()
+   PYCYCL_DATA_WRK.PAY_CYCLE = &GBL_PAY_CYCLE1;
+   PYCYCL_DATA_WRK.BANK_SETID = &GBL_BANK_SETID;
+   PYCYCL_DATA_WRK.BANK_CD = &GBL_BANK_CD;
+   PYCYCL_DATA_WRK.BANK_ACCT_KEY = &GBL_BANK_ACCT_KEY;
+   PYCYCL_DATA_WRK.PYMNT_METHOD = &GBL_PYMNT_METHOD;
+   PYCYCL_DATA_WRK.CURRENCY_PYMNT = &GBL_CURRENCY_PYMNT;
+End-Function;
+
+Function calcTotals();
+   &total_paid = 0;
+   &total_gross = 0;
+   &total_dscnt = 0;
+   &rsVchrInq = &rwLevel0Row1.GetRowset(Scroll.PYCYCL_DATA_VW1);
+   For &j = 1 To &rsVchrInq.ActiveRowCount
+      &rdVchrInq = &rsVchrInq(&j).GetRecord(Record.PYCYCL_DATA_VW1);
+      If &j = 1 Then
+         &currency_pymnt = &rdVchrInq.CURRENCY_PYMNT.Value;
+      End-If;
+      If &currency_pymnt <> &rdVchrInq.CURRENCY_PYMNT.Value Then
+         &multCurr = "Y";
+      End-If;
+      If &multCurr = "Y" Then
+         Break;
+      End-If;
+      &total_paid = &total_paid + &rdVchrInq.PAID_AMT.Value;
+      &total_gross = &total_gross + &rdVchrInq.PAID_AMT_GROSS.Value;
+      &total_dscnt = &total_dscnt + &rdVchrInq.PAID_AMT_DSCNT.Value;
+      &total_late = &total_late + &rdVchrInq.LATE_CHRG_PAID.Value;
+   End-For;
+   If &multCurr = "Y" Then
+      &rdLevel0.DISPLAY_CURRENCY.Value = "";
+      &rdLevel0.CURRENCY_CD1.Value = "";
+      &rdLevel0.TOTAL_PAID_AMT.Value = 0;
+      &rdLevel0.GROSS_AMT.Value = 0;
+      &rdLevel0.DSCNT_PAY_AMT.Value = 0;
+      &rdLevel0.LATE_CHRG_PAID.Value = 0;
+      
+      &rdLevel0.DESCR100.Value = MsgGetText(9460, 11, "*** Totals not available. Multiple currencies are presented. ***");
+      
+      &rdLevel0.DESCR100.Visible = True;
+      &rdLevel0.DESCR100.Style = "STRONG";
+      
+      &rdLevel0.DISPLAY_CURRENCY.Visible = False;
+      &rdLevel0.CURRENCY_CD1.Visible = False;
+      &rdLevel0.TOTAL_PAID_AMT.Visible = False;
+      &rdLevel0.GROSS_AMT.Visible = False;
+      &rdLevel0.DSCNT_PAY_AMT.Visible = False;
+      &rdLevel0.LATE_CHRG_PAID.Visible = False;
+   Else
+      &rdLevel0.DISPLAY_CURRENCY.Value = &currency_pymnt;
+      &rdLevel0.CURRENCY_CD1.Value = &currency_pymnt;
+      &rdLevel0.TOTAL_PAID_AMT.Value = &total_paid;
+      &rdLevel0.GROSS_AMT.Value = &total_gross;
+      &rdLevel0.DSCNT_PAY_AMT.Value = &total_dscnt;
+      &rdLevel0.LATE_CHRG_PAID.Value = &total_late;
+      
+      &rdLevel0.DESCR100.Visible = False;
+      &rdLevel0.DISPLAY_CURRENCY.Visible = True;
+      &rdLevel0.CURRENCY_CD1.Visible = True;
+      &rdLevel0.TOTAL_PAID_AMT.Visible = True;
+      &rdLevel0.GROSS_AMT.Visible = True;
+      &rdLevel0.DSCNT_PAY_AMT.Visible = True;
+      &rdLevel0.LATE_CHRG_PAID.Visible = True;
+      
+      &rdLevel0.DISPLAY_CURRENCY.Style = "STRONG";
+      &rdLevel0.CURRENCY_CD1.Style = "STRONG";
+      &rdLevel0.TOTAL_PAID_AMT.Style = "STRONG";
+      &rdLevel0.GROSS_AMT.Style = "STRONG";
+      &rdLevel0.DSCNT_PAY_AMT.Style = "STRONG";
+      &rdLevel0.LATE_CHRG_PAID.Style = "STRONG";
+   End-If;
+End-Function;
+
+
+Function SearchExeStatement(&force)
+   
+   ReinstantiateLevel0("PYCYCL_DATA_WRK");
+   
+   &bNoError = True;
+   
+   If None(&rdLevel0.PAY_CYCLE.Value) Then
+      MessageBox(0, "", 7015, 57, "You must enter a Pay Cycle.");
+      &bNoError = False;
+   Else
+      SQLExec("select pycycl_security from ps_installation_fs", &PYCYCL_SEC);
+      If &PYCYCL_SEC = "Y" Then
+         SQLExec("select security_type from ps_installation_fs", &SECURITY_TYPE);
+         Evaluate &SECURITY_TYPE
+         When "O"
+            &OPERATOR = %OperatorId;
+            SQLExec("select 'x' from ps_sec_pycycl_opr  where oprid = :1 and pay_cycle = :2", &OPERATOR, &rdLevel0.PAY_CYCLE.Value, &EXISTS);
+            Break;
+         When "C"
+            &CLASS = %OperatorClass;
+            SQLExec("select 'x' from ps_sec_pycycl_cls where oprclass = :1 and pay_cycle = :2", &CLASS, &rdLevel0.PAY_CYCLE.Value, &EXISTS);
+            Break;
+         When-Other
+            &EXISTS = "x";
+            Break;
+         End-Evaluate;
+         If None(&EXISTS) Then
+            Error MsgGet(7015, 186, "Either the pay cycle doesn't exist OR  you are not authorized to use it.");
+            &bNoError = False;
+         End-If;
+      End-If;
+   End-If;
+   
+   If &bNoError Then
+      
+      /********************************************************/
+      /* Generate and execute the SQL Statement               */
+      /********************************************************/
+      
+      /*----------------------------------------------------------------*/
+      /* RUN THE SQL STATEMENT ONLY IF ONE OF THE SEARCH CRITERIA VALUE */
+      /* HAS CHANGED.                                                   */
+      /*----------------------------------------------------------------*/
+      
+      &sBuffer = &rdLevel0.PAY_CYCLE.Value | &rdLevel0.BUSINESS_UNIT.Value | &rdLevel0.PAY_DOC_ID.Value | &rdLevel0.INVOICE_ID.Value | &rdLevel0.REMIT_SETID.Value | &rdLevel0.REMIT_VENDOR.Value | &rdLevel0.REMIT_ADDR_SEQ_NUM.Value | &rdLevel0.VNDR_LOC.Value;
+      
+      &sBuffer = &sBuffer | &rdLevel0.BANK_SETID.Value | &rdLevel0.BANK_CD.Value | &rdLevel0.BANK_ACCT_KEY.Value | &rdLevel0.PYMNT_METHOD.Value | &rdLevel0.PYMNT_HANDLING_CD.Value | &rdLevel0.CURRENCY_PYMNT.Value;
+      
+      
+      /*---- IF SEARCH CRITERIA HAS CHANGED, build the Where clause and execute the SQL ----*/
+      If &pg_sSearchKey <> &sBuffer Or
+            &force = "Y" Then
+         
+         &pg_sSearchKey = &sBuffer;
+         
+         &rsVchrInq = &rwLevel0Row1.GetRowset(Scroll.PYCYCL_DATA_VW1);
+         
+         /*---------------------------------------------*/
+         /*--------- Building the Where clause ---------*/
+         /*---------------------------------------------*/
+         &sPcBind = &rdLevel0.PAY_CYCLE.Value;
+         &sWhere = "WHERE PAY_CYCLE = :1";
+         
+         /*-- Business Unit --*/
+         If All(&rdLevel0.BUSINESS_UNIT.Value) Then
+            &sFromBU = Upper(&rdLevel0.BUSINESS_UNIT.Value);
+            &sWhere = &sWhere | " AND BUSINESS_UNIT = :2";
+         End-If;
+         
+         /*-- Pay Doc ID --*/
+         If All(&rdLevel0.PAY_DOC_ID.Value) Then
+            &sDocBind = &rdLevel0.PAY_DOC_ID.Value;
+            &sWhere = &sWhere | " AND PAY_DOC_ID = :3";
+         End-If;
+         
+         /*-- Invoice ID --*/
+         If All(&rdLevel0.INVOICE_ID.Value) Then
+            &sInvBind = &rdLevel0.INVOICE_ID.Value;
+            &sWhere = &sWhere | " AND INVOICE_ID = :4";
+         End-If;
+         
+         /*-- Remit SetID --*/
+         If All(&rdLevel0.REMIT_SETID.Value) Then
+            &sRsBind = Upper(&rdLevel0.REMIT_SETID.Value);
+            &sWhere = &sWhere | " AND REMIT_SETID = :5";
+         End-If;
+         
+         /*-- Vendor ID --*/
+         If All(&rdLevel0.REMIT_VENDOR.Value) Then
+            &sRvBind = Upper(&rdLevel0.REMIT_VENDOR.Value);
+            &sWhere = &sWhere | " AND REMIT_VENDOR = :6";
+         End-If;
+         
+         /*-- Address --*/
+         If All(&rdLevel0.REMIT_ADDR_SEQ_NUM.Value) Then
+            &sRaBind = Upper(&rdLevel0.REMIT_ADDR_SEQ_NUM.Value);
+            &sWhere = &sWhere | " AND ADDRESS_SEQ_NUM = :7";
+         End-If;
+         
+         /*-- Vendor Location --*/
+         If All(&rdLevel0.VNDR_LOC.Value) Then
+            &sVenLocBind = Upper(&rdLevel0.VNDR_LOC.Value);
+            &sWhere = &sWhere | " AND VNDR_LOC = :8";
+         End-If;
+         
+         /*-- Bank SetID --*/
+         If All(&rdLevel0.BANK_SETID.Value) Then
+            &sBsBind = Upper(&rdLevel0.BANK_SETID.Value);
+            &sWhere = &sWhere | " AND BANK_SETID = :9";
+         End-If;
+         
+         /*-- Bank Cd--*/
+         If All(&rdLevel0.BANK_CD.Value) Then
+            &sBcdBind = Upper(&rdLevel0.BANK_CD.Value);
+            &sWhere = &sWhere | " AND BANK_CD = :10";
+         End-If;
+         
+         /*-- Bank Acct Key --*/
+         If All(&rdLevel0.BANK_ACCT_KEY.Value) Then
+            &sBakBind = Upper(&rdLevel0.BANK_ACCT_KEY.Value);
+            &sWhere = &sWhere | " AND BANK_ACCT_KEY = :11";
+         End-If;
+         
+         /*-- Payment Method --*/
+         If All(&rdLevel0.PYMNT_METHOD.Value) Then
+            &sPmBind = Upper(&rdLevel0.PYMNT_METHOD.Value);
+            &sWhere = &sWhere | " AND PYMNT_METHOD = :12";
+         End-If;
+         
+         /*-- Payment Handling --*/
+         If All(&rdLevel0.PYMNT_HANDLING_CD.Value) Then
+            &sPhdBind = Upper(&rdLevel0.PYMNT_HANDLING_CD.Value);
+            &sWhere = &sWhere | " AND PYMNT_HANDLING_CD = :13";
+         End-If;
+         
+         /*-- Payment Currency --*/
+         If All(&rdLevel0.CURRENCY_PYMNT.Value) Then
+            &sPcuBind = Upper(&rdLevel0.CURRENCY_PYMNT.Value);
+            &sWhere = &sWhere | " AND CURRENCY_PYMNT = :14";
+         End-If;
+         
+         SQLExec("SELECT MAX(PAY_CYCLE_SEQ_NUM) FROM PS_PYCYCL_STAT WHERE PAY_CYCLE = :1", &sPcBind, &seqnum);
+         &rdLevel0.PAY_CYCLE_SEQ_NUM.Value = &seqnum;
+         
+         &sWhere = &sWhere | " AND PAY_CYCLE_SEQ_NUM = :15";
+         
+         SQLExec("SELECT PAY_RUN_AP_STATUS FROM PS_PYCYCL_STAT WHERE PAY_CYCLE = :1 AND PAY_CYCLE_SEQ_NUM = :2", &sPcBind, &seqnum, &STAT_STATUS);
+         
+         &rsVchrInq.Flush();
+         &rsVchrInq.Select(Record.PYCYCL_DATA_VW1, &sWhere, &sPcBind, &sFromBU, &sDocBind, &sInvBind, &sRsBind, &sRvBind, &sRaBind, &sVenLocBind, &sBsBind, &sBcdBind, &sBakBind, &sPmBind, &sPhdBind, &sPcuBind, &seqnum);
+         calcTotals();
+         
+         If &STAT_STATUS = "R" Then
+            GetGrid(Page.PYCYCL_DATA_INQ, "PYCYCL_DATA_VW1").GetColumn("PAY_DOC_ACTION").Enabled = True;
+         Else
+            GetGrid(Page.PYCYCL_DATA_INQ, "PYCYCL_DATA_VW1").GetColumn("PAY_DOC_ACTION").Enabled = False;
+         End-If;
+         For &I = 1 To &rsVchrInq.ActiveRowCount
+            &rsVchrInq(&I).PYCYCL_PNL_WRK1.PAY_DOC_ID.Label = &rsVchrInq(&I).PYCYCL_DATA_VW1.PAY_DOC_ID.Value;
+            If &rsVchrInq(&I).PYCYCL_DATA_VW1.PYMNT_SEPARATE.Value = "Y" Then
+               &rsVchrInq(&I).PYCYCL_PNL_WRK1.PAY_DOC_ACTION.Value = "S";
+            End-If;
+            If &rsVchrInq(&I).PYCYCL_DATA_VW1.SOURCE_TXN.Value = "VCHR" Or
+                  &rsVchrInq(&I).PYCYCL_DATA_VW1.SOURCE_TXN.Value = "EXPN" Or
+                  &rsVchrInq(&I).PYCYCL_DATA_VW1.SOURCE_TXN.Value = "EXAD" Then
+               &rsVchrInq(&I).PYCYCL_PNL_WRK1.PAY_DOC_ID.Enabled = True;
+            Else
+               &rsVchrInq(&I).PYCYCL_PNL_WRK1.PAY_DOC_ID.Enabled = False;
+            End-If;
+            REM MessageBox(0, "", 0, 0, "Dato " | &rsVchrInq(&I).PYCYCL_DATA_VW1.PAY_DOC_ID.Value);
+            /**Inicio #001**/
+            SQLExec("SELECT A.PAY_DOC_ID, A.BUSINESS_UNIT FROM PS_PYCYCL_DATA_VW1 A WHERE A.BANK_ACCT_KEY IN (SELECT B.BANK_ACCT_KEY FROM PS_BANK_ACCT_DEFN B WHERE B.SETID = A.BANK_SETID AND B.BANK_CD = A.BANK_CD AND B.BANK_ACCT_KEY = A.BANK_ACCT_KEY AND B.ACCT_STATUS = 'I') AND A.PAY_CYCLE=:1 AND A.PAY_DOC_ID =:2 AND BANK_SETID =:3", &sPcBind, &rsVchrInq(&I).PYCYCL_DATA_VW1.PAY_DOC_ID.Value, &rsVchrInq(&I).PYCYCL_DATA_VW1.BANK_SETID.Value, &CountPDI, &BUPDI);
+            REM MessageBox(0, "", 0, 0, "Dato " | &CountPDI | "1." | &rsVchrInq(&I).PYCYCL_DATA_VW1.PAY_DOC_ID.Value);
+            
+            
+            If All(&CountPDI) Then
+               &rsVchrInq(&I).PYCYCL_PNL_WRK1.PAY_DOC_ACTION.Value = "E";
+               &rsVchrInq(&I).PYCYCL_PNL_WRK1.DESCR.Value = "Cuenta bancaria inactiva";
+               &rsVchrInq(&I).PYCYCL_PNL_WRK1.DESCR.Enabled = False;
+               rem End-If;
+            End-If;
+            /**Fin #001**/
+         End-For;
+         
+         GetGrid(Page.PYCYCL_DATA_INQ, "PYCYCL_DATA_VW1").GetColumn("DOC_ID_LBL2").Label = GetGrid(Page.PYCYCL_DATA_INQ, "PYCYCL_DATA_VW1").GetColumn("DOC_ID_LBL1").Label;
+         
+      End-If;
+      
+   End-If;
+   
+End-Function;
+

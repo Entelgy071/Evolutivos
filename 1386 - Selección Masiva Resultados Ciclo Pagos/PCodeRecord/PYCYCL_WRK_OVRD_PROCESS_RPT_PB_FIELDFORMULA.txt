@@ -1,0 +1,298 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_2682
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		07/11/2019
+* Descripción:	Generacion de archivos planos desde PSQUERY
+* Proyecto:	    ETY_ERP_AP_EVO_1386
+* Actividad:  	002
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		16/03/2020
+* Descripción:	Ejecucion procesos fin de ciclo de pagos, ejecucion job de contabilizacion.
+***************************************************************************************************************************/
+/***Inicio #001***/
+import AP:Payment:PayCycle;
+import FF_AP_ENCRY_PL_AUTO:FF_CALL_ENCRY_PA;
+
+Local FF_AP_ENCRY_PL_AUTO:FF_CALL_ENCRY_PA &obj_encrypt;
+
+Declare Function SET_NEXT_STATUS PeopleCode PYCYCL_STATRPT.PAY_RUN_AP_STATUS RowInit;
+
+/***Fin #001***/
+Function Set_BatchID(&sPayCycle As string, &nPCSeqNbr As number) Returns string;
+   &sStr1Len = 6 - Len(String(&nPCSeqNbr));
+   &sStr1 = Substring("000000", 1, &sStr1Len) | String(&nPCSeqNbr);
+   &sBatchID = &sPayCycle | "-" | &sStr1;
+   Return &sBatchID;
+End-Function;
+
+/***Inicio #001***/
+Function Psquery_VCHRPAGADOSIMS(&PayFromDt As date, &PayThruDt As date, &PayCycle As string, &PC_SeqNum As number) Returns string;
+   Local string &str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9, &ledger;
+   Local string &strURL, &strFecha, &strCodFideicomiso, &strI;
+   Local number &nbrI, &nbr5;
+   /*create a query API object*/
+   Local ApiObject &aRunQry;
+   /*create a session API object*/
+   Local object &Session = %Session;
+   
+   &obj_encrypt = create FF_AP_ENCRY_PL_AUTO:FF_CALL_ENCRY_PA();
+   
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'CONSULTAS'", &StrText);
+   
+   If &Session <> Null Then
+      &aRunQry = &Session.GetQuery();
+   End-If;
+   
+   If (&aRunQry.Open("TESORERIA_VCHR_PAGADOS_IMS", True, False) <> 0) Then
+      MessageBox(0, "", 0, 0, "Error in opening query");
+   Else
+      &StrDate = Upper(Day(%Date) | Month(%Date) | Year(%Date));
+      &strFile = &StrDate | "_" | PYCYCL_STAT.PAY_CYCLE.Value | "_" | PYCYCL_STAT.PAY_CYCLE_SEQ_NUM.Value;
+      /*&outStrFile = %FilePath | &strFile;
+   &outStrFile = "\\172.16.0.146\ims\Consulta_2\" | &strFile;*/
+      &outStrFile = &StrText | &strFile;
+      /*MessageBox(0, "", 0, 0, "Param: " | AP_PAYSELCT_AET.PAY_FROM_DT.Value | ", " | AP_PAYSELCT_AET.PAY_THRU_DT.Value | ", " | AP_PAYSELCT_AET.PAY_CYCLE.Value | ", " | AP_PAYSELCT_AET.PAY_CYCLE_SEQ_NUM.Value);*/
+      &aQryPromptRec = &aRunQry.PromptRecord;
+      &aQryPromptRec.DATE_FROM.Value = &PayFromDt;
+      &aQryPromptRec.DATE_TO.Value = &PayThruDt;
+      &aQryPromptRec.PAY_CYCLE.Value = &PayCycle;
+      &aQryPromptRec.PAY_CYCLE_SEQ_NUM.Value = &PC_SeqNum;
+      If &aQryPromptRec <> Null Then
+      End-If;
+      If None(&PayFromDt) Or
+            None(&PayThruDt) Or
+            None(&PayCycle) Or
+            None(&PC_SeqNum) Then
+         /*MessageBox(0, "", 0, 0, "No se pudo ejecutar el conjunto de resultados. Parámetros vacíos y/o incompletos.");*/
+         &ReturnStr = "No se pudo ejecutar el conjunto de resultados. Parámetros vacíos y/o incompletos.";
+      Else
+         If (&aRunQry.RunToFile(&aQryPromptRec, &outStrFile, %Query_TXT, 0) = 0) Then
+            /*MessageBox(0, "", 0, 0, "El conjunto de resultados para TESORERIA_VCHR_PAGADOS_IMS se guardó en el archivo " | &strFile | ", correctamente.");*/
+            &ReturnStr = "El conjunto de resultados para TESORERIA_VCHR_PAGADOS_IMS se guardó en el archivo " | &strFile | ", correctamente."
+         Else
+            /*MessageBox(0, "", 0, 0, "No se pudo guardar el conjunto de resultados en el archivo.");*/
+            &ReturnStr = "El conjunto de resultados para TESORERIA_VCHR_PAGADOS_IMS se guardó en el archivo " | &strFile | ", correctamente.";
+         End-If;
+      End-If;
+   End-If;
+   Return (&ReturnStr);
+   
+   &strFile = &strFile | ".csv";
+   &StrFilenamePgpNtIms = &outStrFile | ".csv";
+   &StrFilenamePgpImsProc = "\\172.16.0.146\ims\Consulta_2\" | &strFile;
+   &recContext = GetRecord(Record.PYCYCL_3_AET);
+   &recContext.SELECTPHRASE.Value = &strFile;
+   /*&obj_encrypt.fi_MoveArchivo(&recContext, &StrFilenamePgpNtIms, &StrFilenamePgpImsProc);*/
+   &obj_encrypt.fi_EncryptArchivo(&recContext);
+End-Function;
+
+/***Fin #001***/
+/***Inicio #002***/
+Function insertJobTblFor(&PRCSINSTANCE As number, &PRCSTYPE As string, &PRCSNAME As string, &BUSPROC As string, &ACTIVITY As string, &EVENTNAME As string);
+   Local Rowset &RowLevel1, &RowLevel2;
+   
+   &RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.PYCYCL_STAT);
+   &RowLevel2 = &RowLevel1.GetRow(1).GetRowset(Scroll.PYCYCL_STATRPT);
+   
+   
+   For &JOB_ROW = 1 To &RowLevel2.ActiveRowCount;
+      
+      If &RowLevel2.GetRow(&JOB_ROW).PYCYCL_STATRPT.PYMNT_METHOD.Value = "WIR" Then
+         
+         &CURRENT_ROW = ActiveRowCount(PYCYCL_JOB_TBL.PAY_CYCLE);
+         
+         If (&JOB_ROW > 1 Or
+               &CURRENT_ROW > 1) Then
+            REM &CURRENT_ROW = ActiveRowCount(PYCYCL_JOB_TBL.PAY_CYCLE);
+            InsertRow(Record.PYCYCL_JOB_TBL, &CURRENT_ROW);
+         End-If;
+         UpdateValue(PYCYCL_JOB_TBL.PAY_CYCLE, &CURRENT_ROW, &RowLevel2.GetRow(&JOB_ROW).PYCYCL_STATRPT.PAY_CYCLE.Value);
+         UpdateValue(PYCYCL_JOB_TBL.PAY_CYCLE_SEQ_NUM, &CURRENT_ROW, &RowLevel2.GetRow(&JOB_ROW).PYCYCL_STATRPT.PAY_CYCLE_SEQ_NUM.Value);
+         UpdateValue(PYCYCL_JOB_TBL.PAY_RUN_AP_STATUS, &CURRENT_ROW, "V");
+         UpdateValue(PYCYCL_JOB_TBL.JOB_TYPE, &CURRENT_ROW, "P");
+         UpdateValue(PYCYCL_JOB_TBL.PRCSINSTANCE, &CURRENT_ROW, &PRCSINSTANCE);
+         UpdateValue(PYCYCL_JOB_TBL.PRCSTYPE, &CURRENT_ROW, &PRCSTYPE);
+         UpdateValue(PYCYCL_JOB_TBL.PRCSNAME, &CURRENT_ROW, &PRCSNAME);
+         UpdateValue(PYCYCL_JOB_TBL.BANK_SETID, &CURRENT_ROW, &RowLevel2.GetRow(&JOB_ROW).PYCYCL_STATRPT.BANK_SETID.Value);
+         UpdateValue(PYCYCL_JOB_TBL.BANK_CD, &CURRENT_ROW, &RowLevel2.GetRow(&JOB_ROW).PYCYCL_STATRPT.BANK_CD.Value);
+         UpdateValue(PYCYCL_JOB_TBL.BANK_ACCT_KEY, &CURRENT_ROW, &RowLevel2.GetRow(&JOB_ROW).PYCYCL_STATRPT.BANK_ACCT_KEY.Value);
+         UpdateValue(PYCYCL_JOB_TBL.PYMNT_METHOD, &CURRENT_ROW, &RowLevel2.GetRow(&JOB_ROW).PYCYCL_STATRPT.PYMNT_METHOD.Value);
+         UpdateValue(PYCYCL_JOB_TBL.PYMNT_FILENAME, &CURRENT_ROW, &RowLevel2.GetRow(&JOB_ROW).PYCYCL_STATRPT.PYMNT_FILENAME.Value);
+         UpdateValue(PYCYCL_JOB_TBL.BUSPROCNAME, &CURRENT_ROW, "");
+         UpdateValue(PYCYCL_JOB_TBL.ACTIVITYNAME, &CURRENT_ROW, "");
+         UpdateValue(PYCYCL_JOB_TBL.EVENTNAME, &CURRENT_ROW, "");
+      End-If;
+   End-For;
+End-Function;
+
+
+Function End_Pymnt_Cycle();
+   Local AP:Payment:PayCycle &pC = create AP:Payment:PayCycle();
+   Local Rowset &RowLevel1, &RowLevel2;
+   Local Record &stateRecJob, &stateRecJob1, &stateRecAE;
+   
+   &stateRecJob = CreateRecord(Record.PST_PYMT_RUN_AP);
+   &stateRecJob1 = CreateRecord(Record.PST_PYMT_RUN_BK);
+   
+   &stateRecAE = CreateRecord(Record.PST_PYMT_AET);
+   
+   &RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.PYCYCL_STAT);
+   &RowLevel2 = &RowLevel1.GetRow(1).GetRowset(Scroll.PYCYCL_STATRPT);
+   
+   /****Ejecutar Job Contabilizacion****/
+   <*&stateRecJob.OPRID.Value = %OperatorId;
+   &stateRecJob.RUN_CNTL_ID.Value = Substring(PYCYCL_STAT.PAY_CYCLE.Value | %Date, 1, 30);
+   &stateRecJob.REQUEST_ID.Value = PYCYCL_STAT.PAY_CYCLE.Value;
+   &stateRecJob.DESCR.Value = "Contab. Automática Ciclo Pagos";
+   &stateRecJob.PROCESS_FREQUENCY.Value = "A";
+   &stateRecJob.PROCESS_ORIGIN.Value = "P";
+   &stateRecJob.POST_PYMNT_OPTION.Value = "B";
+   &stateRecJob.Insert();*>
+   
+   
+   REM If  PYCYCL_STATRPT.PYMNT_METHOD.Value = "WIR" Then;
+   rem MessageBox(0, "", 0, 0, "&RowLevel2: " | &RowLevel2.GetRow(&i).PYCYCL_STATRPT.PAY_CYCLE_SEQ_NUM.Value | ", " | &RowLevel2.GetRow(&i).PYCYCL_STATRPT.BANK_CD.Value | ", " | &RowLevel2.GetRow(&i).PYCYCL_STATRPT.BANK_ACCT_KEY.Value);
+   &RQST_XMLP = CreateProcessRequest();
+   &RQST_XMLP.ProcessType = "XML Publisher";
+   &RQST_XMLP.ProcessName = "APX2027";
+   &RQST_XMLP.RunControlID = PYCYCL_PNL_WRK4.RUNCNTLID;
+   &RQST_XMLP.RunLocation = PYCYCL_WRK_OVRD.SERVERNAME;
+   &RQST_XMLP.OutDestType = PYCYCL_STATRPT.OUTDESTTYPE;
+   &RQST_XMLP.OutDest = PYCYCL_STATRPT.OUTDEST;
+   &RQST_XMLP.RunDateTime = %Datetime;
+   &RQST_XMLP.RunControlID = Substring(PYCYCL_PNL_WRK4.RUNCNTLID | &RQST_XMLP.RunDateTime, 1, 30);
+   &RQST_XMLP.Schedule();
+   /*insertJobTblFor(&RQST_XMLP.ProcessInstance, &RQST_XMLP.ProcessType, &RQST_XMLP.ProcessName, "", "", "");
+      &status = PYCYCL_STATRPT.PAY_RUN_AP_STATUS;
+      PYCYCL_STATRPT.PAY_RUN_AP_STATUS = SET_NEXT_STATUS(&status);*/
+   
+   &RQST_ETY_TRS = CreateProcessRequest();
+   &RQST_ETY_TRS.ProcessType = "Application Engine";
+   &RQST_ETY_TRS.ProcessName = "ETY_TRS";
+   &RQST_ETY_TRS.RunControlID = PYCYCL_PNL_WRK4.RUNCNTLID;
+   &RQST_ETY_TRS.RunLocation = PYCYCL_WRK_OVRD.SERVERNAME;
+   &RQST_ETY_TRS.OutDestType = PYCYCL_STATRPT.OUTDESTTYPE;
+   &RQST_ETY_TRS.OutDest = PYCYCL_STATRPT.OUTDEST;
+   &RQST_ETY_TRS.RunDateTime = %Datetime;
+   &RQST_ETY_TRS.RunControlID = Substring(PYCYCL_PNL_WRK4.RUNCNTLID | &RQST_XMLP.RunDateTime, 1, 30);
+   &RQST_ETY_TRS.Schedule();
+   
+   insertJobTblFor(&RQST_ETY_TRS.ProcessInstance, &RQST_ETY_TRS.ProcessType, &RQST_ETY_TRS.ProcessName, "", "", "");
+   /*&status = PYCYCL_STATRPT.PAY_RUN_AP_STATUS;
+      PYCYCL_STATRPT.PAY_RUN_AP_STATUS = SET_NEXT_STATUS(&status);*/
+   
+   
+   REM MessageBox(0, "", 0, 0, "" | &i | "ENTRO ACATRS" | &status);
+   
+   
+   
+   
+   
+   /****Ejecutar Job Contabilizacion****/
+   <*For &i = 1 To &RowLevel2.ActiveRowCount;
+      
+      
+      
+      
+      &stateRecJob1.OPRID.Value = %OperatorId;
+      &stateRecJob1.RUN_CNTL_ID.Value = Substring(&RowLevel2.GetRow(&i).PYCYCL_STATRPT.PAY_CYCLE.Value | %Date, 1, 30);
+      &stateRecJob1.REQUEST_ID.Value = &RowLevel2.GetRow(&i).PYCYCL_STATRPT.PAY_CYCLE.Value;
+      &stateRecJob1.PROCESS_INSTANCE.Value = 0;
+      &stateRecJob1.SETID.Value = &RowLevel2.GetRow(&i).PYCYCL_STATRPT.BANK_SETID.Value;
+      &stateRecJob1.BANK_CD.Value = &RowLevel2.GetRow(&i).PYCYCL_STATRPT.BANK_CD.Value;
+      &stateRecJob1.BANK_ACCT_KEY.Value = &RowLevel2.GetRow(&i).PYCYCL_STATRPT.BANK_ACCT_KEY.Value;
+      &stateRecJob1.PYMNT_ID_REF.Value = &RowLevel2.GetRow(&i).PYCYCL_STATRPT.FIRST_PYMNT_REF_ID.Value;
+      &stateRecJob1.Insert();
+   End-For;*>
+   REM End-If;
+   /*End-For;*/
+   /****Ejecutar Job Contabilizacion****/
+   <* Local ProcessRequest &rqstCont;
+   &rqstCont = CreateProcessRequest("PSJob", "FFCNTPAG");
+   
+   &rqstCont.RunControlID = Substring(PYCYCL_STAT.PAY_CYCLE.Value | %Date, 1, 30);
+   &rqstCont.JobName = "FFCNTPAG";
+   &rqstCont.RunDateTime = %Datetime;
+   &rqstCont.TimeZone = %ServerTimeZone;
+   &rqstCont.Schedule();*>
+   /****Fin Ejecutar Job Contabilizacion****/
+End-Function;
+
+
+
+
+
+
+Function set_next_status_new(&STATUS, &fila) Returns string;
+   
+   Local Rowset &RowLevel1, &RowLevel2;
+   
+   &RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.PYCYCL_STAT);
+   &RowLevel2 = &RowLevel1.GetRow(1).GetRowset(Scroll.PYCYCL_STATRPT);
+   
+   Evaluate &STATUS
+   When = "V"
+      If &RowLevel2(&fila).PYCYCL_STATRPT.PYMNT_METHOD.Value = "EFT" Or
+            &RowLevel2(&fila).PYCYCL_STATRPT.PYMNT_METHOD.Value = "ACH" Or
+            &RowLevel2(&fila).PYCYCL_STATRPT.PYMNT_METHOD.Value = "GE" Or
+            &RowLevel2(&fila).PYCYCL_STATRPT.PYMNT_METHOD.Value = "BEF" Then
+         rem &STARTPOS1 = Find(".", PYCYCL_STATRPT.PYMNT_FILENAME) - 2;
+         rem  &TEMP = Substring(PYCYCL_STATRPT.PYMNT_FILENAME, &STARTPOS1, 2);
+         rem If &TEMP = "AD" Then;
+         Return ("C");
+         rem Else
+            Return (&STATUS);
+         rem End-If;
+      Else
+         If &RowLevel2(&fila).PYCYCL_STATRPT.PYMNT_METHOD.Value = "WIR" Or
+               &RowLevel2(&fila).PYCYCL_STATRPT.PYMNT_METHOD.Value = "LC" Then
+            Return ("C");
+         Else
+            /* must be PYMNT_METHOD = "CHK"  or "BOO"*/
+            rem &STARTPOS1 = Find(".", PYCYCL_STATRPT.PYMNT_FILENAME) - 2;
+            rem &TEMP = Substring(PYCYCL_STATRPT.PYMNT_FILENAME, &STARTPOS1, 2);
+            If &RowLevel2(&fila).PYCYCL_STATRPT.PYMNT_METHOD.Value = "CHK" Then
+               Return ("C")
+            Else
+               If Substring(&RowLevel2(&fila).PYCYCL_STATRPT.PAY_CYCLE.Value, 1, 5) = "QUICK" Then
+                  Return ("C");
+               Else
+                  If BANK_MTHD_VW.FORM_NBR_CONFIRM = "N" And
+                        BANK_MTHD_VW.POSITIVE_PAY_FLG = "N" Then
+                     Return ("C");
+                  Else
+                     If BANK_MTHD_VW.FORM_NBR_CONFIRM = "N" And
+                           BANK_MTHD_VW.POSITIVE_PAY_FLG = "Y" Then
+                        Return ("Y");
+                     Else
+                        Return ("X");
+                     End-If;
+                  End-If;
+               End-If;
+            End-If;
+         End-If;
+      End-If;
+      Break;
+   When = "X"
+      If BANK_MTHD_VW.FORM_NBR_CONFIRM = "Y" Then
+         Return ("5");
+      End-If;
+      Break;
+   When = "5"
+      If BANK_MTHD_VW.POSITIVE_PAY_FLG = "Y" Then
+         Return ("Y");
+      Else
+         Return ("C");
+      End-If;
+      Break;
+   When = "Z"
+      Return ("C");
+      Break;
+   When-Other
+      Return (&STATUS);
+      Break;
+   End-Evaluate;
+End-Function;
+
+/***Fin #002***/

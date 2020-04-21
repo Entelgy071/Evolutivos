@@ -1,0 +1,62 @@
+Hide(PYCYCL_WRK_OVRD.REPROCESS_RPT_PB);
+Hide(PYCYCL_WRK_OVRD.REPROCESS_POS_PB);
+&PYMNT_METHOD = PYCYCL_STATRPT.PYMNT_METHOD;
+PYCYCL_PNL_WRK4.PYMNT_FILENAME = PYCYCL_STATRPT.PYMNT_FILENAME;
+Evaluate &PYMNT_METHOD
+When = "EFT"
+When = "ACH"
+When = "GE"
+When = "BEF"
+   If PYCYCL_STATRPT.PAY_RUN_AP_STATUS = "X" Or
+         PYCYCL_STATRPT.PAY_RUN_AP_STATUS = "C" Then
+      PYCYCL_STATRPT.PRINT_SWITCH = "Y";
+   End-If;
+   &STARTPOS1 = Find(".", PYCYCL_PNL_WRK4.PYMNT_FILENAME) - 2;
+   &TEMP = Substring(PYCYCL_PNL_WRK4.PYMNT_FILENAME, &STARTPOS1, 2);
+   Evaluate &TEMP
+   When = "PM"
+   When = "AD"
+      If PYCYCL_STATRPT.PAY_RUN_AP_STATUS = "C" Then
+         UnHide(PYCYCL_WRK_OVRD.REPROCESS_RPT_PB);
+      End-If;
+   When-Other
+      Break;
+   End-Evaluate;
+   Break;
+When = "CHK"
+When = "BOO"
+   &STARTPOS1 = Find(".", PYCYCL_PNL_WRK4.PYMNT_FILENAME) - 2;
+   &TEMP = Substring(PYCYCL_PNL_WRK4.PYMNT_FILENAME, &STARTPOS1, 2);
+   Evaluate &TEMP
+   When = "PM"
+   When = "AD"
+   When = "CP"
+      If PYCYCL_STATRPT.PAY_RUN_AP_STATUS = "C" Then
+         UnHide(PYCYCL_WRK_OVRD.REPROCESS_RPT_PB);
+      End-If;
+   End-Evaluate;
+   If Substring(PYCYCL_STAT_VW.PAY_CYCLE, 1, 5) <> "QUICK" And
+         &TEMP = "PM" And
+         PYCYCL_STATRPT.PAY_RUN_AP_STATUS = "C" And
+         BANK_MTHD_VW.POSITIVE_PAY_FLG = "Y" Then
+      UnHide(PYCYCL_WRK_OVRD.REPROCESS_POS_PB);
+      Hide(PYCYCL_WRK_OVRD.REPROCESS_RPT_PB);
+      Gray(PYCYCL_WORK.OUTDESTTYPE);
+   End-If;
+   Break;
+When = "LC"
+When = "WIR"
+   If PYCYCL_STATRPT.PAY_RUN_AP_STATUS = "C" Then
+      UnHide(PYCYCL_WRK_OVRD.REPROCESS_RPT_PB);
+   End-If;
+   Break;
+When-Other
+   Break;
+End-Evaluate;
+
+/*&RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.PYCYCL_STAT);
+&RowLevel2 = &RowLevel1.GetRow(1).GetRowset(Scroll.PYCYCL_STATRPT);
+
+For &i = 1 To &RowLevel2.ActiveRowCount;
+   MessageBox(0, "", 0, 0, "&RowLevel2: " | &i | " | " | &RowLevel2.GetRow(&i).PYCYCL_STATRPT.PRINT_SWITCH.Value | ", " | &RowLevel2.GetRow(&i).PYCYCL_STATRPT.OUTDESTTYPE.Value);
+End-For;*/

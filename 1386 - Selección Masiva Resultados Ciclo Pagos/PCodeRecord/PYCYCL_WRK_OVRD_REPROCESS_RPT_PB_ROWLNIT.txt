@@ -1,0 +1,8 @@
+/*Inicio 00001*/
+Declare Function SERV_TIPO_SALIDA PeopleCode PYCYCL_WORK.PYCYCL_REFRESH_STS FieldFormula;
+
+/*Fin 00001*/
+
+/*Inicio 00001*/
+REM SERV_TIPO_SALIDA();
+/*Fin 00001*/

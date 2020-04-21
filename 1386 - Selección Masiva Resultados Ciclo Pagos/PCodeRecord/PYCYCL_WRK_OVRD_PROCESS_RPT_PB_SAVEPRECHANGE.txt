@@ -1,0 +1,121 @@
+/***************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_EVO_1386
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		16/03/2020
+* Descripción:	Ejecucion procesos fin de ciclo de pagos, ejecucion job de contabilizacion.
+***************************************************************************************************************************/
+import AP:Payment:PayCycle;
+
+Local ProcessRequest &RQST, &RQST2;
+/***Inicio #001***/
+Local Record &stateRecJob, &stateRecJob1, &stateRecAE;
+Local Rowset &RowLevel1, &RowLevel2;
+Declare Function SHOW_PROCESSINSTANCE PeopleCode PYCYCL_WORK.PYCYCL_REFRESH_STS FieldFormula;
+
+/***Fin #001***/
+rem process positive pay;
+
+If PYCYCL_WRK_OVRD.PROCESS_RPT_PB = "P" Then
+   Local AP:Payment:PayCycle &pC = create AP:Payment:PayCycle();
+   PYCYCL_WRK_OVRD.PROCESS_RPT_PB = "";
+   &pC.SetUpAEProc();
+End-If;
+
+rem process EFT;
+If PYCYCL_WRK_OVRD.REPROCESS_RPT_PB = "S" Then
+   /* ICE 505227000 - Ted Gibson 12/21/02 
+  If PYCYCL_STATRPT.PRINT_SWITCH = "Y" Then
+      SQLExec("SELECT COUNT(*) FROM PS_PYCYCL_STATTMP WHERE PAY_CYCLE = :1 AND PAY_CYCLE_SEQ_NUM = :2 AND PYMNT_METHOD IN ('EFT','ACH','BEF','GE')", PYCYCL_STAT.PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM, &TMP_COUNT);
+      If &TMP_COUNT = 0 Then */
+   /* ICE 505227000 - Ted Gibson 12/21/02 - following Delete statement added */
+   SQLExec("DELETE FROM PS_PYCYCL_STATTMP WHERE PAY_CYCLE = :1 AND PAY_CYCLE_SEQ_NUM = :2 AND PYMNT_METHOD IN ('EFT','ACH','BEF','GE')", PYCYCL_STAT.PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM);
+   /*INICIO CHGA 001*/
+   SQLExec("INSERT INTO PS_PYCYCL_STATTMP ( PAY_CYCLE , PAY_CYCLE_SEQ_NUM , BANK_SETID , BANK_CD , BANK_ACCT_KEY , PYMNT_ID , PYMNT_METHOD , FF_DET_PAGO, CURRENCY_PYMNT , TOTAL_PYMNT_AMT , COMMIT_STATUS) SELECT A.PAY_CYCLE , A.PAY_CYCLE_SEQ_NUM , A.BANK_SETID , A.BANK_CD , A.BANK_ACCT_KEY , ' ' , A.PYMNT_METHOD , NVL(B.FF_DET_PAGO, ' '), A.CURRENCY_PYMNT , SUM(A.PYMNT_AMT) , 0 FROM PS_PAYMENT_TBL A LEFT OUTER JOIN PS_FF_PAYMENT_TBL B ON A.BANK_SETID = B.BANK_SETID AND A.BANK_CD = B.BANK_CD AND A.BANK_ACCT_KEY = B.BANK_ACCT_KEY AND A.PYMNT_ID = B.PYMNT_ID WHERE A.PYMNT_STATUS IN ('P','E') AND A.PAY_CYCLE = :1 AND A.PAY_CYCLE_SEQ_NUM = :2 AND A.PYMNT_METHOD IN ('EFT','ACH','BEF','GE') GROUP BY A.PAY_CYCLE, A.PAY_CYCLE_SEQ_NUM, A.BANK_SETID, A.BANK_CD, A.BANK_ACCT_KEY, A.PYMNT_METHOD, NVL(B.FF_DET_PAGO, ' '), A.CURRENCY_PYMNT", PYCYCL_STAT.PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM);
+   
+   REM BY CHGA   SQLExec("INSERT INTO PS_PYCYCL_STATTMP ( PAY_CYCLE , PAY_CYCLE_SEQ_NUM , BANK_SETID , BANK_CD , BANK_ACCT_KEY , PYMNT_ID , PYMNT_METHOD , CURRENCY_PYMNT , TOTAL_PYMNT_AMT , COMMIT_STATUS) SELECT PAY_CYCLE , PAY_CYCLE_SEQ_NUM , BANK_SETID , BANK_CD , BANK_ACCT_KEY , ' ' , PYMNT_METHOD , CURRENCY_PYMNT , SUM(PYMNT_AMT) , 0 FROM PS_PAYMENT_TBL WHERE PYMNT_STATUS IN ('P','E') AND PAY_CYCLE = :1 AND PAY_CYCLE_SEQ_NUM = :2 AND PYMNT_METHOD IN ('EFT','ACH','BEF','GE') GROUP BY PAY_CYCLE, PAY_CYCLE_SEQ_NUM, BANK_SETID, BANK_CD, BANK_ACCT_KEY, PYMNT_METHOD, CURRENCY_PYMNT", PYCYCL_STAT.PAY_CYCLE, PYCYCL_STAT.PAY_CYCLE_SEQ_NUM);
+   
+   /*FIN CHGA 001*/
+   
+   /* ICE 505227000 Ted Gibson - 12/21/02 - end-if's no longer needed    End-If;
+   End-If; */
+   
+   PYCYCL_WRK_OVRD.REPROCESS_RPT_PB = "";
+   &RQST = CreateProcessRequest();
+   &RQST.ProcessType = PYCYCL_WRK_OVRD.PRCSTYPE;
+   &RQST.ProcessName = PYCYCL_WRK_OVRD.PRCSNAME;
+   &RQST.RunControlID = PYCYCL_PNL_WRK4.RUNCNTLID;
+   &RQST.RunLocation = PYCYCL_WRK_OVRD.SERVERNAME;
+   If PYCYCL_STATRPT.OUTDESTTYPE = "6" Then
+   Else
+      &RQST.OutDest = PYCYCL_STATRPT.OUTDEST;
+   End-If;
+   &RQST.OutDestType = PYCYCL_STATRPT.OUTDESTTYPE;
+   &RQST.RunDateTime = %Datetime;
+   &RQST.Schedule();
+   &prcsstatus = &RQST.Status;
+   If &RQST.Status = 0 Then
+      &prcsinstance = &RQST.ProcessInstance;
+      PYCYCL_WRK_OVRD.PRCSINSTANCE = &prcsinstance;
+      &CURRENT_ROW = ActiveRowCount(PYCYCL_JOB_TBL.PAY_CYCLE);
+      InsertRow(Record.PYCYCL_JOB_TBL, &CURRENT_ROW);
+      &JOB_ROW = 1;
+      For &FIND = 1 To ActiveRowCount(PYCYCL_JOB_TBL.PAY_CYCLE);
+         &FIND_STATUS = FetchValue(PYCYCL_JOB_TBL.PAY_RUN_AP_STATUS, &FIND);
+         If None(&FIND_STATUS) Or
+               &FIND_STATUS = " " Then
+            &JOB_ROW = &FIND;
+            Break;
+         End-If;
+      End-For;
+      /*se llama el proceso de encriptar*/
+      
+      If &RQST.ProcessName = "FIN2025" Then
+         Local Record &rec_run1 = CreateRecord(Record.FF_ENCR_RU1_TBL);
+         &rec_run1.RUN_CNTL_ID.Value = "ENCRYPT" | Right("00000000000" | &prcsinstance, 11);;
+         &rec_run1.OPRID.Value = %OperatorId;
+         &rec_run1.PROCESS_INSTANCE.Value = &prcsinstance;
+         If Not &rec_run1.Insert() Then
+            &rec_run1.Update();
+         End-If;
+         &RQST2 = CreateProcessRequest();
+         &RQST2.ProcessType = "Application Engine";
+         &RQST2.ProcessName = "FF_ENCRYP_FL";
+         &RQST2.RunControlID = "ENCRYPT" | Right("00000000000" | &prcsinstance, 11);
+         &RQST2.RunLocation = PYCYCL_WRK_OVRD.SERVERNAME;
+         &RQST2.RunDateTime = %Datetime;
+         &RQST2.Schedule();
+         
+         
+      End-If;
+      
+      
+      UpdateValue(PYCYCL_JOB_TBL.PAY_CYCLE, &JOB_ROW, PYCYCL_PNL_WRK4.PAY_CYCLE);
+      UpdateValue(PYCYCL_JOB_TBL.PAY_CYCLE_SEQ_NUM, &JOB_ROW, PYCYCL_PNL_WRK4.PAY_CYCLE_SEQ_NUM);
+      UpdateValue(PYCYCL_JOB_TBL.PAY_RUN_AP_STATUS, &JOB_ROW, "V");
+      UpdateValue(PYCYCL_JOB_TBL.JOB_TYPE, &JOB_ROW, "P");
+      UpdateValue(PYCYCL_JOB_TBL.PRCSINSTANCE, &JOB_ROW, PYCYCL_WRK_OVRD.PRCSINSTANCE);
+      UpdateValue(PYCYCL_JOB_TBL.PRCSTYPE, &JOB_ROW, PYCYCL_WRK_OVRD.PRCSTYPE);
+      UpdateValue(PYCYCL_JOB_TBL.PRCSNAME, &JOB_ROW, PYCYCL_WRK_OVRD.PRCSNAME);
+      UpdateValue(PYCYCL_JOB_TBL.BANK_SETID, &JOB_ROW, "");
+      UpdateValue(PYCYCL_JOB_TBL.BANK_CD, &JOB_ROW, "");
+      UpdateValue(PYCYCL_JOB_TBL.BANK_ACCT_KEY, &JOB_ROW, "");
+      UpdateValue(PYCYCL_JOB_TBL.PYMNT_METHOD, &JOB_ROW, "");
+      UpdateValue(PYCYCL_JOB_TBL.PYMNT_FILENAME, &JOB_ROW, "");
+      UpdateValue(PYCYCL_JOB_TBL.BUSPROCNAME, &JOB_ROW, "");
+      UpdateValue(PYCYCL_JOB_TBL.ACTIVITYNAME, &JOB_ROW, "");
+      UpdateValue(PYCYCL_JOB_TBL.EVENTNAME, &JOB_ROW, "");
+   Else
+      WinMessage(MsgGet(7250, 114, "Error submitting job"), 0);
+   End-If;
+   
+   
+   
+   
+   
+End-If;
+
+
+
+
+rem SHOW_PROCESSINSTANCE();

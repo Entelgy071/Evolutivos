@@ -1,0 +1,75 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_EVO_1386
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		03/01/2020
+* Descripción:	Incluir opcion: Aprobación, creación y Contabilización para gestor de ciclo de pagos 
+***************************************************************************************************************************/
+import AP:Payment:PayCycle;
+
+/**Inicio #001**/
+Declare Function SET_NEXT_STATUS PeopleCode PYCYCL_STATRPT.PAY_RUN_AP_STATUS RowInit;
+
+/**Fin #001**/
+Local AP:Payment:PayCycle &pc = create AP:Payment:PayCycle();
+/**Inicio #001**/
+Local Rowset &RowLevel1, &RowLevel2;
+Local ProcessRequest &RQST, &RQST2, &RQST3, &RQST4;
+/**Fin #001**/
+
+/******************************************* Main *****************************************/
+
+
+If None(PYCYCL_WK_OVRD3.SERVERNAME) Then
+   If %Page = Page.PYCYCL_MGR Then
+      SetCursorPos(Page.PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_WK_OVRD3, 1, PYCYCL_WK_OVRD3.SERVERNAME);
+   Else
+      SetCursorPos(Page.EXP_PYCYCL_MGR, Record.PYCYCL_STAT, 1, Record.PYCYCL_WK_OVRD3, 1, PYCYCL_WK_OVRD3.SERVERNAME);
+   End-If;
+   MessageBox(0, "", 7250, 159, "Process Scheduler Server is Required.");
+Else
+   If &pc.validateServer(PYCYCL_WK_OVRD3.SERVERNAME, PYCYCL_WK_OVRD3.PRCSTYPE) = 7 Then
+      
+      SetCursorPos(Page.PYCYCL_MGR, PYCYCL_WK_OVRD3.SERVERNAME);
+   Else
+      PYCYCL_WORK.RUN_LEVEL = "P";
+      PYCYCL_PNL_WRK4.OPRID = %OperatorId;
+      &PAY_CYCLE = PYCYCL_STAT.PAY_CYCLE;
+      PYCYCL_PNL_WRK4.RUNCNTLID = &PAY_CYCLE;
+      PYCYCL_PNL_WRK4.RUNLOCATION = "2";
+      PYCYCL_PNL_WRK4.SERVERNAME = "";
+      Evaluate PYCYCL_STEP_VW.STEP_NAME
+      When = "Payment Selection & Creation"
+         PYCYCL_WK_OVRD3.PROCESS_RPT_PB = "A";
+         Break;
+      When = "Payment Creation"
+         PYCYCL_WK_OVRD3.PROCESS_RPT_PB = "B";
+         Break;
+      When = "Payment Selection"
+         PYCYCL_WK_OVRD3.PROCESS_RPT_PB = "D";
+         Break;
+      When = "Draft Staging"
+         PYCYCL_WK_OVRD3.PROCESS_RPT_PB = "F";
+         Break;
+         /**Inicio #001**/
+         REM When = "Aprobación, creación y Contabilización"
+         REM PYCYCL_WK_OVRD3.PROCESS_RPT_PB = "G";
+         
+         /*&RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.PYCYCL_STAT);
+         &RowLevel2 = &RowLevel1.GetRow(1).GetRowset(Scroll.PYCYCL_STATRPT);
+         For &j = 1 To &RowLevel2.ActiveRowCount
+            MessageBox(0, "", 0, 0, "Data Prcs: " | &RowLevel2.GetRow(&j).PYCYCL_WRK_OVRD.PRCSNAME.Value | ", " | &RowLevel2.GetRow(&j).PYCYCL_WRK_OVRD.PRCSTYPE.Value);
+         End-For;*/
+         REM Break;
+         /**Fin #001**/
+      When-Other
+         PYCYCL_WK_OVRD3.PROCESS_RPT_PB = "A";
+         Break;
+      End-Evaluate;
+      &status = PYCYCL_STAT.PAY_RUN_AP_STATUS;
+      PYCYCL_STAT.PAY_RUN_AP_STATUS = " ";
+      PYCYCL_STAT.PAY_RUN_AP_STATUS = &status;
+      PYCYCL_WORK.ACTION_FLG = "Y";
+      DoSave();
+   End-If;
+End-If;

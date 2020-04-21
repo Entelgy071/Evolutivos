@@ -1,0 +1,67 @@
+import AP:Payment:PayCycle;
+
+Local AP:Payment:PayCycle &pC;
+
+Local ProcessRequest &RQST;
+
+
+/************************* Mainline **********************************/
+
+/* If pay cycle has error and error occurs before AP_APY2015 inserts new PYCYCL_STAT row with  */
+/* incremented PAY_CYCLE_SEQ_NUM, we need to insert the missing PYCYCL_STAT row.               */
+
+&PAY_CYCLE = FetchValue(PYCYCL_STAT.PAY_CYCLE, CurrentRowNumber());
+&PAY_CYCLE_SEQ_NUM = FetchValue(PYCYCL_STAT.PAY_CYCLE_SEQ_NUM, CurrentRowNumber());
+SQLExec("SELECT A.PRCSINSTANCE FROM PS_PYCYCL_JOB_TBL A, PSPRCSRQST B, PS_PYCYCL_STAT C WHERE A.PAY_CYCLE = :1 AND A.PAY_CYCLE_SEQ_NUM = :2 AND A.PRCSNAME = 'AP_APY2015' AND A.PAY_RUN_AP_STATUS IN ('N','2','D') AND A.PRCSINSTANCE = B.PRCSINSTANCE AND B.RUNSTATUS IN ('3','10','8') AND A.PAY_CYCLE = C.PAY_CYCLE AND A.PAY_CYCLE_SEQ_NUM = C.PAY_CYCLE_SEQ_NUM AND A.PRCSINSTANCE <> C.PROCESS_INSTANCE", &PAY_CYCLE, &PAY_CYCLE_SEQ_NUM, &ERR_PROCINST);
+If All(&ERR_PROCINST) Then
+   &NEXT_SEQ_NUM = &PAY_CYCLE_SEQ_NUM + 1;
+   SQLExec("INSERT INTO PS_PYCYCL_STAT (PAY_CYCLE, PAY_CYCLE_SEQ_NUM, PAY_RUN_AP_STATUS, PAY_THRU_DT, PYMNT_DT, OPRID, PAY_RUN_DT, ACCOUNTING_DT, TIME_HH, TIME_MM, COMMIT_STATUS, DSCNT_ALRT_FLG, NEG_BAL_FLG, CNV_ERR_FLG, BAD_CURR_FLG, SAME_REF_FLG, PROCESS_INSTANCE, CURTEMPINSTANCE) SELECT '" | &PAY_CYCLE | "', " | &NEXT_SEQ_NUM | ", 'E', PAY_THRU_DT, PYMNT_DT, '" | %OperatorId | "', %CurrentDateIn, ACCOUNTING_DT, 0, 0, 0, 'N', 'N', 'N', 'N', 'N', " | &ERR_PROCINST | ", 0 FROM PS_PYCYCL WHERE PAY_CYCLE = '" | &PAY_CYCLE | "'");
+   If Not (PYCYCL_WORK.ACTION_FLG = "R" And
+         PYCYCL_WORK.RESET_CYCLE_PB = "Y") Then
+      SQLExec("INSERT INTO PS_PYCYCL_JOB_TBL (PAY_CYCLE, PAY_CYCLE_SEQ_NUM, PAY_RUN_AP_STATUS, JOB_TYPE, BANK_SETID, BANK_CD, BANK_ACCT_KEY, PYMNT_METHOD, PYMNT_FILENAME, PRCSINSTANCE, PRCSTYPE, PRCSNAME, BUSPROCNAME, ACTIVITYNAME, EVENTNAME) VALUES (:1, :2, 'N','P',' ',' ',' ',' ',' ', :3, 'Application Engine', 'AP_APY2015',' ',' ',' ')", &PAY_CYCLE, &NEXT_SEQ_NUM, &ERR_PROCINST);
+   End-If;
+End-If;
+
+&pC = create AP:Payment:PayCycle();
+If PYCYCL_WORK.ACTION_FLG = "R" And
+      PYCYCL_WORK.RESET_CYCLE_PB = "Y" Then
+   PYCYCL_WORK.ACTION_FLG = "N";
+   PYCYCL_WORK.RESET_CYCLE_PB = "N";
+   &PAY_CYCLE = FetchValue(PYCYCL_STAT.PAY_CYCLE, CurrentRowNumber());
+   &PAY_CYCLE_SEQ_NUM = FetchValue(PYCYCL_STAT.PAY_CYCLE_SEQ_NUM, CurrentRowNumber());
+   &PYCYCL_DEL_REASON = PYCYCL_WORK.DESCR254_MIXED;
+   /* Clear AE run control and other AET record so that process can be rerun without AE suspend error */
+   &sAEPgm = "AP_APY2015";
+   SQLExec("select process_instance from ps_aeruncontrol where run_cntl_id = :1 and ae_applid = :2 and oprid = :3", PYCYCL_STAT.PAY_CYCLE, &sAEPgm, %OperatorId, &sProcInstance);
+   If All(&sProcInstance) Then
+      SQLExec("delete from ps_aeruncontrol where process_instance = :1", &sProcInstance);
+      SQLExec("delete from ps_ap_payselct_aet where process_instance = :1", PYCYCL_STAT.PROCESS_INSTANCE);
+      SQLExec("delete from ps_pycycl_2_aet where process_instance = :1", PYCYCL_STAT.PROCESS_INSTANCE);
+      SQLExec("delete from ps_pycycl_3_aet where process_instance = :1", PYCYCL_STAT.PROCESS_INSTANCE);
+      SQLExec("delete from ps_pycycl_4_aet where process_instance = :1", PYCYCL_STAT.PROCESS_INSTANCE);
+      SQLExec("delete from ps_ap_prepaid_aet where process_instance = :1", PYCYCL_STAT.PROCESS_INSTANCE);
+      SQLExec("delete from ps_bch_pymnt_aet where process_instance = :1", PYCYCL_STAT.PROCESS_INSTANCE);
+      SQLExec("delete from ps_ft_docsq_aet where process_instance = :1", PYCYCL_STAT.PROCESS_INSTANCE);
+      SQLExec("delete from ps_wthd_calc_aet where process_instance = :1", PYCYCL_STAT.PROCESS_INSTANCE);
+   End-If;
+   
+   If All(&ERR_PROCINST) Then
+      &PAY_CYCLE_SEQ_NUM = &NEXT_SEQ_NUM;
+   Else
+      SQLExec("delete from ps_pycycl_job_tbl where pay_cycle = :1 and pay_cycle_seq_num = :2", &PAY_CYCLE, &PAY_CYCLE_SEQ_NUM);
+      For &I = ActiveRowCount(Record.PYCYCL_STAT, CurrentRowNumber(1), Record.PYCYCL_STATRPT) To 1 Step - 1;
+         DeleteRow(Record.PYCYCL_STAT, CurrentRowNumber(1), Record.PYCYCL_STATRPT, &I);
+      End-For;
+   End-If;
+   &pC.setUpApy2015("C", &PAY_CYCLE, &PAY_CYCLE_SEQ_NUM, PYCYCL_WORK.SERVERNAME, &PYCYCL_DEL_REASON);
+   
+   &PAY_CYCLE_5 = Substring(PYCYCL_STAT.PAY_CYCLE, 1, 5);
+   If &PAY_CYCLE_5 = "QUICK" Then
+      UpdateValue(PYCYCL_STAT.PAY_RUN_AP_STATUS, CurrentRowNumber(), "C");
+   Else
+      If &PAY_CYCLE_5 = "RSTRT" And
+            &PAY_RUN_AP_STATUS = "6" Then
+         TransferPanel(Panel.PYCYCL_RSTRT);
+      End-If;
+   End-If;
+End-If;

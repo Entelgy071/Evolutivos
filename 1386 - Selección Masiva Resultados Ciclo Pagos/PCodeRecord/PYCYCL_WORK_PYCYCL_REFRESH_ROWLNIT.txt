@@ -1,0 +1,39 @@
+/*************************************************************************************************************************************
+Actividad:    Tipo:     PROYECTO:            Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+#00001        Actlz.    ETY_ERP_AP_1386      John Diaz          29 oct 2019       Se invoca función para la selección masiva de pagos 
+*************************************************************************************************************************************/
+import AP:Payment:PayCycle;
+
+/*Inicio 00001*/
+Declare Function SERV_TIPO_SALIDA PeopleCode PYCYCL_WORK.PYCYCL_REFRESH_STS FieldFormula;
+/*Fin 00001*/
+
+Global string &RECRIATEADVICE;
+
+Function GRAY_ADVICE()
+   
+   For &I = 1 To ActiveRowCount(Record.PYCYCL_STAT, 1, Record.PYCYCL_STATRPT);
+      &FILENAME = FetchValue(Record.PYCYCL_STAT, 1, PYCYCL_STATRPT.PYMNT_FILENAME, &I);
+      &STARTPOS1 = Find(".", &FILENAME);
+      &FILETYPE = Substring(&FILENAME, &STARTPOS1 - 2, 2);
+      &PRINTADV = Substring(&FILENAME, &STARTPOS1 + 1, 2);
+      If &FILETYPE = "AD" And
+            &PRINTADV = "NO" Then
+         Gray(Record.PYCYCL_STAT, 1, PYCYCL_WRK_OVRD.PROCESS_RPT_PB, &I);
+         Gray(Record.PYCYCL_STAT, 1, PYCYCL_WRK_OVRD.REPROCESS_RPT_PB, &I);
+         
+      End-If;
+   End-For
+End-Function;
+
+Local AP:Payment:PayCycle &pc = create AP:Payment:PayCycle();
+
+&pc.refreshAll();
+PYCYCL_WORK.ACTION_CHANGED = "N";
+
+GRAY_ADVICE();
+
+/*Inicio 00001*/
+REM SERV_TIPO_SALIDA();
+/*Fin 00001*/

@@ -1,0 +1,91 @@
+/*************************************************************************************************************************************
+Actividad:    Tipo:     PROYECTO:            Autor:             Fecha:            Descripción:
+--------------------------------------------------------------------------------------------------------------------------------------  
+#00001      Actlz.    ETY_ERP_AP_1386      John Diaz          29 oct 2019         Se crea función para inicializar el campo Nombre 
+                                                                                  servidor “PSUNX” y el campo Tipo de Salida “WEB”
+*************************************************************************************************************************************/ /*Inicio 00001*/
+Function SERV_TIPO_SALIDA()
+   Local Rowset &RowLevel1, &RowLevel2;
+   
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'ETY_SERV' AND STRING_ID = 'SERVERNAME'", &STRING_TEXT);
+   &RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.PYCYCL_STAT);
+   &RowLevel2 = &RowLevel1.GetRow(1).GetRowset(Scroll.PYCYCL_STATRPT);
+   
+   For &j = 1 To &RowLevel2.ActiveRowCount
+      
+      &RowLevel2.GetRow(&j).PYCYCL_WRK_OVRD.SERVERNAME.Value = &STRING_TEXT;
+      &RowLevel2.GetRow(&j).PYCYCL_STATRPT.OUTDESTTYPE.Value = "6";
+      &RowLevel2.GetRow(&j).PYCYCL_WRK_OVRD.SERVERNAME.Visible = False;
+      &RowLevel2.GetRow(&j).PYCYCL_STATRPT.OUTDESTTYPE.Visible = False;
+      &RowLevel2.GetRow(&j).PYCYCL_STATRPT.OUTDEST.Visible = False;
+   End-For;
+   
+End-Function;
+
+/*Fin 00001*/
+Function SHOW_PROCESSINSTANCE()
+   Local Rowset &RowLevel1;
+   Local number &PrcsInst1;
+   
+   Local Record &recInst1;
+   
+   Local Record &REC;
+   
+   
+   
+   SQLExec("Select prcsinstance from psprcsrqst where prcsname = 'FIN2025' and oprid =:1 and runstatus in ('5','6','7')", %UserId, &PrcsInst);
+   
+   SQLExec("Select prcsinstance from psprcsrqst where prcsname = 'FFCNTPAG' and oprid =:1 and runstatus in ('5','6','7')", %UserId, &PrcsInst1);;
+   
+   
+   &RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.PYCYCL_STAT);
+   
+   
+   &REC = CreateRecord(Record.ETY_PAYCYCLPRCS);
+   &REC.PAY_CYCLE.Value = &RowLevel1(1).PYCYCL_STAT.PAY_CYCLE.Value;
+   &REC.PAY_CYCLE_SEQ_NUM.Value = &RowLevel1(1).PYCYCL_STAT.PAY_CYCLE_SEQ_NUM.Value;
+   &REC.SelectByKey();
+   
+   
+   
+   
+   If Not &REC.SelectByKey() Then
+      
+      
+      &REC.PAY_CYCLE.Value = &RowLevel1(1).PYCYCL_STAT.PAY_CYCLE.Value;
+      &REC.PAY_CYCLE_SEQ_NUM.Value = &RowLevel1(1).PYCYCL_STAT.PAY_CYCLE_SEQ_NUM.Value;
+      
+      If All(&PrcsInst) Then
+         &RowLevel1.GetRow(1).PYCYCL_WORK.PROCESS_INSTANCE.Value = &PrcsInst;
+         &REC.PROCESS_INSTANCE.Value = &PrcsInst;
+      End-If;
+      
+      If All(&PrcsInst1) Then
+         &RowLevel1.GetRow(1).PYCYCL_WORK.PROCESS_INSTANCE2.Value = &PrcsInst1;
+         &REC.PROCESS_INSTANCE2.Value = &PrcsInst1;
+      End-If;
+      
+      
+      &REC.Insert();
+      
+   Else
+      
+      
+      &REC.PAY_CYCLE.Value = &RowLevel1(1).PYCYCL_STAT.PAY_CYCLE.Value;
+      &REC.PAY_CYCLE_SEQ_NUM.Value = &RowLevel1(1).PYCYCL_STAT.PAY_CYCLE_SEQ_NUM.Value;
+      
+      If All(&PrcsInst) Then
+         &RowLevel1.GetRow(1).PYCYCL_WORK.PROCESS_INSTANCE.Value = &PrcsInst;
+         &REC.PROCESS_INSTANCE.Value = &PrcsInst;
+      End-If;
+      
+      If All(&PrcsInst1) Then
+         &RowLevel1.GetRow(1).PYCYCL_WORK.PROCESS_INSTANCE2.Value = &PrcsInst1;
+         &REC.PROCESS_INSTANCE2.Value = &PrcsInst1;
+      End-If;
+      
+      &REC.Update();
+   End-If;
+   
+End-Function;
+
