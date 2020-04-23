@@ -1,0 +1,15 @@
+&sql = CreateSQL("Select Business_unit from PS_FF_RUN_INF_BUSR where OPRID=:1 and RUN_CNTL_ID=:2", %OperatorId, ETY_GL_INFM_AET.RUN_CNTL_ID.Value);
+ETY_GL_INFM_AET.DESCRLONG.Value = "";
+While &sql.fetch(&BU)
+   If All(&BU) And
+         &BU <> " " Then
+      If All(ETY_GL_INFM_AET.DESCRLONG.Value) Then
+         ETY_GL_INFM_AET.DESCRLONG.Value = ETY_GL_INFM_AET.DESCRLONG.Value | ",'" | &BU | "'";
+      Else
+         ETY_GL_INFM_AET.DESCRLONG.Value = "('" | &BU | "'";
+      End-If;
+   End-If;
+End-While;
+If All(ETY_GL_INFM_AET.DESCRLONG.Value) Then
+   ETY_GL_INFM_AET.DESCRLONG.Value = " and c.Business_unit in " | ETY_GL_INFM_AET.DESCRLONG.Value | ") ";
+End-If;

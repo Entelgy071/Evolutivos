@@ -1,0 +1,27 @@
+rem +--------------------------------------------------------------------------------------------------------------------------------------+;
+rem |PROYECTO                        ACTIVIDAD               DEV             FECHA             DESCRIPCIÓN                                 |;
+rem +--------------------------------------------------------------------------------------------------------------------------------------+;
+rem |FF_ARCH_PLAN_PERFORM_001        001                     GPARRA          06-May-2014       Se realizan ajustes para inhabilitar el paso|;
+rem |                                                                                          anterior y manejar el insert con cursor de  |;
+rem |                                                                                          tal manera que se pueda controlar el commit |;
+rem |                                                                                          y se mejore el performance.                 |;
+rem +--------------------------------------------------------------------------------------------------------------------------------------+;
+
+/* Inicio 001 */
+Local Record &rcd_ETY_GLRT3_TMP = CreateRecord(Record.ETY_GLRT3_TMP);
+Local number &nbr_i;
+Local SQL &sql_FF_GL_RT3NUL_VW = GetSQL(SQL.ETY_D_RTF3CERO_STEP03, ETY_GL_INFM_AET.PROCESS_INSTANCE.Value, ETY_GL_INFM_AET.FF_COD_FIDEICOMISO.Value, ETY_GL_INFM_AET.FF_CODIGO_SFC.Value, ETY_GL_INFM_AET.TREE_NAME.Value);
+
+While &sql_FF_GL_RT3NUL_VW.Fetch(&rcd_ETY_GLRT3_TMP)
+   
+   &rcd_ETY_GLRT3_TMP.Insert();
+   
+   &nbr_i = &nbr_i + 1;
+   
+   If Mod(&nbr_i, 500) = 0 Then
+      CommitWork();
+   End-If;
+   
+End-While;
+&sql_FF_GL_RT3NUL_VW.Close();
+/* Fin 001 */

@@ -1,0 +1,166 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_GL_FLP_EVO_73677
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		16/10/2019
+* Descripción:	Generacion de archivo plano formato 524
+***************************************************************************************************************************/
+Component File &fl_FF524;
+Component string &strTotalRegistros;
+Local string &str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9, &ledger;
+Local string &strURL, &strFecha, &strCodFideicomiso, &strI, &tree_niif, &tree_d;
+Local number &nbrI, &nbr5;
+Local SQL &sql1, &sql2, &sql3, &sql4, &sql5;
+Local boolean &bolSql3, &bolSql4;
+
+&strFecha = DateTimeToLocalizedString(%Date, "yyyyMMdd");
+
+&fl_FF524 = GetFile("FORMATO_524_" | &strFecha | ".txt", "W", %FilePath_Relative);
+
+If &fl_FF524.IsOpen Then
+   /***********************************/
+   /*REGISTRO TIPO 1*/
+   /***********************************/
+   /*REGISTRO TIPO 5*/
+   /*Unidad de captura 01*/
+   /*Obtener valores Reg Tipo4*/
+   &sql5 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, FF_ID_TIPO_FIDU, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, FF_ID_TIPO_FIDU ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+   If &sql5.Fetch(&BU, &CtaAlt, &str1, &str11, &str12, &str13) Then
+      SQLExec("SELECT FF_ID_REGISTRO FROM %Table(FF_R3_524_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value, &Cons);
+      &TotalRegistros = &Cons;
+      While &sql5.Fetch(&BU, &CtaAlt, &str1, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+         /*&ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str1 = Rept("0", 17 - Len(&str1)) | &str1;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "01" | &strt45 | &ConsSub | &EtyVlr2 | &str1);
+         &fl_FF524.WriteLine("");*/
+      End-While;
+      &sql6 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, FF_SUBTIPO_FIDU, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, FF_SUBTIPO_FIDU ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql6.Fetch(&BU, &CtaAlt, &str1, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql7 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, FF_CODIGO_FIDU, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, FF_CODIGO_FIDU ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql7.Fetch(&BU, &CtaAlt, &str3, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql8 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, ETY_VALOR, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, ETY_VALOR ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql8.Fetch(&BU, &CtaAlt, &str4, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql9 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql9.Fetch(&BU, &CtaAlt, &str5, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql10 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, NATIONAL_ID, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, NATIONAL_ID ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql10.Fetch(&BU, &CtaAlt, &str6, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql12 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, COLUMNNUM, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, COLUMNNUM ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql12.Fetch(&BU, &CtaAlt, &str9, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql13 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql13.Fetch(&BU, &CtaAlt, &str10, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql14 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql14.Fetch(&BU, &CtaAlt, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql15 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql15.Fetch(&BU, &CtaAlt, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql16 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql16.Fetch(&BU, &CtaAlt, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql17 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO3, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO3 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql17.Fetch(&BU, &CtaAlt, &str14, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql18 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, NUMBER1, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, NUMBER1 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql18.Fetch(&BU, &CtaAlt, &str15, &str11, &str12, &str13)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+   End-If;
+   /***************************/
+   /***************************/
+   /*Unidad de captura 02*/
+   /*Obtener valores totales*/
+   &sql40 = CreateSQL("SELECT SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP)  WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+   If &sql40.Fetch(&Tot1, &Tot2, &Tot3) Then
+      &TotalRegistros = &TotalRegistros + 3;
+   End-If;
+   /***************************/
+   /***************************/
+   /*Unidad de captura 03*/
+   /*Obtener valores Reg Tipo4*/
+   &sql31 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+   If &sql31.Fetch(&BU, &CtaAlt, &str31, &str36, &str37, &str38) Then
+      While &sql31.Fetch(&BU, &CtaAlt, &str31, &str36, &str37, &str38)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql32 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, NATIONAL_ID, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, NATIONAL_ID ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql32.Fetch(&BU, &CtaAlt, &str32, &str36, &str37, &str38)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql33 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, LC_NOMBRE_TERCERO, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, LC_NOMBRE_TERCERO ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql33.Fetch(&BU, &CtaAlt, &str33, &str36, &str37, &str38)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql34 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO1, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO1 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql34.Fetch(&BU, &CtaAlt, &str34, &str36, &str37, &str38)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql35 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql35.Fetch(&BU, &CtaAlt, &str35, &str36, &str37, &str38)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql36 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql36.Fetch(&BU, &CtaAlt, &str36, &str37, &str38)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql37 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql37.Fetch(&BU, &CtaAlt, &str36, &str37, &str38)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql38 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql38.Fetch(&BU, &CtaAlt, &str36, &str37, &str38)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+      &sql39 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, NUMBER1, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, NUMBER1 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql39.Fetch(&BU, &CtaAlt, &str39, &str36, &str37, &str38)
+         &TotalRegistros = &TotalRegistros + 1;
+      End-While;
+   End-If;
+   /***************************/
+   /***************************/
+   /*Registro Tipo 5*/
+   MessageBox(0, "", 0, 0, "Total Reg: " | &TotalRegistros);
+   &strTotalRegistros = &TotalRegistros;
+   /***********************************/
+   /*&sql1.Close();
+   &sql2.Close();
+   
+   &sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+&sql5.Close();
+   &fl_FF524.Close();*/
+Else
+   /* file not opened, do error processing */
+   MessageBox(0, "", 0, 0, "File Not Opened");
+End-If;

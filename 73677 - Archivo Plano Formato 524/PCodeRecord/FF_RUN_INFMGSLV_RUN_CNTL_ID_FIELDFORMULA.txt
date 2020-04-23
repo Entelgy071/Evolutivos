@@ -1,0 +1,15 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_GL_FLP_EVO_73677
+* Actividad:  	003
+* Responsable: 	David A. Suarez
+* Fecha:		16Dic2019
+* Descripción:	Funcion para saber la naturaleza de la cuenta. 
+***************************************************************************************************************************/
+
+Function Naturaleza_Cta(&AltCta) Returns string;
+   SQLExec("SELECT SETID, TREE_NODE FROM PSTREENODE WHERE TREE_NAME = 'PUC_NIIF_1' AND TREE_NODE =:1", &AltCta, &SetId, &TreeNode);
+   SQLExec("SELECT FF_NATURALEZA FROM PS_FF_TREE_NDE_TBL WHERE SETID =:1 AND TREE_NODE =:2", &SetId, &TreeNode, &Natu);
+   
+   Return &Natu
+End-Function;
+

@@ -1,0 +1,532 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_GL_FLP_EVO_73677
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		16/10/2019
+* Descripción:	Generacion de archivo plano formato 524
+***************************************************************************************************************************/
+Component File &fl_FF524;
+Component string &strTotalRegistros;
+Declare Function Naturaleza_Cta PeopleCode FF_RUN_INFMGSLV.RUN_CNTL_ID FieldFormula;
+
+Local string &str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9, &ledger;
+Local string &strURL, &strFecha, &strCodFideicomiso, &strI, &tree_niif, &tree_d;
+Local number &nbrI, &nbr5;
+Local SQL &sql1, &sql2, &sql3, &sql4, &sql5;
+Local boolean &bolSql3, &bolSql4;
+
+
+SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME = 'ARBOL_COLECTIVAS_COLGAAP'", &tree_d);
+SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME = 'ARBOL_COLECTIVAS_NIIF'", &tree_niif);
+
+&bolSql3 = False;
+&bolSql4 = False;
+&strFecha = DateTimeToLocalizedString(%Date, "yyyyMMdd");
+/* ASM - 28/11/2012 - Por uso de servers UNX se cambia el uso de URL por Filepath relativos
+&strURL = GetURL(URL.FF_GL_ARCH_PLANOS);*/
+&fl_FF524 = GetFile("FORMATO_524_" | &strFecha | ".txt", "W", %FilePath_Relative);
+/**/
+&strTotalRegistros = Rept("0", 8 - Len(&strTotalRegistros)) | &strTotalRegistros;
+If &fl_FF524.IsOpen Then
+   /***********************************/
+   /*REGISTRO TIPO 1*/
+   /*SQLExec("SELECT LPAD(FF_ID_REGISTRO,8,0) FROM %TABLE(FF_GL_RT5_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value, &strTotalRegistros);*/
+   &sql1 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_TIPO_ENTIDAD, FF_CODIGO_SFC, FF_FECHA_CORTE, FF_TOTAL_REGISTRO, FF_PALABRA_CLAVE, FF_AREA_INF, FF_TIPO_INFORME FROM PS_FF_GL_RT1_TMP WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+   If &sql1.Fetch(&str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9) Then
+      &fl_FF524.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &strTotalRegistros | &str7 | &str8 | &str9);
+      &fl_FF524.WriteLine("");
+   End-If;
+   /***********************************/
+   /*REGISTRO TIPO 2*/
+   &nbrI = 1;
+   &sql2 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, CARR_DESCR FROM %Table(FF_R2_524_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+   /*While &sql2.Fetch(&str1, &str2, &str3)*/
+   If &sql2.Fetch(&str1, &str2, &str3) Then
+      /*&strI = String(&nbrI);
+      &str1 = Rept("0", 8 - Len(&strI)) | &str1;*/
+      /*If All(&strFundCode) Then*/
+      &fl_FF524.WriteString(&str1 | &str2 | &str3);
+      &fl_FF524.WriteLine("");
+   End-If;
+   /*REGISTRO TIPO 3*/
+   /*Son codigos PUC, reporto registros tipo 3*/
+   &sql3 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, CARR_DESCR FROM %Table(FF_R3_524_TMP)", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+   &bolSql3 = True;
+   If &sql3.Fetch(&str1, &str2, &str3) Then
+      &fl_FF524.WriteString(&str1 | &str2 | &str3);
+      &fl_FF524.WriteLine("");
+   End-If;
+   /*Son formatos, reporto registros tipo 4*/
+   /***********************************/
+   /***********************************/
+   /*REGISTRO TIPO 5*/
+   /*Unidad de captura 01*/
+   /*Obtener valores Reg Tipo4*/
+   &sql5 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, FF_ID_TIPO_FIDU, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, FF_ID_TIPO_FIDU ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+   If &sql5.Fetch(&BU, &CtaAlt, &str1, &str11, &str12, &str13) Then
+      SQLExec("SELECT FF_ID_REGISTRO FROM %Table(FF_R3_524_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value, &Cons);
+      SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME='TIPO_REGISTRO4'", &EtyVlr);
+      SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME='FORMATO_524'", &EtyVlr1);
+      SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME='TIPO_REGISTRO4_CAMPO7'", &EtyVlr2);
+      &strt41 = &Cons;
+      &ConsSub = 0;
+      &strt42 = &EtyVlr;
+      &strt43 = &EtyVlr1;
+      &strt45 = "01";
+      While &sql5.Fetch(&BU, &CtaAlt, &str1, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str1 = Rept("0", 17 - Len(&str1)) | &str1;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "01" | &strt45 | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str1)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql6 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, FF_SUBTIPO_FIDU, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, FF_SUBTIPO_FIDU ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql6.Fetch(&BU, &CtaAlt, &str2, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str2 = Rept("0", 17 - Len(&str2)) | &str2;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "02" | &strt45 | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str2)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql7 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, FF_CODIGO_FIDU, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, FF_CODIGO_FIDU ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql7.Fetch(&BU, &CtaAlt, &str3, &str11, &str12, &str13)
+         /*  &str10 = Rept("0", 6 - Len(&str10)) | &str10;*/
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str3 = Rept("0", 17 - Len(&str3)) | &str3;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "03" | &strt45 | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str3)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql8 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, ETY_VALOR, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, ETY_VALOR ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql8.Fetch(&BU, &CtaAlt, &str4, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str4 = Rept("0", 17 - Len(&str4)) | &str4;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "04" | &strt45 | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str4)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql9 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql9.Fetch(&BU, &CtaAlt, &str5, &str11, &str12, &str13)
+         SQLExec("SELECT FF_CLS_NEGOCIO FROM PS_FF_BU_GL_NF_CN WHERE BUSINESS_UNIT =:1", &BU, &ClsNeg);
+         Evaluate &ClsNeg
+         When = "EFP"
+            &str5 = "3";
+         When = "PAP"
+            &str5 = "3";
+         When = "PRV"
+            &str5 = "3";
+         End-Evaluate;
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str5 = Rept("0", 17 - Len(&str5)) | &str5;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "05" | &strt45 | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str5)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql91 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql91.Fetch(&BU, &CtaAlt, &str31, &str36, &str37, &str38)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str31 = Rept("0", 17 - Len(&str31)) | &str31;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "05" | "03" | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str31)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql10 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, NATIONAL_ID, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, NATIONAL_ID ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql10.Fetch(&BU, &CtaAlt, &str6, &str11, &str12, &str13)
+         SQLExec("SELECT FF_CLS_NEGOCIO FROM PS_FF_BU_GL_NF_CN WHERE BUSINESS_UNIT =:1", &BU, &ClsNeg);
+         SQLExec("SELECT RH_COD_ORIGEN, RH_COD_DESTINO FROM PS_RH_EQUIV_TBL EQ WHERE EQ.RH_TABLA_EQUIVALEN = 'CTAS_FORMATO_524' AND EQ.RH_CONJ_EQUIV = 'COLUMNA_06' AND RH_COD_ORIGEN =:1", &ClsNeg, &Cta06O, &Cta06D);
+         &str6 = &Cta06D;
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str6 = Rept("0", 17 - Len(&str6)) | &str6;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "06" | &strt45 | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str6)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql101 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, NATIONAL_ID, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, NATIONAL_ID ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql101.Fetch(&BU, &CtaAlt, &str32, &str36, &str37, &str38)
+         /*&str35 = Rept("0", 6 - Len(&str35)) | &str35;*/
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str32 = Rept("0", 17 - Len(&str32)) | &str32;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "06" | "03" | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str32)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql33 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, LC_NOMBRE_TERCERO, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, LC_NOMBRE_TERCERO ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql33.Fetch(&BU, &CtaAlt, &str33, &str36, &str37, &str38)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str33 = Rept(" ", 72 - Len(&str33)) | &str33;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "07" | "03" | &ConsSub | &EtyVlr2 | &str33);
+         &fl_FF524.WriteLine("");
+      End-While;
+      /*&sql11 = CreateSQL("SELECT FF_ID_TIPO_FIDU, FF_SUBTIPO_FIDU, FF_CODIGO_FIDU, ETY_VALOR, RH_COD_DESTINO,NATIONAL_ID, LC_NOMBRE_TERCERO, RH_COD_DESTINO1, COLUMNNUM, RH_COD_DESTINO2,MONETARY_AMOUNT,POSTED_BASE_AMT,FF_AMOUNT_SALDO,RH_COD_DESTINO3, NUMBER1 FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      While &sql11.Fetch(&str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9, &str10, &str11, &str12, &str13, &str14, &str15)
+         &str10 = Rept("0", 6 - Len(&str10)) | &str10;
+         &str7 = Rept(" ", 50 - Len(&str7)) | &str7;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "07" | &strt45 | &str10 | &EtyVlr2 | &str7);
+         &fl_FF524.WriteLine("");
+      End-While;*/
+      &sql34 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO1, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO1 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql34.Fetch(&BU, &CtaAlt, &str34, &str36, &str37, &str38)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str34 = Rept("0", 17 - Len(&str34)) | &str34;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "08" | "03" | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str34)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql12 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, COLUMNNUM, SUM(MONETARY_AMOUNT), SUM (POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, COLUMNNUM ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql12.Fetch(&BU, &CtaAlt, &str9, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str8 = Rept("0", 17 - Len(&str9)) | &str9;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "09" | &strt45 | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str9)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql13 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql13.Fetch(&BU, &CtaAlt, &str10, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &strCta = &str10;
+         &strCta = Rept("0", 17 - Len(&strCta)) | &strCta;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "10" | &strt45 | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&strCta)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql35 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql35.Fetch(&BU, &CtaAlt, &str35, &str36, &str37, &str38)
+         &Cta03 = &str35;
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &Cta03 = Rept("0", 17 - Len(&Cta03)) | &Cta03;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "10" | "03" | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&Cta03)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql14 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql14.Fetch(&BU, &CtaAlt, &CtaH, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         /***Revison naturaleza cta***/
+         &Natu = Naturaleza_Cta(&CtaH);
+         /*MessageBox(0, "", 0, 0, "11. Naturaleza/Cta " | &Natu | "/" | &CtaH);*/
+         Evaluate &Natu
+         When = "NEGA"
+            &str11 = &str11 * ( - 1);
+            &EtyVlr2 = "-";
+         When = "POSI"
+            &str11 = &str11 * 1;
+         End-Evaluate;
+         /***Fin Revison naturaleza cta***/
+         &str11 = Round(&str11, 2);
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str11 = Rept("0", 17 - Len(&str11)) | &str11;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "11" | &strt45 | &ConsSub | &EtyVlr2 | &str11);
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql411 = CreateSQL("SELECT SUM(MONETARY_AMOUNT) FROM %TABLE(FF_R5_524_TMP)  WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      If &sql411.Fetch(&Tot1) Then
+         &Tot1 = Round(&Tot1, 2);
+         &Tot1 = Rept("0", 17 - Len(&Tot1)) | &Tot1;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "11" | "02" | "000000" | &EtyVlr2 | &Tot1);
+         &fl_FF524.WriteLine("");
+      End-If;
+      &sql36 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql36.Fetch(&BU, &CtaAlt, &CtaH, &str36, &str37, &str38)
+         &ConsSub = &ConsSub + 1;
+         /***Revison naturaleza cta***/
+         &Natu = Naturaleza_Cta(&CtaH);
+         REM MessageBox(0, "", 0, 0, "12. Naturaleza/Cta " | &Natu | "/" | &CtaH);
+         Evaluate &Natu
+         When = "NEGA"
+            &str36 = &str36 * ( - 1);
+         When = "POSI"
+            &str36 = &str36 * (1);
+         End-Evaluate;
+         &str36 = Round(&str36, 2);
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str36 = Rept("0", 17 - Len(&str36)) | &str36;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "11" | "03" | &ConsSub | &EtyVlr2 | &str36);
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql15 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql15.Fetch(&BU, &CtaAlt, &CtaH, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         /***Revison naturaleza cta***/
+         &Natu = Naturaleza_Cta(&CtaH);
+         REM MessageBox(0, "", 0, 0, "12. Naturaleza/Cta " | &Natu | "/" | &CtaH);
+         Evaluate &Natu
+         When = "NEGA"
+            &str12 = &str12 * ( - 1);
+            &EtyVlr2 = "-";
+         When = "POSI"
+            &str12 = &str12 * 1;
+         End-Evaluate;
+         /***Fin Revison naturaleza cta***/
+         &str12 = Round(&str12, 2);
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str12 = Rept("0", 17 - Len(&str12)) | &str12;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "12" | &strt45 | &ConsSub | &EtyVlr2 | &str12);
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql412 = CreateSQL("SELECT SUM(POSTED_BASE_AMT) FROM %TABLE(FF_R5_524_TMP)  WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      If &sql412.Fetch(&Tot2) Then
+         &Tot2 = Round(&Tot2, 2);
+         &Tot2 = Rept("0", 17 - Len(&Tot2)) | &Tot2;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "12" | "02" | "000000" | &EtyVlr2 | &Tot2);
+         &fl_FF524.WriteLine("");
+      End-If;
+      &sql37 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql37.Fetch(&BU, &CtaAlt, &CtaH, &str36, &str37, &str38)
+         &ConsSub = &ConsSub + 1;
+         /***Revison naturaleza cta***/
+         &Natu = Naturaleza_Cta(&CtaH);
+         REM MessageBox(0, "", 0, 0, "12. Naturaleza/Cta " | &Natu | "/" | &CtaH);
+         Evaluate &Natu
+         When = "NEGA"
+            &str37 = &str37 * ( - 1);
+            &EtyVlr2 = "-";
+         When = "POSI"
+            &str37 = &str37 * (1);
+         End-Evaluate;
+         &str37 = Round(&str37, 2);
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str37 = Rept("0", 17 - Len(&str37)) | &str37;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "12" | "03" | &ConsSub | &EtyVlr2 | &str37);
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql16 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql16.Fetch(&BU, &CtaAlt, &CtaH, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         /***Revison naturaleza cta***/
+         &Natu = Naturaleza_Cta(&CtaH);
+         REM MessageBox(0, "", 0, 0, "13. Naturaleza/Cta " | &Natu | "/" | &CtaH);
+         Evaluate &Natu
+         When = "NEGA"
+            &str13 = &str13 * ( - 1);
+            &EtyVlr2 = "-";
+         When = "POSI"
+            &str13 = &str13 * (1);
+         End-Evaluate;
+         /***Fin Revison naturaleza cta***/
+         &str13 = Round(&str13, 2);
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str13 = Rept("0", 17 - Len(&str13)) | &str13;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "13" | &strt45 | &ConsSub | &EtyVlr2 | &str13);
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql413 = CreateSQL("SELECT SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      If &sql413.Fetch(&Tot3) Then
+         &Tot3 = Round(&Tot3, 2);
+         &Tot3 = Rept("0", 17 - Len(&Tot3)) | &Tot3;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "13" | "02" | "000000" | &EtyVlr2 | &Tot3);
+         &fl_FF524.WriteLine("");
+      End-If;
+      &sql38 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO2 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql38.Fetch(&BU, &CtaAlt, &CtaH, &str36, &str37, &str38)
+         &ConsSub = &ConsSub + 1;
+         /***Revison naturaleza cta***/
+         &Natu = Naturaleza_Cta(&CtaH);
+         REM MessageBox(0, "", 0, 0, "12. Naturaleza/Cta " | &Natu | "/" | &CtaH);
+         Evaluate &Natu
+         When = "NEGA"
+            &str38 = &str38 * ( - 1);
+            &EtyVlr2 = "-";
+         When = "POSI"
+            &str38 = &str38 * (1);
+         End-Evaluate;
+         &str38 = Round(&str38, 2);
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str38 = Rept("0", 17 - Len(&str38)) | &str38;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "13" | "03" | &ConsSub | &EtyVlr2 | &str38);
+         &fl_FF524.WriteLine("");
+      End-While;
+      SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME='TIPO_REGISTRO4_CAMPO7'", &EtyVlr2);
+      &sql17 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO3, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO3 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql17.Fetch(&BU, &CtaAlt, &str14, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &str14 = Rept("0", 17 - Len(&str14)) | &str14;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "14" | &strt45 | &ConsSub | &EtyVlr2 | NumberToString("%#017.2t", Value(&str14)));
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql18 = CreateSQL("SELECT BUSINESS_UNIT, FF_CODIGO_FIDU, ALTACCT, NUMBER1, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, FF_CODIGO_FIDU, ALTACCT, NUMBER1 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql18.Fetch(&BU, &CodFidu1, &CtaAlt, &str15, &str11, &str12, &str13)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &NbrCol15 = &str15;
+         SQLExec("SELECT COUNT(RH_COD_ORIGEN) FROM PS_RH_EQUIV_TBL WHERE RH_TABLA_EQUIVALEN = 'CTAS_FORMATO_524' AND RH_CONJ_EQUIV = 'COLUMNA_15' AND RH_COD_ORIGEN =:1", &CodFidu1, &CodFidu2);
+         If All(&CodFidu2) Then
+            &Col15 = "0";
+         Else
+            Evaluate &NbrCol15
+            When = 0
+               &Col15 = "0";
+            When >= 361
+               &Col15 = "E";
+            When-Other
+               SQLExec("SELECT FF_CATEGORIA, FF_INICIO, FF_FIN FROM PS_FF_CAT_DET_TBL WHERE SETID = 'FIDUP' AND FF_ID_CATEGORIA = 'EVALUA_CAR' AND FF_ID_TABLA = 'ETY_EVA_BI' AND FF_INICIO <=:1 AND FF_FIN >=:2", &NbrCol15, &NbrCol15, &ffCat, &ffini, &fffin);
+               &Col15 = &ffCat;
+            End-Evaluate;
+         End-If;
+         &Col15 = Rept(" ", 50 - Len(&Col15)) | &Col15;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "15" | &strt45 | &ConsSub | &EtyVlr2 | &Col15);
+         &fl_FF524.WriteLine("");
+      End-While;
+      &sql39 = CreateSQL("SELECT BUSINESS_UNIT, FF_CODIGO_FIDU, ALTACCT, NUMBER1, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, FF_CODIGO_FIDU, ALTACCT, NUMBER1 ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      &ConsSub = 0;
+      While &sql39.Fetch(&BU, &CodFidu1, &CtaAlt, &str39, &str36, &str37, &str38)
+         &ConsSub = &ConsSub + 1;
+         &ConsSub = Rept("0", 6 - Len(&ConsSub)) | &ConsSub;
+         &NbrCol35 = &str39;
+         SQLExec("SELECT COUNT(RH_COD_ORIGEN) FROM PS_RH_EQUIV_TBL WHERE RH_TABLA_EQUIVALEN = 'CTAS_FORMATO_524' AND RH_CONJ_EQUIV = 'COLUMNA_15' AND RH_COD_ORIGEN =:1", &CodFidu1, &CodFidu2);
+         If All(&CodFidu2) Then
+            &Col15 = "0";
+         Else
+            Evaluate &NbrCol35
+            When = 0
+               &Col35 = "0";
+            When >= 361
+               &Col35 = "E";
+            When-Other
+               SQLExec("SELECT FF_CATEGORIA, FF_INICIO, FF_FIN FROM PS_FF_CAT_DET_TBL WHERE SETID = 'FIDUP' AND FF_ID_CATEGORIA = 'EVALUA_CAR' AND FF_ID_TABLA = 'ETY_EVA_BI' AND FF_INICIO <=:1 AND FF_FIN >=:2", &NbrCol35, &NbrCol35, &ffCat, &ffini, &fffin);
+               &Col35 = &ffCat;
+            End-Evaluate;
+         End-If;
+         &Col35 = Rept(" ", 50 - Len(&Col35)) | &Col35;
+         &strt41 = &strt41 + 1;
+         &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+         &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "15" | "03" | &ConsSub | &EtyVlr2 | &Col35);
+         &fl_FF524.WriteLine("");
+      End-While;
+   End-If;
+   /***************************/
+   /***************************/
+   /*Unidad de captura 02*/
+   /*Obtener valores totales*/
+   /*&sql40 = CreateSQL("SELECT SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP)  WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+   If &sql40.Fetch(&Tot1, &Tot2, &Tot3) Then
+      SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME='TIPO_REGISTRO4'", &EtyVlr);
+      SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME='FORMATO_524'", &EtyVlr1);
+      SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME='TIPO_REGISTRO4_CAMPO7'", &EtyVlr2);
+      &strt42 = &EtyVlr;
+      &strt43 = &EtyVlr1;
+      &strt45 = "02";
+      &Tot1 = Round(&Tot1, 2);
+      &Tot1 = Rept("0", 17 - Len(&Tot1)) | &Tot1;
+      &strt41 = &strt41 + 1;
+      &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+      &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "11" | &strt45 | "000000" | &EtyVlr2 | &Tot1);
+      &fl_FF524.WriteLine("");
+      &Tot2 = Round(&Tot2, 2);
+      &Tot2 = Rept("0", 17 - Len(&Tot2)) | &Tot2;
+      &strt41 = &strt41 + 1;
+      &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+      &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "12" | &strt45 | "000000" | &EtyVlr2 | &Tot2);
+      &fl_FF524.WriteLine("");
+      &Tot3 = Round(&Tot3, 2);
+      &Tot3 = Rept("0", 17 - Len(&Tot3)) | &Tot3;
+      &strt41 = &strt41 + 1;
+      &strt41 = Rept("0", 8 - Len(&strt41)) | &strt41;
+      &fl_FF524.WriteString(&strt41 | &strt42 | &strt43 | "13" | &strt45 | "000000" | &EtyVlr2 | &Tot3);
+      &fl_FF524.WriteLine("");
+   End-If;*/
+   /***************************/
+   /***************************/
+   /*Unidad de captura 03*/
+   /*Obtener valores Reg Tipo4*/
+   /*&sql31 = CreateSQL("SELECT BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO, SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R53_524_TM) WHERE PROCESS_INSTANCE = :1 GROUP BY BUSINESS_UNIT, ALTACCT, RH_COD_DESTINO ORDER BY BUSINESS_UNIT, ALTACCT", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+   If &sql31.Fetch(&BU, &CtaAlt, &str31, &str36, &str37, &str38) Then
+      &ConsSub = 0;
+   End-If;*/
+   /***************************/
+   /***************************/
+   /*Registro Tipo 5*/
+   /*MessageBox(0, "", 0, 0, "Total Reg: " | &strTotalRegistros);
+   &strTotalRegistros = &strt41;*/
+   &strt41 = &strt41 | "6";
+   &fl_FF524.WriteString(&strt41);
+   &fl_FF524.WriteLine("");
+   /***********************************/
+   &sql1.Close();
+   &sql2.Close();
+   If (&bolSql3) Then
+      &sql3.Close();
+   End-If;
+   If (&bolSql4) Then
+      &sql4.Close();
+   End-If;
+   &sql5.Close();
+   /*&sql5.Close();
+&sql5.Close();
+&sql5.Close();*/
+   &fl_FF524.Close();
+Else
+   /* file not opened, do error processing */
+   MessageBox(0, "", 0, 0, "File Not Opened");
+End-If;

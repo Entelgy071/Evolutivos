@@ -1,0 +1,15 @@
+/**************************************************************************************************************************
+* Proyecto:	    FF_GL_ARCH_PLN_SCD_FIDU_000
+* Actividad:  	001
+* Responsable: 	Quanam – Alicia Szerenyi
+* Fecha:		03Dic012
+* Descripción:	-Se actualizan los montos de los nodos '3040102005' ,'3040102010' ,'3040102015' ,'3040102020' ,'3040102025'
+				que deben multiplicar por 50% su valor 
+				-Se actualiza el monto del nodo '3040101030' que debe multiplicar por 10% su valor
+***************************************************************************************************************************/
+
+/*Inicio #001*/
+SQLExec("UPDATE %Table(ETY_GLRT4_TMP) SET FF_VALOR_ACTIVO = ROUND(FF_VALOR_ACTIVO*0.5) WHERE PROCESS_INSTANCE = :1 AND FF_TIPO_REGISTRO = '4' AND FF_COD_FORMATO IN ('3040102005' ,'3040102010' ,'3040102015' ,'3040102020' ,'3040102025') AND FF_COD_FIDEICOMISO = '304' AND FF_CODIGO_SFC = ' '", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+
+SQLExec("UPDATE %Table(ETY_GLRT4_TMP) SET FF_VALOR_ACTIVO = ROUND(FF_VALOR_ACTIVO*0.1) WHERE PROCESS_INSTANCE = :1 AND FF_TIPO_REGISTRO = '4' AND FF_COD_FORMATO = '3040101030' AND FF_COD_FIDEICOMISO = '304' AND FF_CODIGO_SFC = ' '", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+/*Fin #001*/

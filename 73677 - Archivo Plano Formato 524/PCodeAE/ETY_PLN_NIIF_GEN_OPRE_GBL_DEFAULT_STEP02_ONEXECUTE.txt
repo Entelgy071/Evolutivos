@@ -1,0 +1,163 @@
+/**************************************************************************************************************************
+* Proyecto:	    FF_GL_ARCH_PLN_SCD_FIDU_000
+* Actividad:  	001
+* Responsable: 	Quanam – Alicia Szerenyi
+* Fecha:		29May012
+* Descripción:	Generación del archivo plano a partir de los registros temporales cargados en el paso anterior
+***************************************************************************************************************************/
+/**************************************************************************************************************************
+* Proyecto:	    FF_GL_ARCH_PLN_SCD_FIDU_000
+* Actividad:  	002
+* Responsable: 	Quanam – David Polo
+* Fecha:		2013-Feb-19
+* Descripción:	Control de cambios. Sumar el valor de los nodos en los registros 999.
+***************************************************************************************************************************/
+
+Local File &fl_OperRecip;
+Local Rowset &rst_FF_GL_OPER_RECIP;
+Local Rowset &RS1, &RS2, &RS3, &RS4, &RS5, &RS6;
+Local Rowset &rst_2, &rst_3, &rst_4, &rst_5, &rst_6;
+Local SQL &sql1, &sql2, &sql3, &sql4, &sql5, &sql6;
+
+&strFecha = DateTimeToLocalizedString(%Date, "yyyyMMdd");
+/* ASM - 28/11/2012 - Por uso de servers UNX se cambia el uso de URL por Filepath relativos
+&strURL = GetURL(URL.FF_GL_ARCH_PLANOS);
+&fl_OperRecip = GetFile(&strURL | "OPERACIONES_RECIPROCAS_" | &strFecha | ".txt", "W", %FilePath_Absolute);*/
+&fl_OperRecip = GetFile("OPERACIONES_RECIPROCAS_" | &strFecha | ".txt", "W", %FilePath_Relative);
+&fl_OperRecip_csv = GetFile("OPERACIONES_RECIPROCAS_CSV_" | &strFecha | ".csv", "W", %FilePath_Relative);
+/**/
+If &fl_OperRecip.IsOpen And
+      &fl_OperRecip_csv.IsOpen Then
+   If &fl_OperRecip.SetFileLayout(FileLayout.FF_GL_CAR5_FL) And
+         &fl_OperRecip_csv.SetFileLayout(FileLayout.FF_GL_CAR5_CSV_FL) Then
+      
+      
+      /***********************************/
+      /*REGISTRO TIPO 1*/
+      SQLExec("SELECT FF_ID_REGISTRO FROM PS_FF_GL_CAR6_TM WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE, &strTotalRegistros);
+      &sql1 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, TRIM(FF_TIPO_ENTIDAD), FF_CODIGO_SFC, FF_FECHA_CORTE, FF_TOTAL_REGISTRO, FF_PALABRA_CLAVE, FF_AREA_INF, FF_TIPO_INFORME FROM %Table(FF_GL_RT1_TMP)  WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      If &sql1.Fetch(&str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9) Then
+         &fl_OperRecip.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &strTotalRegistros | &str7 | &str8 | &str9);
+         &fl_OperRecip_csv.WriteString(&str1 | ";" | &str2 | ";" | &str3 | ";" | &str4 | ";" | &str5 | ";" | &strTotalRegistros | ";" | &str7 | ";" | &str8 | ";" | &str9);
+      End-If;
+      &fl_OperRecip.WriteLine("");
+      &fl_OperRecip_csv.WriteLine("");
+      /***********************************/
+      /*REGISTRO TIPO 2*/
+      &sql2 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_TIPO_IDENT, TRIM(NATIONAL_ID), LC_DIG_VERIF, NAME_DISPLAY FROM PS_FF_GL_CAR2_TM WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      If &sql2.Fetch(&str1, &str2, &str3, &str4, &str5, &str6) Then
+         &str6 = Substitute(&str6, ".", "");
+         &str6 = Substitute(&str6, " ", "");
+         &fl_OperRecip.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &str6);
+         &fl_OperRecip_csv.WriteString(&str1 | ";" | &str2 | ";" | &str3 | ";" | &str4 | ";" | &str5 | ";" | &str6);
+      End-If;
+      &fl_OperRecip.WriteLine("");
+      &fl_OperRecip_csv.WriteLine("");
+      /***********************************/
+      /*REGISTRO TIPO 3*/
+      &sql3 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_TIPO_EVALUACION, FF_TIPO_FIDEI, FF_COD_FIDEICOMISO, TRIM(FF_TIPO_ENTIDAD), FF_COD_ENTIDAD, FF_VAL_FIDEI FROM PS_FF_GL_CAR3_TM WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      If &sql3.Fetch(&str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8) Then
+         &fl_OperRecip.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &str6 | &str7 | &str8);
+         &fl_OperRecip_csv.WriteString(&str1 | ";" | &str2 | ";" | &str3 | ";" | &str4 | ";" | &str5 | ";" | &str6 | ";" | &str7 | ";" | &str8);
+      End-If;
+      &fl_OperRecip.WriteLine("");
+      &fl_OperRecip_csv.WriteLine("");
+      /***********************************/
+      /*REGISTRO TIPO 4*/
+      &sql4 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_TIPO_IDENT, TRIM(NATIONAL_ID), FF_COD_CIIU, FF_NATUR_JUR, VAR_TYPE_1, VAR_TYPE_2, VAR_TYPE_3, FF_COD_REPORTADO FROM PS_FF_GL_CAR4_TM WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      If &sql4.Fetch(&str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9, &str10) Then
+         &fl_OperRecip.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &str6 | &str7 | &str8 | &str9 | &str10);
+         &fl_OperRecip_csv.WriteLine(&str1 | ";" | &str2 | ";" | &str3 | ";" | &str4 | ";" | &str5 | ";" | &str6 | ";" | &str7 | ";" | &str8 | ";" | &str9 | ";" | &str10);
+      End-If;
+      &fl_OperRecip.WriteLine("");
+      &fl_OperRecip_csv.WriteLine("");
+      
+      /***********************************/
+      /*REGISTRO TIPO 5*/
+      &rec5 = CreateRecord(Record.FF_GL_CAR5_WK);
+      rem &sql5 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, TREE_NODE, SIGN, LPAD(ROUND(ABS(FF_VAL_FIDEI)/1000000),17,'0') FROM PS_ETY_GLCAR5_TM WHERE PROCESS_INSTANCE = :1 AND ROUND(ABS(FF_VAL_FIDEI)/1000000) > 0 ORDER BY LEDGER, TREE_NODE_NUM", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      Local Rowset &rs_ETY_GL_CAR5_VW;
+      Local Record &rec_ETY_GL_CAR5_VW;
+      
+      &rec_ETY_GL_CAR5_VW = CreateRecord(Record.ETY_GL_CAR5_VW);
+      
+      &rs_ETY_GL_CAR5_VW = CreateRowset(Record.ETY_GL_CAR5_VW);
+      
+      &rs_ETY_GL_CAR5_VW.Fill("WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+      
+      &rs_ETY_GL_CAR5_VW.Sort(ETY_GL_CAR5_VW.TREE_NODE_NUM, "A");
+      
+      
+      
+      &nbrI = 4;
+      
+      /* Inicio #002 */
+      Local string &str_TipoReg, &str_Key, &padl;
+      Local number &Total_999;
+      
+      &str_TipoReg = " ";
+      &Total_999 = 0;
+      /* Fin #002 */
+      
+      Local number &NumReg = 0;
+      
+      For &row = 1 To &rs_ETY_GL_CAR5_VW.ActiveRowCount
+         &rec_ETY_GL_CAR5_VW = &rs_ETY_GL_CAR5_VW.GetRow(&row).GetRecord(Record.ETY_GL_CAR5_VW);
+         &rec_ETY_GL_CAR5_VW.CopyFieldsTo(&rec5);
+         
+         
+         rem JSZ  While &sql5.Fetch(&rec5);
+         
+         /* Inicio #002 */
+         &str_TipoReg = Substring(&rec5.FF_TREE_NODE.Value, 8, 3);
+         &str_Key = Substring(&rec5.FF_TREE_NODE.Value, 1, 7);
+         
+         If &str_TipoReg = "999" Then
+            &padl = Rept("0", 17);
+            rem &rec5.FF_VAL_FIDEI.Value = Right(&padl | String(Round(Abs(&Total_999), 0)), 17);
+            &Total_999 = 0;
+         Else
+            &Total_999 = &Total_999 + &rec5.FF_VAL_FIDEI.Value;
+         End-If;
+         /* Fin #002 */
+         
+         &nbrI = &nbrI + 1;
+         &strI = String(&nbrI);
+         &rec5.FF_ID_REGISTRO.Value = Rept("0", 8 - Len(&strI)) | &strI;
+         
+         MessageBox(0, "", 0, 0, &str_Key);
+         
+         &fl_OperRecip.WriteRecord(&rec5);
+         
+         &fl_OperRecip_csv.WriteRecord(&rec5);
+         
+         rem End-While;
+      End-For;
+      
+      /***********************************/
+      /*REGISTRO TIPO 6*/
+      &sql6 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO FROM PS_FF_GL_CAR6_TM WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      If &sql6.Fetch(&str1, &str2) Then
+         &fl_OperRecip.WriteString(&str1 | &str2);
+         &fl_OperRecip_csv.WriteString(&str1 | ";" | &str2);
+      End-If;
+      
+      
+      
+      
+   Else
+      /* file layout not found, do error processing */
+      MessageBox(0, "", 0, 0, "File Layout Not Found");
+   End-If;
+   &sql1.Close();
+   &sql2.Close();
+   &sql3.Close();
+   &sql4.Close();
+   rem &sql5.Close();
+   &sql6.Close();
+   &fl_OperRecip.Close();
+   &fl_OperRecip_csv.Close();
+Else
+   /* file not opened, do error processing */
+   MessageBox(0, "", 0, 0, "File Not Opened");
+End-If;

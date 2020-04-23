@@ -1,0 +1,65 @@
+/*********************************************************************
+* Proyecto:	    ETY_PLN_NIIF
+* Actividad:  	001
+* Responsable: 	Entelgy - Kevin Vanegas
+* Fecha:		16-06-2015
+* Descripción:	Selección de sección a seguir dependiendo del tipo de
+archivo que se quiera generar.
+/*********************************************************************
+* Proyecto:	    ETY_ERP_GL_FLP_EVO_73677
+* Actividad:  	002
+* Responsable: 	Entelgy - David A. Suarez
+* Fecha:		07-10-2019
+* Descripción:	Adicion formato plano 524.
+*********************************************************************/
+/*INICIO 001*/
+If ETY_GL_INFM_AET.LEDGER = "DIARIO" Or
+      None(ETY_GL_INFM_AET.LEDGER) Then
+   ETY_GL_INFM_AET.AE_APPLID.Value = "ETY_PLN_NIIF";
+End-If;
+If ETY_GL_INFM_AET.LEDGER = "NIIF" Then
+   ETY_GL_INFM_AET.AE_APPLID.Value = "ETY_PLAN_NIF";
+End-If;
+Evaluate ETY_GL_INFM_AET.FF_ID_ARCHIVO
+When "CA"
+   ETY_GL_INFM_AET.AE_SECTION.Value = "COMP_ACC";
+   Break;
+When "FI"
+   /*Fideicomisos*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "FIDEICOM";
+   Break;
+When "PP"
+   /*Pasivos Pensionales*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "PASIVOSP";
+   Break;
+When "NG"
+   /*Negocios*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "NEGOCIOS";
+   Break;
+When "FN"
+   /*Fondos de Inversión*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "FINVERSI";
+   Break;
+When "OR"
+   /*Operaciones Reciprocas*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "OPRECIPR";
+   Break;
+When "SO"
+   /*Sociedad Fiduciaria*/
+   REM ETY_GL_INFM_AET.AE_SECTION.Value = "FFSOCIED";
+   ETY_GL_INFM_AET.AE_SECTION.Value = "SOCFIDUC";
+   Break;
+When "CC"
+   /*Carteras Colectivas*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "FFCARTER";
+   Break;
+   /*INICIO 002*/
+When "F5"
+   /*Formato Plano 524*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "FF524";
+   Break;
+End-Evaluate;
+MessageBox(0, "", 0, 0, "Application Engine: > " | ETY_GL_INFM_AET.AE_APPLID);
+MessageBox(0, "", 0, 0, "Section: > " | ETY_GL_INFM_AET.AE_SECTION);
+/*FIN 002*/
+/*FIN 001*/

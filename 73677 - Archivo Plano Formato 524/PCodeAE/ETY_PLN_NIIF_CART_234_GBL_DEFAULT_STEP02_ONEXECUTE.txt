@@ -1,0 +1,17 @@
+/******************************************************************************************
+* Proyecto:	    FF_GL_ARCH_PLN_SCD_FIDU_000
+* Actividad:  	001
+* Responsable: 	Quanam – Alicia Szerenyi
+* Fecha:		11Jun2012
+* Descripción:	Cargo dinamicamente la seccion a utilizar para cargar registros tipo 3.
+******************************************************************************************/
+/*Inicio #001*/
+If All(ETY_GL_INFM_AET.FF_CODIGO_SFC) Then
+   /*Si hay valor en FF_CODIGO_SFC estoy cargando un Compartimento. Utilizo seccion que filtra por FUND_CODE*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "FFGLRTCX";
+Else
+   /*Si no hay valor en FF_CODIGO_SFC estoy cargando una Cartera Colectiva. Utilizo seccion que no filtra por FUND_CODE*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "CART_3";
+End-If;
+MessageBox(0, "", 0, 0, "Section Cartera Colectiva: > " | ETY_GL_INFM_AET.AE_SECTION);
+/*Fin #001*/

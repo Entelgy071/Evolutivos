@@ -1,0 +1,90 @@
+/**************************************************************************************************************************
+* Proyecto:	    FF_GL_ARCH_PLN_SCD_FIDU_000
+* Actividad:  	001
+* Responsable: 	Quanam – Alicia Szerenyi
+* Fecha:		29May012
+* Descripción:	Manejo de los campos de la pagina de Ejecucion de los Archivos Planos de GL
+				Para los FF_ID_ARCHIVO IN ('CC', 'FI', 'PP') se deben ocultar FISCAL_YEAR, ACCOUNTING_PERIOD, ACCOUNTING_PERIOD2
+				Para los FF_ID_ARCHIVO IN ('CA', 'OR')  no se debe ocultar ningún campo
+				Para los FF_ID_ARCHIVO IN ('SO')  se debe ocultar ACCOUNTING_PERIOD2
+**************************************************************************************************************************
+* Proyecto:	    ETY_GL_EVO1090_OS
+* Actividad:  	002
+* Responsable: 	Olga Sarmiento
+* Fecha:		13May2019
+* Descripción:	Manejo de los campos de la pagina para visualizar grilla de unidades de negocio
+***************************************************************************************************************************/
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_GL_FLP_EVO_73677
+* Actividad:  	003
+* Responsable: 	David A. Suarez
+* Fecha:		22Oct2019
+* Descripción:	Ocultar campos de año fiscal, y periodo contable para cuando se seleccione formato 524. 
+***************************************************************************************************************************/
+/*Inicio #001*/
+Local string &str_IdArchivo;
+
+&str_IdArchivo = FF_RUN_INFMGSLV.FF_ID_ARCHIVO;
+
+FF_RUN_INFMGSLV.FISCAL_YEAR.Visible = True;
+FF_RUN_INFMGSLV.ACCOUNTING_PERIOD.Visible = True;
+FF_RUN_INFMGSLV.ACCOUNTING_PERIOD2.Visible = True;
+FF_RUN_INFMGSLV.FISCAL_YEAR.Enabled = False;
+FF_RUN_INFMGSLV.ACCOUNTING_PERIOD.Enabled = False;
+FF_RUN_INFMGSLV.ACCOUNTING_PERIOD2.Enabled = False;
+
+REM Local Rowset &RS1;
+
+REM &RS1 = GetRowset(Scroll.ETY_RUN_INFMGSL);
+
+If &str_IdArchivo <> "FN" Then
+   REM &RS1.HideAllRows();
+Else
+   REM &RS1.ShowAllRows();
+   FF_RUN_INFMGSLV.FISCAL_YEAR.Visible = False;
+   FF_RUN_INFMGSLV.ACCOUNTING_PERIOD.Visible = False;
+   FF_RUN_INFMGSLV.ACCOUNTING_PERIOD2.Visible = False;
+End-If;
+
+/*Carteras Colectivas o Fideicomisos o Pasivos Pensionales*/
+If (&str_IdArchivo = "CC" Or
+      &str_IdArchivo = "FI" Or
+      &str_IdArchivo = "PP" Or
+      &str_IdArchivo = "NG") Then
+   FF_RUN_INFMGSLV.FISCAL_YEAR.Visible = False;
+   FF_RUN_INFMGSLV.ACCOUNTING_PERIOD.Visible = False;
+   FF_RUN_INFMGSLV.ACCOUNTING_PERIOD2.Visible = False;
+   /*Igual cargo estos datos porque los voy a necesitar en el proceso*/
+   FF_RUN_INFMGSLV.FISCAL_YEAR = Year(FF_RUN_INFMGSLV.DATE_END);
+   FF_RUN_INFMGSLV.ACCOUNTING_PERIOD = Month(FF_RUN_INFMGSLV.DATE_END);
+Else
+   /*Sociedad Fiduciaria*/
+   If (&str_IdArchivo = "SO") Then
+      FF_RUN_INFMGSLV.ACCOUNTING_PERIOD2.Visible = False;
+      FF_RUN_INFMGSLV.FISCAL_YEAR = Year(FF_RUN_INFMGSLV.DATE_END);
+      FF_RUN_INFMGSLV.ACCOUNTING_PERIOD = Month(FF_RUN_INFMGSLV.DATE_END);
+   Else
+      /*Operacion Reciprocas*/
+      If (&str_IdArchivo = "OR") Then
+         FF_RUN_INFMGSLV.FISCAL_YEAR = Year(FF_RUN_INFMGSLV.DATE_END);
+         FF_RUN_INFMGSLV.ACCOUNTING_PERIOD2 = Month(FF_RUN_INFMGSLV.DATE_END);
+         /*ASM - Se carga el periodo, de la fecha ingresada a tres periodos hacia atras*/
+         FF_RUN_INFMGSLV.ACCOUNTING_PERIOD = FF_RUN_INFMGSLV.ACCOUNTING_PERIOD2 - 2;
+      End-If;
+   End-If;
+End-If;
+/*Fin #001*/
+/*inicio 002*/
+If &str_IdArchivo = "NG" Then
+   ETY_PLN_AET.DESCR_LONG.Visible = True;
+Else
+   ETY_PLN_AET.DESCR_LONG.Visible = False;
+End-If;
+/*fin 002*/
+/*inicio 003*/
+If &str_IdArchivo = "F5" Then
+   FF_RUN_INFMGSLV.FISCAL_YEAR.Visible = False;
+   FF_RUN_INFMGSLV.ACCOUNTING_PERIOD.Visible = False;
+   FF_RUN_INFMGSLV.ACCOUNTING_PERIOD2.Visible = False;
+End-If;
+/*fin 003*/

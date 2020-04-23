@@ -1,0 +1,359 @@
+/**************************************************************************************************************************
+* Proyecto:	    FF_GL_ARCH_PLN_SCD_FIDU_000
+* Actividad:  	001
+* Responsable: 	Quanam – Alicia Szerenyi
+* Fecha:		29May012
+* Descripción:	Generación del archivo plano a partir de los registros temporales cargados en el paso anterior
+***************************************************************************************************************************/
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ARCH_PLANO
+* Actividad:  	002
+* Responsable: 	Entelgy – Camilo Trujillo
+* Fecha:		01Mar016
+* Descripción:	Modificacion para que genere el plano con el anexo de NIIF. Se elimina un If que validaba un valor..
+***************************************************************************************************************************/
+
+Local File &fl_SocFiduc;
+Local string &str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9;
+Local string &strURL, &strFecha, &strTotalRegistros, &strCodFideicomiso, &strI, &strTipoInf, &treename;
+Local number &nbrI, &nbr5;
+Local SQL &sql1, &sql2, &sql3, &sql4, &sql5;
+Local boolean &bolSql3, &bolSql4;
+
+&bolSql3 = False;
+&bolSql4 = False;
+&strFecha = DateTimeToLocalizedString(%Date, "yyyyMMdd");
+/* ASM - 28/11/2012 - Por uso de servers UNX se cambia el uso de URL por Filepath relativos
+&strURL = GetURL(URL.FF_GL_ARCH_PLANOS);
+&fl_SocFiduc = GetFile(&strURL | "SOCIEDAD_FIDUCIARIA_" | &strFecha | ".txt", "W", %FilePath_Absolute);*/
+&fl_SocFiduc = GetFile("SOCIEDAD_FIDUCIARIA_" | &strFecha | ".txt", "W", %FilePath_Relative);
+SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_GEN WHERE ETY_PARAM_GEN='SF_NIIFSUP'", &treename);
+SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_GEN WHERE ety_param_gen = 'SF_464NIIF'", &treename464);
+SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_GEN WHERE ety_param_gen = 'SF_304NIIF'", &treename304);
+
+<*Inicio 0001*>
+&treename = "PUC_SFIN_FIDUPNIIF";
+&treename464 = "COD_FORMA_464_NIF";
+&treename505 = "COD_FORMAT_505";
+&treename304 = "COD_FORMA_304_NIIF";
+<*Fin 0001*>
+/**/
+
+If &fl_SocFiduc.IsOpen Then
+   /***********************************/
+   /*REGISTRO TIPO 1*/
+   SQLExec("SELECT LPAD(FF_ID_REGISTRO,5,0) FROM %table(ETY_GLRT5_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE, &strTotalRegistros);
+   &sql1 = CreateSQL("SELECT LPAD(FF_ID_REGISTRO,5,0), FF_TIPO_REGISTRO, TRIM(FF_TIPO_ENTIDAD), FF_CODIGO_SFC, FF_FECHA_CORTE, FF_TOTAL_REGISTRO, FF_PALABRA_CLAVE, FF_AREA_INF, FF_TIPO_INFORME FROM %Table(FF_GL_RT1_TMP)  WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+   &nbr_pos = &fl_SocFiduc.GetPosition();
+   If &sql1.Fetch(&str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9) Then
+      &str_cabecera1 = &str1 | &str2 | &str3 | &str4 | &str5;
+      &str_cabecera2 = &str7 | &str8 | &str9;
+      &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &strTotalRegistros | &str7 | &str8 | &str9);
+   End-If;
+   &fl_SocFiduc.WriteLine("");
+   
+   If ETY_GL_INFM_AET.LEDGER = "DIARIO" Or
+         None(ETY_GL_INFM_AET.LEDGER) Then
+      /***********************************/
+      /*REGISTRO TIPO 2*/
+      &nbrI = 1;
+      &nbrCount2 = 0;
+      &sql2 = CreateSQL("SELECT  LPAD(FF_ID_REGISTRO,5,0), FF_TIPO_REGISTRO, FF_COD_OFICINA, CONSTANTS, FF_TIPO_MONEDA, FF_TIPOINFORMACION, TRIM(FF_TIPO_FIDEI), TRIM(FF_COD_FIDEICOMISO),LEDGER FROM %Table(ETY_GLRT2_TMP) WHERE LEDGER= 'DIARIO' AND PROCESS_INSTANCE = :1 AND FF_TIPO_MONEDA=0  ORDER BY FF_COD_FIDEICOMISO, FF_TIPOINFORMACION, FF_TIPO_MONEDA", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      While &sql2.Fetch(&str1, &str2, &str3, &str4, &str5, &strTipoInf, &str7, &str8, &ledger)
+         &nbrCount2 = &nbrCount2 + 1;
+         &nbrI = &nbrI + 1;
+         &strI = String(&nbrI);
+         &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+         &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &strTipoInf | &str7 | &str8);
+         &fl_SocFiduc.WriteLine("");
+         /***********************************/
+         /*REGISTRO TIPO 3*/
+         If (&strTipoInf = "0") Then
+            /*Son codigos PUC, reporto registros tipo 3*/
+            rem &sql3 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, RPAD(FF_CODIGO_PUC,6,0), SIGN, ABS(FF_VALOR_ACTIVO) FROM PS_ETY_GLRT3_TMP WHERE PROCESS_INSTANCE = :1 AND FF_TIPO_MONEDA = :2 ORDER BY TO_NUMBER(FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str5);
+            
+            &sql3 = CreateSQL("SELECT DISTINCT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, RPAD(A.FF_CODIGO_PUC,6,0), (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END), ABS(A.FF_VALOR_ACTIVO) FROM %Table(ETY_GLRT3_TMP) A, PS_FF_GL_TRNODE_VW B WHERE A.PROCESS_INSTANCE = :1 AND A.FF_TIPO_MONEDA = :2 AND A.FF_COD_FIDEICOMISO = :3 AND B.SETID = 'FIDUP' AND B.TREE_NAME = 'PUC_SUPERFIN_FIDUP' AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM AND A.FF_VALOR_ACTIVO <> 0  ORDER BY to_number(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str5, &strCodFideicomiso);
+            
+            &bolSql3 = True;
+            While &sql3.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+               /*Formatear numero a 20 posiciones, forzar 2 decimales y rellenar con 0 a la izquierda*/
+               &str5 = NumberToString("%#020.2", &nbr5);
+               &nbrI = &nbrI + 1;
+               &strI = String(&nbrI);
+               &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+               &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+               &fl_SocFiduc.WriteLine("");
+            End-While;
+            
+            
+         Else
+            
+            /*Son formatos, reporto registros tipo 4*/
+            /***********************************/
+            /*REGISTRO TIPO 4*/
+            If (&nbrCount2 = 4) Then
+               /*El 4to registro Tipo 2 corresponde a formato 464*/
+               rem &sql4 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_FORMATO, SIGN, ABS(FF_VALOR_ACTIVO) FROM PS_ETY_GLRT4_TMP WHERE PROCESS_INSTANCE = :1 AND FF_COD_FIDEICOMISO = '464' ORDER BY TO_NUMBER(FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+               <*
+				&sql4 = CreateSQL("SELECT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, A.FF_COD_FORMATO, (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END), ABS(A.FF_VALOR_ACTIVO) FROM PS_ETY_GLRT4_TMP A, PS_FF_GL_TRNODE_VW B WHERE A.PROCESS_INSTANCE = :1 AND A.FF_COD_FIDEICOMISO = '464' AND B.SETID = 'FIDUP' AND B.TREE_NAME = 'CODIGOS_FORMAT_464' AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM AND A.LEDGER='DIARIO' AND A.FF_VALOR_ACTIVO <> 0 ORDER BY TO_NUMBER(A.FF_ID_REGISTRO) ", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+               &bolSql4 = True;
+               While &sql4.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+                  /*Formatear numero a 20 posiciones, forzar 2 decimales y rellenar con 0 a la izquierda*/
+                  &str5 = NumberToString("%#020.2", &nbr5);
+                  &nbrI = &nbrI + 1;
+                  &strI = String(&nbrI);
+                  &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+                  &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+                  &fl_SocFiduc.WriteLine("");
+               End-While;
+*>
+            Else
+               /*El 5to registro Tipo 2 corresponde a formatos 304 y 305*/
+               /*Formato 304*/
+               rem &sql4 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_FORMATO, SIGN, ABS(ROUND(FF_VALOR_ACTIVO/1000000)) FROM PS_ETY_GLRT4_TMP WHERE PROCESS_INSTANCE = :1 AND FF_COD_FIDEICOMISO = '304' ORDER BY TO_NUMBER(FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+               &sql4 = CreateSQL("SELECT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, A.FF_COD_FORMATO, (CASE WHEN B.FF_NATURALEZA = 'POSI' THEN '+' ELSE '-' END), A.FF_VALOR_ACTIVO FROM %Table(ETY_GLRT4_TMP) A, PS_FF_GL_TRNODE_VW B WHERE A.PROCESS_INSTANCE = :1 AND A.FF_COD_FIDEICOMISO = '304' AND B.SETID = 'FIDUP' AND B.TREE_NAME = 'CODIGOS_FORMAT_304' AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM AND A.LEDGER='DIARIO' AND A.FF_VALOR_ACTIVO <> 0 ORDER BY TO_NUMBER(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+               &bolSql4 = True;
+               While &sql4.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+                  /*Formatear numero a 20 posiciones y rellenar con 0 a la izquierda. Solo se reportan decimales para el codigo 3040104005*/
+                  /* DAPM */
+                  If (&str3 = "3040104005" Or
+                        &str3 = "3040101999" Or
+                        &str3 = "3040103005") And
+                        &nbr5 < 0 Then
+                     &str4 = "-";
+                     &nbr5 = Abs(&nbr5);
+                  End-If;
+                  /* DAPM */
+                  If (&str3 = "3040104005") Then
+                     &str5 = NumberToString("%#020.2", &nbr5);
+                  Else
+                     &str5 = NumberToString("%020.0", &nbr5);
+                  End-If;
+                  &nbrI = &nbrI + 1;
+                  &strI = String(&nbrI);
+                  &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+                  &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+                  &fl_SocFiduc.WriteLine("");
+               End-While;
+               /*Formato 305*/
+               &sql4 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_FORMATO, SIGN, ABS(FF_VALOR_ACTIVO) FROM %Table(ETY_GLRT4_TMP) WHERE PROCESS_INSTANCE = :1 AND FF_COD_FIDEICOMISO NOT IN ('304','464') AND FF_COD_FIDEICOMISO <> ' ' AND LEDGER='DIARIO' AND FF_VALOR_ACTIVO <> 0 ORDER BY FF_COD_FORMATO, FF_COD_FIDEICOMISO, FF_CODIGO_SFC", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+               &bolSql4 = True;
+               While &sql4.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+                  /*Formatear numero a 20 posiciones y rellenar con 0 a la izquierda. Solo se reportan decimales para los codigos 3050601XXX*/
+                  If (Substring(&str3, 1, 7) = "3050601") Then
+                     &str5 = NumberToString("%#020.2", &nbr5);
+                  Else
+                     &str5 = NumberToString("%020.0", &nbr5);
+                  End-If;
+                  &nbrI = &nbrI + 1;
+                  &strI = String(&nbrI);
+                  &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+                  &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+                  &fl_SocFiduc.WriteLine("");
+               End-While;
+            End-If;
+            
+         End-If;
+      End-While;
+      
+      
+      
+      If (&bolSql3) Then
+         &sql3.Close();
+      End-If;
+      If (&bolSql4) Then
+         &sql4.Close();
+      End-If;
+      
+   End-If;
+   
+   /***********************************/
+   
+   /***********************************************NIIF*******************************************************/
+   
+   If ETY_GL_INFM_AET.LEDGER = "NIIF" Or
+         None(ETY_GL_INFM_AET.LEDGER) Then
+      /***********************************/
+      /*REGISTRO TIPO 2*/
+      If ETY_GL_INFM_AET.LEDGER = "NIIF" Then
+         &nbrI = 1;
+         &nbrCount2 = 0;
+      End-If;
+      
+      &sql2 = CreateSQL("SELECT LPAD(FF_ID_REGISTRO,5,0), FF_TIPO_REGISTRO, FF_COD_OFICINA, CONSTANTS, FF_TIPO_MONEDA, FF_TIPOINFORMACION, TRIM(FF_TIPO_FIDEI), TRIM(FF_COD_FIDEICOMISO),LEDGER FROM %Table(ETY_GLRT2_TMP) WHERE ledger = 'NIIF' AND PROCESS_INSTANCE = :1 AND FF_TIPO_MONEDA=0  ORDER BY ledger,FF_COD_FIDEICOMISO, FF_TIPOINFORMACION, FF_TIPO_MONEDA", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      While &sql2.Fetch(&str1, &str2, &str3, &str4, &str5, &strTipoInf, &str7, &str8, &ledger)
+         &formato = &str1;
+         &nbrCount2 = &nbrCount2 + 1;
+         &nbrI = &nbrI + 1;
+         &strI = String(&nbrI);
+         &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+         &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &strTipoInf | &str7 | &str8);
+         &fl_SocFiduc.WriteLine("");
+         /***********************************/
+         /*REGISTRO TIPO 3*/
+         If (&strTipoInf = "0") Then
+            /*Son codigos PUC, reporto registros tipo 3*/
+            rem &sql3 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, RPAD(FF_CODIGO_PUC,6,0), SIGN, ABS(FF_VALOR_ACTIVO) FROM PS_ETY_GLRT3_TMP WHERE PROCESS_INSTANCE = :1 AND FF_TIPO_MONEDA = :2 ORDER BY TO_NUMBER(FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str5);
+            <* &ledger = "DIARIO" Then
+            &sql3 = CreateSQL("SELECT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, RPAD(A.FF_CODIGO_PUC,6,0), (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END), ABS(A.FF_VALOR_ACTIVO) FROM PS_ETY_GLRT3_TMP A, PS_FF_GL_TRNODE_VW B WHERE A.PROCESS_INSTANCE = :1 AND A.FF_TIPO_MONEDA = :2 AND A.FF_COD_FIDEICOMISO = :3 AND B.SETID = 'FIDUP' AND B.TREE_NAME = 'PUC_SUPERFIN_FIDUP' AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM ORDER BY to_number(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str5, &strCodFideicomiso);
+            
+            &bolSql3 = True;
+            While &sql3.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+               /*Formatear numero a 20 posiciones, forzar 2 decimales y rellenar con 0 a la izquierda*/
+               &str5 = NumberToString("%#020.2", &nbr5);
+               &nbrI = &nbrI + 1;
+               &strI = String(&nbrI);
+               &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+               &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+               &fl_SocFiduc.WriteLine("");
+            End-While;
+         End-If;
+         If &ledger = "NIIF" Then *>
+            
+            &sql3 = CreateSQL("SELECT DISTINCT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, RPAD(A.FF_CODIGO_PUC,6,0), (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END), ABS(A.FF_VALOR_ACTIVO) FROM %Table(ETY_GLRT3_TMP) A, PS_FF_GL_TRNODE_VW B WHERE A.LEDGER='NIIF' AND A.PROCESS_INSTANCE = :1 AND B.SETID = 'NIIF1' AND B.TREE_NAME = :2  AND A.FF_TIPO_MONEDA = :3 AND  A.FF_ID_REGISTRO = B.TREE_NODE_NUM AND A.FF_VALOR_ACTIVO <> 0 GROUP BY A.FF_ID_REGISTRO,   A.FF_TIPO_REGISTRO,  A.FF_CODIGO_PUC, B.FF_NATURALEZA, A.FF_VALOR_ACTIVO ORDER BY to_number(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &treename, &str5);
+            &bolSql3 = True;
+            While &sql3.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+               /*Formatear numero a 20 posiciones, forzar 2 decimales y rellenar con 0 a la izquierda*/
+               &str5 = NumberToString("%#020.2", &nbr5);
+               &nbrI = &nbrI + 1;
+               &strI = String(&nbrI);
+               &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+               &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+               &fl_SocFiduc.WriteLine("");
+            End-While;
+            
+         Else
+            
+            /*Son formatos, reporto registros tipo 4*/
+            /***********************************/
+            /*REGISTRO TIPO 4*/
+            /*Inicio 002*/ /*Formato 404 DIARIO*/
+            &sql4 = CreateSQL("SELECT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, A.FF_COD_FORMATO, (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END), ABS(A.FF_VALOR_ACTIVO) FROM %Table(ETY_GLRT4_TMP) A, PS_FF_GL_TRNODE_VW B WHERE A.PROCESS_INSTANCE = :1 AND A.FF_COD_FIDEICOMISO = '464' AND B.SETID = 'FIDUP' AND B.TREE_NAME = 'CODIGOS_FORMAT_464' AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM AND A.LEDGER='DIARIO' AND A.FF_VALOR_ACTIVO <> 0 ORDER BY TO_NUMBER(A.FF_ID_REGISTRO) ", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+            &bolSql4 = True;
+            While &sql4.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+               /*Formatear numero a 20 posiciones, forzar 2 decimales y rellenar con 0 a la izquierda*/
+               &str5 = NumberToString("%#020.2", &nbr5);
+               &nbrI = &nbrI + 1;
+               &strI = String(&nbrI);
+               &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+               &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+               &fl_SocFiduc.WriteLine("");
+            End-While;
+            /*Fin 002*/
+            
+            
+            /*Inicio 002*/
+            Rem If (&formato = 4) Then;
+            
+            /*El 4to registro Tipo 2 corresponde a formato 464*/
+            rem &sql4 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_FORMATO, SIGN, ABS(FF_VALOR_ACTIVO) FROM PS_ETY_GLRT4_TMP WHERE PROCESS_INSTANCE = :1 AND FF_COD_FIDEICOMISO = '464' ORDER BY TO_NUMBER(FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+            &sql4 = CreateSQL("SELECT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, A.FF_COD_FORMATO, (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END), ABS(A.FF_VALOR_ACTIVO) FROM %Table(ETY_GLRT4_TMP) A, PS_FF_GL_TRNODE_VW B WHERE A.PROCESS_INSTANCE = :1 AND A.FF_COD_FIDEICOMISO = '464' AND B.SETID = 'NIIF1' AND B.TREE_NAME = :2 AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM AND A.LEDGER='NIIF' AND A.FF_VALOR_ACTIVO <> 0 ORDER BY TO_NUMBER(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &treename464);
+            &bolSql4 = True;
+            While &sql4.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+               /*Formatear numero a 20 posiciones, forzar 2 decimales y rellenar con 0 a la izquierda*/
+               &str5 = NumberToString("%#020.2", &nbr5);
+               &nbrI = &nbrI + 1;
+               &strI = String(&nbrI);
+               &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+               &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+               &fl_SocFiduc.WriteLine("");
+            End-While;
+            
+            Rem End-If;
+            /*El 5to registro Tipo 2 corresponde a formatos 304 y 305*/
+            /*Formato 304*/
+            rem &sql4 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_FORMATO, SIGN, ABS(ROUND(FF_VALOR_ACTIVO/1000000)) FROM PS_ETY_GLRT4_TMP WHERE PROCESS_INSTANCE = :1 AND FF_COD_FIDEICOMISO = '304' ORDER BY TO_NUMBER(FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+            &sql4 = CreateSQL("SELECT DISTINCT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, A.FF_COD_FORMATO, (CASE WHEN B.FF_NATURALEZA = 'POSI' THEN '+' ELSE '-' END), A.FF_VALOR_ACTIVO FROM %Table(ETY_GLRT4_TMP) A, PS_FF_GL_TRNODE_VW B WHERE A.PROCESS_INSTANCE = :1 AND A.FF_COD_FIDEICOMISO = '304' AND B.SETID = 'NIIF1' AND B.TREE_NAME = :2 AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM AND A.LEDGER='NIIF' AND A.FF_VALOR_ACTIVO <> 0 ORDER BY TO_NUMBER(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &treename304);
+            &bolSql4 = True;
+            While &sql4.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+               /*Formatear numero a 20 posiciones y rellenar con 0 a la izquierda. Solo se reportan decimales para el codigo 3040104005*/
+               /* DAPM */
+               If (&str3 = "3040104005" Or
+                     &str3 = "3040101999" Or
+                     &str3 = "3040103005") And
+                     &nbr5 < 0 Then
+                  &str4 = "-";
+                  &nbr5 = Abs(&nbr5);
+               End-If;
+               /* DAPM */
+               If (&str3 = "3040104005") Then
+                  &str5 = NumberToString("%#020.2", &nbr5);
+               Else
+                  &str5 = NumberToString("%020.0", &nbr5);
+               End-If;
+               &nbrI = &nbrI + 1;
+               &strI = String(&nbrI);
+               &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+               &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+               &fl_SocFiduc.WriteLine("");
+            End-While;
+            /*Formato 305*/
+            &sql4 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_FORMATO, SIGN, ABS(FF_VALOR_ACTIVO) FROM %Table(ETY_GLRT4_TMP) WHERE PROCESS_INSTANCE = :1 AND FF_COD_FIDEICOMISO NOT IN ('304','464') AND FF_COD_FIDEICOMISO <> ' ' AND LEDGER='NIIF' AND FF_VALOR_ACTIVO <> 0 ORDER BY FF_COD_FORMATO, FF_COD_FIDEICOMISO, FF_CODIGO_SFC", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+            &bolSql4 = True;
+            While &sql4.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+               /*Formatear numero a 20 posiciones y rellenar con 0 a la izquierda. Solo se reportan decimales para los codigos 3050601XXX*/
+               If (Substring(&str3, 1, 7) = "3050601") Then
+                  &str5 = NumberToString("%#020.2", &nbr5);
+               Else
+                  &str5 = NumberToString("%020.0", &nbr5);
+               End-If;
+               &nbrI = &nbrI + 1;
+               &strI = String(&nbrI);
+               &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+               &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+               &fl_SocFiduc.WriteLine("");
+            End-While;
+            /*Inicio 002*/
+            /***********************************/
+            /*REGISTRO TIPO 5*/
+            Rem If (&formato = 5) Then;
+            &sql4 = CreateSQL("SELECT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, A.FF_COD_FORMATO, (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END), ABS(A.FF_VALOR_ACTIVO) FROM %Table(ETY_GLRT6_TMP) A, PS_FF_GL_TRNODE_VW B WHERE A.PROCESS_INSTANCE = :1 AND A.FF_COD_FIDEICOMISO = '505' AND B.SETID = 'NIIF1' AND B.TREE_NAME = :2 AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM AND A.LEDGER='NIIF' AND A.FF_VALOR_ACTIVO <> 0 ORDER BY TO_NUMBER(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &treename505);
+            &bolSql4 = True;
+            While &sql4.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+               /*Formatear numero a 20 posiciones, forzar 2 decimales y rellenar con 0 a la izquierda*/
+               &str5 = NumberToString("%#020.2", &nbr5);
+               &nbrI = &nbrI + 1;
+               &strI = String(&nbrI);
+               &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+               &fl_SocFiduc.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+               &fl_SocFiduc.WriteLine("");
+            End-While;
+            Rem End-If;
+            /*Fin 002*/
+            /***********************************/
+         End-If;
+      End-While;
+   End-If;
+   /***********************************/
+   /*REGISTRO TIPO 5*/
+   <*
+   &sql5 = CreateSQL("SELECT LPAD(FF_ID_REGISTRO,5,0), FF_TIPO_REGISTRO FROM PS_ETY_GLRT5_TMP WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+   If &sql5.Fetch(&str1, &str2) Then
+      &nbrI = &nbrI + 1;
+      &strI = String(&nbrI);
+      &str1 = Rept("0", 5 - Len(&strI)) | &strI;
+      &fl_SocFiduc.WriteString(&str1 | &str2);
+      &str_cabecera = &str_cabecera1 | &str1 | &str_cabecera2;
+      &fl_SocFiduc.SetPosition(&nbr_pos);
+      &fl_SocFiduc.WriteLine(&str_cabecera);
+      rem &fl_SocFiduc.WriteLine("");
+   End-If;
+*>
+   /***********************************/
+   &sql1.Close();
+   &sql2.Close();
+   If (&bolSql3) Then
+      &sql3.Close();
+   End-If;
+   If (&bolSql4) Then
+      &sql4.Close();
+   End-If;
+   
+   <*
+   &sql5.Close();
+   &fl_SocFiduc.Close();
+ *>
+Else
+   /* file not opened, do error processing */
+   MessageBox(0, "", 0, 0, "File Not Opened");
+End-If;

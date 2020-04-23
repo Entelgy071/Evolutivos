@@ -1,0 +1,64 @@
+/*********************************************************************
+* Proyecto:	    ETY_PLN_NIIF
+* Actividad:  	001
+* Responsable: 	Entelgy - Kevin Vanegas
+* Fecha:		16-0-2015
+* Descripción:	Selección de sección a seguir dependiendo del tipo de
+archivo que se quiera generar.
+*********************************************************************/
+/*INICIO 001*/
+If ETY_GL_INFM_AET.LEDGER = "DIARIO" Then
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_ARCH";
+   ETY_GL_INFM_AET.AE_APPLID.Value = "ETY_PLN_NIIF";
+End-If;
+
+If None(ETY_GL_INFM_AET.LEDGER) Then
+   ETY_GL_INFM_AET.AE_APPLID.Value = "ETY_PLAN_NIF";
+   Evaluate ETY_GL_INFM_AET.FF_ID_ARCHIVO
+   When "CA"
+      ETY_GL_INFM_AET.AE_SECTION.Value = "COMP_ACC";
+      Break;
+   When "FI"
+      /*Fideicomisos*/
+      ETY_GL_INFM_AET.AE_SECTION.Value = "FIDEICOM";
+      Break;
+   When "PP"
+      /*Pasivos Pensionales*/
+      ETY_GL_INFM_AET.AE_SECTION.Value = "PASIVOSP";
+      Break;
+   When "NG"
+      /*Negocios*/
+      ETY_GL_INFM_AET.AE_SECTION.Value = "NEGOCIOS";
+      Break;
+   When "OR"
+      /*Operaciones Reciprocas*/
+      ETY_GL_INFM_AET.AE_SECTION.Value = "OPRECIPR";
+      Break;
+   When "SO"
+      /*Sociedad Fiduciaria*/
+      REM ETY_GL_INFM_AET.AE_SECTION.Value = "FFSOCIED";
+      ETY_GL_INFM_AET.AE_SECTION.Value = "SOCFIDUC";
+      Break;
+   When "CC"
+      /*Carteras Colectivas*/
+      ETY_GL_INFM_AET.AE_SECTION.Value = "FFCARTER";
+      Break;
+   When "FN"
+      /*Fondos de Inversión*/
+      ETY_GL_INFM_AET.AE_SECTION.Value = "FINVERSI";
+      Break;
+   When "F5"
+      ETY_GL_INFM_AET.AE_APPLID.Value = "ETY_PLN_NIIF";
+      ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_ARCH";
+      Break;
+   End-Evaluate;
+   
+End-If;
+If ETY_GL_INFM_AET.LEDGER = "NIIF" Then
+   ETY_GL_INFM_AET.AE_SECTION.Value = "NIIF";
+   ETY_GL_INFM_AET.AE_APPLID.Value = "ETY_PLN_NIIF";
+End-If;
+
+MessageBox(0, "", 0, 0, "Application Engine: > " | ETY_GL_INFM_AET.AE_APPLID);
+MessageBox(0, "", 0, 0, "Section: > " | ETY_GL_INFM_AET.AE_SECTION);
+/*FIN 001*/

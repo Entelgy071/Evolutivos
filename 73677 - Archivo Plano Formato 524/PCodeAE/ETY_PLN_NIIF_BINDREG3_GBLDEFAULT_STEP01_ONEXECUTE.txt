@@ -1,0 +1,27 @@
+/**************************************************************************************************************************
+* Proyecto:	    FF_GL_ARCH_PLN_SCD_FIDU_000
+* Actividad:  	001
+* Responsable: 	Quanam – Alicia Szerenyi
+* Fecha:		29May012
+* Descripción:	Seteo el Fiscal Year y Accounting Period al correcto para ir a buscar saldos del mes anterior a la Ledger y 
+				movimientos hasta la fecha de corte a la Journal Line
+***************************************************************************************************************************/
+/*Inicio #001*/
+/*Para todos los casos el anio sera el mismo y el periodo sera el mes anterior. 
+Para el periodo 1 tambien dado que los saldos se tomaran del periodo 0 de ese mismo anio (saldos al inicio de anio)*/
+rem el Fiscal Year ya viene bien cargado de la pagina de ejecucion;
+If ETY_GL_INFM_AET.ACCOUNTING_PERIOD = 1 Then /*MARG*/
+   
+   /*
+ORIGINAL
+   ETY_GL_INFM_AET.ACCOUNTING_PERIOD = ETY_GL_INFM_AET.ACCOUNTING_PERIOD 
+*/
+   
+   ETY_GL_INFM_AET.ACCOUNTING_PERIOD = ETY_GL_INFM_AET.ACCOUNTING_PERIOD - 1;
+   
+Else /*MARG*/
+   ETY_GL_INFM_AET.ACCOUNTING_PERIOD = ETY_GL_INFM_AET.ACCOUNTING_PERIOD - 1;
+End-If; /*MARG*/
+/*Cargo la fecha de inicio de periodo para la Journal Line, sera el primero del mes de la fecha de corte*/
+ETY_GL_INFM_AET.DATE_BEGIN = Date3(Year(ETY_GL_INFM_AET.DATE_END), Month(ETY_GL_INFM_AET.DATE_END), 1);
+/*Fin #001*/

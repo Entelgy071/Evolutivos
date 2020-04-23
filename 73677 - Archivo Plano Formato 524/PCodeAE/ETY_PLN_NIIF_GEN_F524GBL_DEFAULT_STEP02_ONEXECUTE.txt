@@ -1,0 +1,229 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_GL_FLP_EVO_73677
+* Actividad:  	001
+* Responsable: 	Entelgy – David A. Suarez
+* Fecha:		21/10/2019
+* Descripción:	Generacion de XLS de formato 524 (Publisher)
+***************************************************************************************************************************/
+
+/* Inicio Actividad #00001 */
+import PSXP_RPTDEFNMANAGER:*;
+import PSXP_XMLGEN:*;
+
+Declare Function GetFileExtension PeopleCode PSXPFUNCLIB.FUNCLIB FieldFormula;
+Declare Function DeleteLocalFile PeopleCode PSXPFUNCLIB.FUNCLIB FieldFormula;
+Declare Function Naturaleza_Cta PeopleCode FF_RUN_INFMGSLV.RUN_CNTL_ID FieldFormula;
+
+/*Inicio Carga de Parámetros*/
+&FECHA_CORTE = ETY_GL_INFM_AET.DATE_END.Value;
+&AÑO_FISCAL = ETY_GL_INFM_AET.FISCAL_YEAR.Value;
+&PERIODO_CONT = ETY_GL_INFM_AET.ACCOUNTING_PERIOD.Value;
+&PERIODO_HASTA = ETY_GL_INFM_AET.ACCOUNTING_PERIOD2.Value;
+
+
+/*Origen*/
+&Where = " WHERE PROCESS_INSTANCE = " | ETY_GL_INFM_AET.PROCESS_INSTANCE.Value;
+
+
+/*Local Rowset &rstData03 = CreateRowset(Record.FF_R53_524_TM);
+Local Rowset &rstData01 = CreateRowset(Record.FF_R5_524_TMP, &rstData03);*/
+Local Rowset &rstData03 = CreateRowset(Record.FF_R53_524_VW);
+Local Rowset &rstData01 = CreateRowset(Record.FF_R5_F524_VW, &rstData03);
+
+
+Local Rowset &rstData3 = CreateRowset(Record.FF_R53_524_WK);
+Local Rowset &rstData1 = CreateRowset(Record.FF_R5_524_WRK, &rstData3);
+
+&rstData01.Fill(&Where);
+&rstData03.Fill(&Where);
+&rstDataF = &rstData1.GetRow(1).GetRowset(Scroll.FF_R53_524_WK);
+
+
+&rstData1.GetRow(1).GetRecord(Record.FF_R5_524_WRK).GetField(Field.JOURNAL_DATE).Value = &FECHA_CORTE;
+
+/*Obtener sumatoria totales unidad de captura 01*/
+SQLExec("SELECT SUM(MONETARY_AMOUNT), SUM(POSTED_BASE_AMT), SUM(FF_AMOUNT_SALDO) FROM %TABLE(FF_R5_524_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value, &Sum11, &Sum12, &Sum13);
+&rstData1.GetRow(1).GetRecord(Record.FF_R5_524_WRK).GetField(Field.VAT_TOL_AMT).Value = &Sum11;
+&rstData1.GetRow(1).GetRecord(Record.FF_R5_524_WRK).GetField(Field.VAL_TOL_AMT_BSE).Value = &Sum12;
+&rstData1.GetRow(1).GetRecord(Record.FF_R5_524_WRK).GetField(Field.SUMM_TOL_AMT_OVER).Value = &Sum13;
+
+For &i = 1 To &rstData01.ActiveRowCount
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.PROCESS_INSTANCE).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.PROCESS_INSTANCE).Value;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.JOURNAL_ID).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.JOURNAL_ID).Value;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.FF_ID_TIPO_FIDU).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.FF_ID_TIPO_FIDU).Value;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.FF_SUBTIPO_FIDU).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.FF_SUBTIPO_FIDU).Value;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.FF_CODIGO_FIDU).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.FF_CODIGO_FIDU).Value;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_VALOR).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.ETY_VALOR).Value;
+   /**Ajuste campos 05 y 06**/
+   SQLExec("SELECT FF_CLS_NEGOCIO FROM PS_FF_BU_GL_NF_CN WHERE BUSINESS_UNIT =:1", &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.BUSINESS_UNIT).Value, &ClsNeg);
+   Evaluate &ClsNeg
+   When = "EFP"
+      &str5 = "3";
+      &str6 = "860525148";
+   When = "PAP"
+      &str5 = "3";
+      &str6 = "830053105";
+   When = "PRV"
+      &str5 = "3";
+      &str6 = "830053105";
+   When-Other
+      &str5 = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.RH_COD_DESTINO).Value;
+      &str6 = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.NATIONAL_ID).Value;
+   End-Evaluate;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.RH_COD_DESTINO).Value = &str5;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.NATIONAL_ID).Value = &str6;
+   /**Fin Ajuste campos 05 y 06**/
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.LC_NOMBRE_TERCERO).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.LC_NOMBRE_TERCERO).Value;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.RH_COD_DESTINO1).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.RH_COD_DESTINO1).Value;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.COLUMNNUM).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.COLUMNNUM).Value;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.RH_COD_DESTINO2).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.RH_COD_DESTINO2).Value;
+   &CtaH = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.RH_COD_DESTINO2).Value;
+   &str11 = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.MONETARY_AMOUNT).Value;
+   &str12 = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.POSTED_BASE_AMT).Value;
+   &str13 = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.FF_AMOUNT_SALDO).Value;
+   /***Revison naturaleza cta***/
+   &Natu = Naturaleza_Cta(&CtaH);
+   REM MessageBox(0, "", 0, 0, "11. Naturaleza/Cta " | &Natu | "/" | &CtaH);
+   Evaluate &Natu
+   When = "NEGA"
+      &str11 = &str11 * ( - 1);
+      &str12 = &str12 * ( - 1);
+      &str13 = &str13 * ( - 1);
+   When = "POSI"
+      &str11 = &str11 * 1;
+      &str12 = &str12 * 1;
+      &str13 = &str13 * 1;
+   End-Evaluate;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.MONETARY_AMOUNT).Value = &str11;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.POSTED_BASE_AMT).Value = &str12;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.FF_AMOUNT_SALDO).Value = &str13;
+   &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.RH_COD_DESTINO3).Value = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.RH_COD_DESTINO3).Value;
+   &Col15 = &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.NUMBER1).Value;
+   SQLExec("SELECT COUNT(RH_COD_ORIGEN) FROM PS_RH_EQUIV_TBL WHERE RH_TABLA_EQUIVALEN = 'CTAS_FORMATO_524' AND RH_CONJ_EQUIV = 'COLUMNA_15' AND RH_COD_ORIGEN =:1", &rstData01.GetRow(&i).GetRecord(Record.FF_R5_F524_VW).GetField(Field.FF_CODIGO_FIDU).Value, &CodFidu2);
+   If All(&CodFidu2) Then
+      &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = "0";
+   Else
+      Evaluate &Col15
+      When = 0
+         &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = "0";
+      When >= 361
+         &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = "E";
+      When-Other
+         SQLExec("SELECT FF_CATEGORIA, FF_INICIO, FF_FIN FROM PS_FF_CAT_DET_TBL WHERE SETID = 'FIDUP' AND FF_ID_CATEGORIA = 'EVALUA_CAR' AND FF_ID_TABLA = 'ETY_EVA_BI' AND FF_INICIO <=:1 AND FF_FIN >=:2", &Col15, &Col15, &ffCat, &ffini, &fffin);
+         &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = &ffCat;
+      End-Evaluate;
+   End-If;
+   /*When <= 30
+      &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = "A";
+   When (&Col15 >= 31 And
+         &Col15 <= 60)
+      &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = "B";
+   When (&Col15 >= 61 And
+         &Col15 <= 180)
+      &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = "C";
+   When (&Col15 >= 31 And
+         &Col15 <= 60)
+      &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = "D";
+   When >= 361
+      &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = "E";
+   When = 0
+      &rstData1.GetRow(&i).GetRecord(Record.FF_R5_524_WRK).GetField(Field.ETY_CATEGORY_INV).Value = "0";
+   End-Evaluate;*/
+   &rstData1.InsertRow(&i);
+End-For;
+For &j = 1 To &rstData03.ActiveRowCount
+   &rstDataF.InsertRow(&j);
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.PROCESS_INSTANCE).Value = ETY_GL_INFM_AET.PROCESS_INSTANCE.Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.JOURNAL_ID).Value = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.JOURNAL_ID).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.RH_COD_DESTINO).Value = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.RH_COD_DESTINO).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.NATIONAL_ID).Value = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.NATIONAL_ID).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.LC_NOMBRE_TERCERO).Value = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.LC_NOMBRE_TERCERO).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.RH_COD_DESTINO1).Value = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.RH_COD_DESTINO1).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.RH_COD_DESTINO2).Value = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.RH_COD_DESTINO2).Value;
+   &CtaH1 = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.RH_COD_DESTINO2).Value;
+   &str311 = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.MONETARY_AMOUNT).Value;
+   &str312 = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.POSTED_BASE_AMT).Value;
+   &str313 = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.FF_AMOUNT_SALDO).Value;
+   /***Revison naturaleza cta***/
+   &Natu = Naturaleza_Cta(&CtaH1);
+   REM MessageBox(0, "", 0, 0, "11. Naturaleza/Cta " | &Natu | "/" | &CtaH);
+   Evaluate &Natu
+   When = "NEGA"
+      &str311 = &str311 * ( - 1);
+      &str312 = &str312 * ( - 1);
+      &str313 = &str313 * ( - 1);
+   When = "POSI"
+      &str311 = &str311 * 1;
+      &str312 = &str312 * 1;
+      &str313 = &str313 * 1;
+   End-Evaluate;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.MONETARY_AMOUNT).Value = &str311;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.POSTED_BASE_AMT).Value = &str312;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.FF_AMOUNT_SALDO).Value = &str313;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.ETY_CATEGORY_INV).Value = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.NUMBER1).Value;
+   /*&rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.JOURNAL_ID).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.JOURNAL_ID).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.RH_COD_DESTINO).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.RH_COD_DESTINO).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.NATIONAL_ID).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.NATIONAL_ID).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.LC_NOMBRE_TERCERO).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.LC_NOMBRE_TERCERO).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.RH_COD_DESTINO1).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.RH_COD_DESTINO1).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.RH_COD_DESTINO2).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.RH_COD_DESTINO2).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.MONETARY_AMOUNT).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.MONETARY_AMOUNT).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.POSTED_BASE_AMT).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.POSTED_BASE_AMT).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.FF_AMOUNT_SALDO).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.FF_AMOUNT_SALDO).Value;
+   &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.ETY_CATEGORY_INV).Value = &rstData01.GetRow(&j).GetRecord(Record.FF_R5_524_TMP).GetField(Field.NUMBER1).Value;*/
+   &Col15 = &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.NUMBER1).Value;
+   SQLExec("SELECT COUNT(RH_COD_ORIGEN) FROM PS_RH_EQUIV_TBL WHERE RH_TABLA_EQUIVALEN = 'CTAS_FORMATO_524' AND RH_CONJ_EQUIV = 'COLUMNA_15' AND RH_COD_ORIGEN =:1", &rstData03.GetRow(&j).GetRecord(Record.FF_R53_524_VW).GetField(Field.FF_CODIGO_FIDU).Value, &CodFidu2);
+   If All(&CodFidu2) Then
+      &rstData1.GetRow(&i).GetRecord(Record.FF_R53_524_WK).GetField(Field.ETY_CATEGORY_INV).Value = "0";
+   Else
+      Evaluate &Col15
+      When = 0
+         &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.ETY_CATEGORY_INV).Value = "0";
+      When >= 361
+         &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.ETY_CATEGORY_INV).Value = "E";
+      When-Other
+         SQLExec("SELECT FF_CATEGORIA, FF_INICIO, FF_FIN FROM PS_FF_CAT_DET_TBL WHERE SETID = 'FIDUP' AND FF_ID_CATEGORIA = 'EVALUA_CAR' AND FF_ID_TABLA = 'ETY_EVA_BI' AND FF_INICIO <=:1 AND FF_FIN >=:2", &Col15, &Col15, &ffCat, &ffini, &fffin);
+         &rstDataF.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.ETY_CATEGORY_INV).Value = &ffCat;
+      End-Evaluate;
+   End-If;
+   rem MessageBox(0, "", 0, 0, "No Fila: " | &j | " J: " | &rstData3.GetRow(&j).GetRecord(Record.FF_R53_524_WK).GetField(Field.ETY_CATEGORY_INV).Value);
+End-For;
+
+
+&oRptDefn = create PSXP_RPTDEFNMANAGER:ReportDefn("ETY_FORM_524");
+&oRptDefn.Get();
+&oRptDefn.UseBurstValueAsOutputFileName = True;
+&oRptDefn.SetRuntimeDataRowset(&rstData1);
+
+&rds = create PSXP_XMLGEN:RowSetDS(); /*package method*/
+&mySchema = &rds.GetXSDSchema(&rstData1);
+
+&Str_SchemaFile = &RptOutputDir | "FORMATO_524.xsd";
+&Fl_SchemaFile = GetFile(&Str_SchemaFile, "W", %FilePath_Absolute);
+&Fl_SchemaFile.WriteLine(&mySchema);
+&Fl_SchemaFile.Close();
+
+&myXMLFile = &rds.GetXMLData(&rstData1, &Str_SchemaFile);
+&Str_ReportFileXML = &RptOutputDir | "FORMATO_524.xml";
+&Fl_ReportFileXML = GetFile(&Str_ReportFileXML, "W", "UTF8", %FilePath_Absolute);
+&Fl_ReportFileXML.WriteLine(&myXMLFile);
+&Fl_ReportFileXML.Close();
+
+&FileXMLGen = &Fl_ReportFileXML.Name;
+/**Publisher**/
+&plantilla = "ETY_FORM_524_1";
+
+&oRptDefn.SetRuntimeDataXMLFile(&Str_ReportFileXML);
+
+&oRptDefn.ProcessReport(&plantilla, "ESP", %Date, "XLS");
+
+/*generate report*/
+&oRptDefn.Publish("", "", "", ETY_GL_INFM_AET.PROCESS_INSTANCE.Value);
+
+/* display the output */
+rem &oRptDefn.DisplayOutput();
+
+
+/* cleanup */
+/*DeleteLocalFile(&sOutputFile, %FilePath_Relative);*/
+/* Fin Actividad #00001 */

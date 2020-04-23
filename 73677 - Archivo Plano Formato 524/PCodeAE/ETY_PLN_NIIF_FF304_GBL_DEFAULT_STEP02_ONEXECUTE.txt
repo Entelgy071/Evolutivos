@@ -1,0 +1,78 @@
+/**************************************************************************************************************************
+* Proyecto:	    FF_GL_ARCH_PLN_SCD_FIDU_000
+* Actividad:  	001
+* Responsable: 	Quanam – Alicia Szerenyi
+* Fecha:		29May012
+* Descripción:	Manipulacion de nodos con manejo especifico
+***************************************************************************************************************************/
+/* Se hace un select sobre la tabla FF_GL_RT4_TMP para el process_instance que se está ejecutando y para todos los FF_COD_FORMATO like '340101%' sumando los de SIGN + y restando los de SIGN - y se inserta bajo el código del formato 3040101999 FF_ID_REGISTRO = TREE_NODE_NUM del nodo 3040101999 del árbol PUC_FIDEICOMISOS además teniendoen cuenta lo especificado en el numeral 2.1.2.1 del gap GL_GAPFIT0020_Archivo Plano Sociedad Fiduciaria para el registro TIPO 4 y formato 304*/
+/* %InsertSelect(FF_GL_RT4_TMP, FF_GL_RT4_TMP A, PROCESS_INSTANCE = %ProcessInstance, FF_COD_FORMATO = '3040101999', FF_ID_REGISTRO = TREE_NODE_NUM, FF_TIPO_REGISTRO = '4', FF_COD_FIDEICOMISO = '304', FF_VALOR_ACTIVO = SUM(A.FF_VALOR_ACTIVO)) FROM PS_ETY_GLRT4_TMP A WHERE A.PROCESS_INSTANCE = %ProcessInstance AND A.FF_COD_FORMATO LIKE '3040101%' AND A.FF_COD_FIDEICOMISO = '304' GROUP BY %ProcessInstance, '', A.FF_TIPO_REGISTRO, A.TREE_NODE_NUM */
+
+Local number &nbr_ValorTotal_1999, &nbr_ValorTotal_2999, &nbr_ValorTotal_3005, &nbr_ValorActivo;
+Local SQL &sql_3040101, &sql_3040102;
+Local string &str_Sign1, &str_Naturaleza, &str_Signo, &str_IdRegistro;
+
+/************************************************************************************/
+/*INSERTA NODO 3040101999*/
+/************************************************************************************/
+&nbr_ValorTotal_1999 = 0;
+&sql_3040101 = CreateSQL("SELECT SIGN, FF_VALOR_ACTIVO FROM %Table(ETY_GLRT4_TMP) WHERE PROCESS_INSTANCE = :1 AND FF_COD_FORMATO LIKE '3040101%' AND FF_COD_FIDEICOMISO = '304'", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+While &sql_3040101.Fetch(&str_Sign1, &nbr_ValorActivo)
+   If (&str_Sign1 = "+") Then
+      &nbr_ValorTotal_1999 = &nbr_ValorTotal_1999 + Abs(&nbr_ValorActivo);
+   Else
+      &nbr_ValorTotal_1999 = &nbr_ValorTotal_1999 - Abs(&nbr_ValorActivo);
+   End-If;
+End-While;
+&sql_3040101.Close();
+&nbr_ValorTotal_1999 = Round(&nbr_ValorTotal_1999, 0);
+
+SQLExec("SELECT TREE_NODE_NUM, FF_NATURALEZA FROM PS_FF_GL_TRNODE_VW WHERE SETID = 'FIDUP' AND TREE_NAME = 'CODIGOS_FORMAT_304' AND TREE_NODE = '3040101999'", &str_IdRegistro, &str_Naturaleza);
+If (&str_Naturaleza = "POSI") Then
+   &str_Signo = "+";
+Else
+   &str_Signo = "-";
+End-If;
+
+SQLExec("INSERT INTO %Table(ETY_GLRT4_TMP) (PROCESS_INSTANCE, FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_FORMATO, SIGN, FF_VALOR_ACTIVO, FF_COD_FIDEICOMISO, FF_CODIGO_SFC,LEDGER) VALUES (:1,:2,:3,:4,:5,:6,:7,:8,'DIARIO')", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str_IdRegistro, "4", "3040101999", &str_Signo, &nbr_ValorTotal_1999, "304", "");
+
+/************************************************************************************/
+/*INSERTA NODO 3040102999*/
+/************************************************************************************/
+/* Se hace un select sobre la tabla FF_GL_RT4_TMP para el process_instance que se está ejecutando y para todos los FF_COD_FORMATO like '3040102%' sumando los de SIGN + y restando los de SIGN - y se inserta bajo el código del formato 3040102999 FF_ID_REGISTRO = TREE_NODE_NUM del nodo 3040102999 del árbol PUC_FIDEICOMISOS además teniendoen cuenta lo especificado en el numeral 2.1.2.1 del gap GL_GAPFIT0020_Archivo Plano Sociedad Fiduciaria para el registro TIPO 4 y formato 304*/
+&nbr_ValorTotal_2999 = 0;
+&sql_3040102 = CreateSQL("SELECT SIGN, FF_VALOR_ACTIVO FROM %Table(ETY_GLRT4_TMP) WHERE PROCESS_INSTANCE = :1 AND FF_COD_FORMATO LIKE '3040102%' AND FF_COD_FIDEICOMISO = '304'", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+While &sql_3040102.Fetch(&str_Sign1, &nbr_ValorActivo)
+   If (&str_Sign1 = "+") Then
+      &nbr_ValorTotal_2999 = &nbr_ValorTotal_2999 + Abs(&nbr_ValorActivo);
+   Else
+      &nbr_ValorTotal_2999 = &nbr_ValorTotal_2999 - Abs(&nbr_ValorActivo);
+   End-If;
+End-While;
+&sql_3040102.Close();
+&nbr_ValorTotal_2999 = Round(&nbr_ValorTotal_2999, 0);
+
+SQLExec("SELECT TREE_NODE_NUM, FF_NATURALEZA FROM PS_FF_GL_TRNODE_VW WHERE SETID = 'FIDUP' AND TREE_NAME = 'CODIGOS_FORMAT_304' AND TREE_NODE = '3040102999'", &str_IdRegistro, &str_Naturaleza);
+If (&str_Naturaleza = "POSI") Then
+   &str_Signo = "+";
+Else
+   &str_Signo = "-";
+End-If;
+
+SQLExec("INSERT INTO %Table(ETY_GLRT4_TMP) (PROCESS_INSTANCE, FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_FORMATO, SIGN, FF_VALOR_ACTIVO, FF_COD_FIDEICOMISO, FF_CODIGO_SFC,LEDGER) VALUES (:1,:2,:3,:4,:5,:6,:7,:8,'DIARIO')", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str_IdRegistro, "4", "3040102999", &str_Signo, &nbr_ValorTotal_2999, "304", "");
+
+/************************************************************************************/
+/*INSERTA NODO 3040103005*/
+/************************************************************************************/
+SQLExec("SELECT TREE_NODE_NUM, FF_NATURALEZA FROM PS_FF_GL_TRNODE_VW WHERE SETID = 'FIDUP' AND TREE_NAME = 'CODIGOS_FORMAT_304' AND TREE_NODE = '3040103005'", &str_IdRegistro, &str_Naturaleza);
+If (&str_Naturaleza = "POSI") Then
+   &str_Signo = "+";
+Else
+   &str_Signo = "-";
+End-If;
+
+&nbr_ValorTotal_3005 = &nbr_ValorTotal_1999 + &nbr_ValorTotal_2999;
+
+SQLExec("INSERT INTO %Table(ETY_GLRT4_TMP) (PROCESS_INSTANCE, FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_FORMATO, SIGN, FF_VALOR_ACTIVO, FF_COD_FIDEICOMISO, FF_CODIGO_SFC,LEDGER) VALUES (:1,:2,:3,:4,:5,:6,:7,:8,'DIARIO')", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str_IdRegistro, "4", "3040103005", &str_Signo, &nbr_ValorTotal_3005, "304", "");
+
+/************************************************************************************/

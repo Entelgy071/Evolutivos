@@ -1,0 +1,50 @@
+/*********************************************************************
+* Proyecto:	    ETY_ERP_GL_FLP_EVO_73677
+* Actividad:  	002
+* Responsable: 	Entelgy - David A. Suarez
+* Fecha:		17-10-2019
+* Descripción:	Adicion formato plano 524.
+*********************************************************************/
+Evaluate ETY_GL_INFM_AET.FF_ID_ARCHIVO
+When "CA"
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_COMP";
+   Break;
+When "FI"
+   /*Fideicomisos*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_FIDE";
+   Break;
+When "PP"
+   /*Pasivos Pensionales*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_PASI";
+   Break;
+When "NG"
+   /*Negocios*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_NEGO";
+   Break;
+When "OR"
+   /*Operaciones Reciprocas*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_OPRE";
+   Break;
+When "SO"
+   /*Sociedad Fiduciaria*/
+   REM ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_SOCI";
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_SOFI";
+   Break;
+When "CC"
+   /*Carteras Colectivas*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_CART";
+   Break;
+When "FN"
+   /*Carteras Colectivas*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_FINV";
+   Break;
+When "F5"
+   /*Formato 524*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "GEN_F524";
+   Break;
+End-Evaluate;
+ETY_GL_INFM_AET.AE_APPLID.Value = "ETY_PLN_NIIF";
+
+/*MessageBox(0, "", 0, 0, "Ledger: > " | ETY_GL_INFM_AET.LEDGER);
+MessageBox(0, "", 0, 0, "Section: > " | ETY_GL_INFM_AET.AE_SECTION);
+*/

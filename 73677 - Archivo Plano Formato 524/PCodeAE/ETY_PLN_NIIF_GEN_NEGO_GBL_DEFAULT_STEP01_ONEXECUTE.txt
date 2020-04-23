@@ -1,0 +1,141 @@
+/**************************************************************************************************************************
+* Proyecto:	    ETY_ERP_GL_FLP_EVO_NG_74935
+* Actividad:  	001
+* Responsable: 	Entelgy – Alexandro Pachón
+* Fecha:		23/02/2018
+* Descripción:	Generación del archivo plano a partir de los registros temporales cargados en el paso anterior
+***************************************************************************************************************************/
+
+Local File &fl_Negocios;
+Local string &str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9;
+Local string &strURL, &strFecha, &strCodFideicomiso, &strI, &ledger, &tree_name, &strTotalRegistros;
+Local number &nbrI, &nbr5;
+Local SQL &sql1, &sql2, &sql3, &sql5;
+Local boolean &bolSql3;
+
+&nbrI = 1;
+&bolSql3 = False;
+&strFecha = DateTimeToLocalizedString(%Date, "yyyyMMdd");
+/* ASM - 28/11/2012 - Por uso de servers UNX se cambia el uso de URL por Filepath relativos
+&strURL = GetURL(URL.FF_GL_ARCH_PLANOS);
+&fl_Negocios = GetFile(&strURL | "PASIVOS_PENSIONALES_" | &strFecha | ".txt", "W", %FilePath_Absolute);*/
+&fl_Negocios = GetFile("NEGOCIOS_" | &strFecha | ".txt", "W", %FilePath_Relative);
+/**/
+/*Valor de Ledger*/
+&ledger = ETY_GL_INFM_AET.LEDGER;
+/*Nombre del arbol*/
+SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME = :1", ETY_GL_INFM_AET.PARAM_NAME.Value, &tree_name);
+SQLExec("SELECT ETY_VALOR FROM PS_ETY_PARAM_PLANO WHERE PARAM_NAME = 'SETID_NIIF'", &setid_name);
+If &fl_Negocios.IsOpen Then
+   /***********************************/
+   /*REGISTRO TIPO 1*/
+   If None(ETY_GL_INFM_AET.LEDGER) Then
+      SQLExec("SELECT LPAD(SUM(FF_ID_REGISTRO)-2,8,0)  FROM %table(ETY_GLRT5_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE, &strTotalRegistros);
+      &strTotalRegistros = Rept("0", 8 - Len(&strTotalRegistros)) | &strTotalRegistros;
+   End-If;
+   If All(ETY_GL_INFM_AET.LEDGER) Then
+      SQLExec("SELECT LPAD(SUM(FF_ID_REGISTRO),8,0)  FROM %table(ETY_GLRT5_TMP) WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE, &strTotalRegistros);
+   End-If;
+   &sql1 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_TIPO_ENTIDAD, FF_CODIGO_SFC, FF_FECHA_CORTE, FF_TOTAL_REGISTRO, FF_PALABRA_CLAVE, FF_AREA_INF, FF_TIPO_INFORME FROM %Table(FF_GL_RT1_TMP)  WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+   
+   SQLExec("SELECT COUNT(*) FROM PS_FF_GL_RT2_TMP WHERE PROCESS_INSTANCE = :1", ETY_GL_INFM_AET.PROCESS_INSTANCE, &strTotalRegistros1);
+   SQLExec("SELECT COUNT(*) FROM %Table(ETY_GLRT3_TMP) WHERE PROCESS_INSTANCE = :1 AND LEDGER = 'NIIF'", ETY_GL_INFM_AET.PROCESS_INSTANCE, &strTotalRegistros2);
+   
+   &strTotalRegistros = &strTotalRegistros1 + &strTotalRegistros2 + 2;
+   &strTotalRegistros = Rept("0", 8 - Len(&strTotalRegistros)) | &strTotalRegistros;
+   
+   If &sql1.Fetch(&str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &str9) Then
+      &fl_Negocios.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &strTotalRegistros | &str7 | &str8 | &str9);
+   End-If;
+   &fl_Negocios.WriteLine("");
+   /**/
+   /*If &ledger = "DIARIO" Or
+         &ledger = " " Then*/
+   If &ledger = "NIIF" Or
+         &ledger = " " Then
+      /**/
+      /***********************************/
+      /*REGISTRO TIPO 2 NIIF*/
+      
+      &sql2 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_OFICINA, CONSTANTS, FF_TIPO_MONEDA, FF_TIPOINFORMACION, FF_TIPO_FIDEI, LPAD(FF_COD_FIDEICOMISO,6,0), FF_COD_FIDEICOMISO FROM PS_FF_GL_RT2_TMP WHERE PROCESS_INSTANCE = :1 ORDER BY FF_COD_FIDEICOMISO, FF_TIPO_MONEDA, FF_TIPO_REGISTRO", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      While &sql2.Fetch(&str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &strCodFideicomiso)
+         &nbrI = &nbrI + 1;
+         &strI = String(&nbrI);
+         &str1 = Rept("0", 8 - Len(&strI)) | &strI;
+         &fl_Negocios.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &str6 | &str7 | &str8);
+         &fl_Negocios.WriteLine("");
+         /***********************************/
+         /*REGISTRO TIPO 3 DIARIO*/
+         rem &sql3 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, RPAD(FF_CODIGO_PUC,6,0), SIGN, FF_VALOR_ACTIVO FROM PS_ETY_GLRT3_TMP WHERE PROCESS_INSTANCE = :1 AND FF_TIPO_MONEDA = :2 AND FF_COD_FIDEICOMISO = :3 ORDER BY FF_ID_REGISTRO", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str5, &strCodFideicomiso);
+         /*Cuando ya tiene signo lo dejo (por ejemplo nodos fijos con saldo 0 ya vienen con signo +), sino pongo el signo en base a la configuracion del nodo*/
+         REM &sql3 = CreateSQL("SELECT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, RPAD(A.FF_CODIGO_PUC,6,0), (CASE WHEN A.SIGN <> ' ' THEN A.SIGN ELSE (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END) END), ABS(A.FF_VALOR_ACTIVO) FROM PS_ETY_GLRT3_TMP A, PS_FF_GL_TRNODE_VW B WHERE A.LEDGER='DIARIO' AND A.PROCESS_INSTANCE = :1 AND A.FF_TIPO_MONEDA = :2 AND A.FF_COD_FIDEICOMISO = :3 AND B.SETID = 'PAPEN' AND B.TREE_NAME = 'PUC_SUPERFIN_PASIV' AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM ORDER BY to_number(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str5, &strCodFideicomiso);
+         &sql3 = CreateSQL("SELECT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, RPAD(A.FF_CODIGO_PUC,6,0), (CASE WHEN A.SIGN <> ' ' THEN A.SIGN ELSE (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END) END), ABS(A.FF_VALOR_ACTIVO) FROM %Table(ETY_GLRT3_TMP) A, PS_FF_GL_TRNODE_VW B WHERE A.LEDGER='NIIF' AND A.PROCESS_INSTANCE = :1 AND A.FF_TIPO_MONEDA = :2 AND A.FF_COD_FIDEICOMISO = :3 AND B.SETID = :4  AND B.TREE_NAME = :5 AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM ORDER BY to_number(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str5, &strCodFideicomiso, &setid_name, &tree_name);
+         &bolSql3 = True;
+         While &sql3.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+            /*Formatear numero a 20 posiciones, forzar 2 decimales y rellenar con 0 a la izquierda*/
+            &str5 = NumberToString("%#020.2", &nbr5);
+            &nbrI = &nbrI + 1;
+            &strI = String(&nbrI);
+            &str1 = Rept("0", 8 - Len(&strI)) | &strI;
+            &fl_Negocios.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+            &fl_Negocios.WriteLine("");
+         End-While;
+      End-While;
+      If (&bolSql3) Then
+         &sql3.Close();
+      End-If;
+   End-If;
+   /***********************************/
+   <*
+   If &ledger = "NIIF" Or
+         &ledger = " " Then
+      /*REGISTRO TIPO 2 NIIF*/
+      
+      &sql2 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, FF_COD_OFICINA, CONSTANTS, FF_TIPO_MONEDA, FF_TIPOINFORMACION, FF_TIPO_FIDEI, LPAD(FF_COD_FIDEICOMISO,6,0), FF_COD_FIDEICOMISO FROM PS_ETY_GLRT2_TMP WHERE PROCESS_INSTANCE = :1 AND LEDGER='NIIF' ORDER BY FF_COD_FIDEICOMISO, FF_TIPO_MONEDA, FF_TIPO_REGISTRO", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+      While &sql2.Fetch(&str1, &str2, &str3, &str4, &str5, &str6, &str7, &str8, &strCodFideicomiso)
+         &nbrI = &nbrI + 1;
+         &strI = String(&nbrI);
+         &str1 = Rept("0", 8 - Len(&strI)) | &strI;
+         &fl_Negocios.WriteString(&str1 | &str2 | &str3 | &str4 | &str5 | &str6 | &str7 | &str8);
+         &fl_Negocios.WriteLine("");
+         /*REGISTRO TIPO 3 NIIF*/
+         rem &sql3 = CreateSQL("SELECT FF_ID_REGISTRO, FF_TIPO_REGISTRO, RPAD(FF_CODIGO_PUC,6,0), SIGN, FF_VALOR_ACTIVO FROM PS_ETY_GLRT3_TMP WHERE PROCESS_INSTANCE = :1 AND FF_TIPO_MONEDA = :2 AND FF_COD_FIDEICOMISO = :3 ORDER BY FF_ID_REGISTRO", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str5, &strCodFideicomiso);
+         /*Cuando ya tiene signo lo dejo (por ejemplo nodos fijos con saldo 0 ya vienen con signo +), sino pongo el signo en base a la configuracion del nodo*/
+         &sql3 = CreateSQL("SELECT A.FF_ID_REGISTRO, A.FF_TIPO_REGISTRO, RPAD(A.FF_CODIGO_PUC,6,0), (CASE WHEN A.SIGN <> ' ' THEN A.SIGN ELSE (CASE WHEN B.FF_NATURALEZA = 'POSI' AND A.FF_VALOR_ACTIVO >=0 THEN '+' WHEN  B.FF_NATURALEZA = 'NEGA' AND A.FF_VALOR_ACTIVO < 0 THEN '+' ELSE '-' END) END), ABS(A.FF_VALOR_ACTIVO) FROM PS_ETY_GLRT3_TMP A, PS_FF_GL_TRNODE_VW B WHERE A.LEDGER='NIIF' AND  A.PROCESS_INSTANCE = :1 AND A.FF_TIPO_MONEDA = :2 AND A.FF_COD_FIDEICOMISO = :3 AND B.SETID = :5 AND B.TREE_NAME = :4 AND A.FF_ID_REGISTRO = B.TREE_NODE_NUM ORDER BY to_number(A.FF_ID_REGISTRO)", ETY_GL_INFM_AET.PROCESS_INSTANCE, &str5, &strCodFideicomiso, &tree_name, &setid_name);
+         &bolSql3 = True;
+         While &sql3.Fetch(&str1, &str2, &str3, &str4, &nbr5)
+            /*Formatear numero a 20 posiciones, forzar 2 decimales y rellenar con 0 a la izquierda*/
+            &str5 = NumberToString("%#020.2", &nbr5);
+            &nbrI = &nbrI + 1;
+            &strI = String(&nbrI);
+            &str1 = Rept("0", 8 - Len(&strI)) | &strI;
+            &fl_Negocios.WriteString(&str1 | &str2 | &str3 | &str4 | &str5);
+            &fl_Negocios.WriteLine("");
+         End-While;
+      End-While;
+   End-If;
+   *>
+   
+   /***********************************/
+   /*REGISTRO TIPO 5 NIIF*/
+   &sql5 = CreateSQL("SELECT LPAD(sum(FF_ID_REGISTRO),8,0)  ,FF_TIPO_REGISTRO  FROM %table(ETY_GLRT5_TMP) WHERE PROCESS_INSTANCE = :1 group by FF_TIPO_REGISTRO ", ETY_GL_INFM_AET.PROCESS_INSTANCE);
+   If &sql5.Fetch(&str324, &str325) Then
+      If None(ETY_GL_INFM_AET.LEDGER) Then
+         &str324 = &nbrI + 1;
+         &str324 = Rept("0", 8 - Len(&str324)) | &str324;
+      End-If;
+      &fl_Negocios.WriteString(&str324 | &str325);
+   End-If;
+   /***********************************/
+   
+   &sql1.Close();
+   &sql2.Close();
+   If (&bolSql3) Then
+      &sql3.Close();
+   End-If;
+   &sql5.Close();
+   &fl_Negocios.Close();
+Else
+   /* file not opened, do error processing */
+   MessageBox(0, "", 0, 0, "File Not Opened");
+End-If;

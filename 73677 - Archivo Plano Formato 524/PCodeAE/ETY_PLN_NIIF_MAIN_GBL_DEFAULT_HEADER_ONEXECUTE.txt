@@ -1,0 +1,62 @@
+/*********************************************************************
+* Proyecto:	    ETY_ERP_GL_FLP_EVO_73677
+* Actividad:  	002
+* Responsable: 	Entelgy - David A. Suarez
+* Fecha:		07-10-2019
+* Descripción:	Adicion peoplecode para plano formato 524.
+*********************************************************************/
+/*INICIO 001*/
+ETY_GL_INFM_AET.AE_APPLID.Value = "ETY_PLN_NIIF";
+Evaluate ETY_GL_INFM_AET.FF_ID_ARCHIVO
+   <*
+When "CA"
+   ETY_GL_INFM_AET.AE_SECTION.Value = "COMP_ACC";
+   Break;
+When "FI"
+   /*Fideicomisos*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "HEAD_FID";
+   Break;
+When "OR"
+   /*Operaciones Reciprocas*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "HEAD_OPR";
+   ETY_GL_INFM_AET.LEDGER.Value = "NIIF";
+   Break;
+When "CC"
+   /*Carteras Colectivas*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "HEAD_CCO";
+   Break;
+*>
+   
+When "PP"
+   /*Pasivos Pensionales*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "HEAD_PP";
+   ETY_GL_INFM_AET.PARAM_NAME.Value = "ARBOL_PUC_SFIN_CUIF_NIIF";
+   Break;
+   
+When "SO"
+   /*Sociedad Fiduciaria*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "HEAD_SF";
+   ETY_GL_INFM_AET.PARAM_NAME.Value = "ARBOL_PUC_SFIN_CUIF_NIIF";
+   Break;
+   
+When "NG"
+   /*Negocios*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "HEAD_NG";
+   ETY_GL_INFM_AET.PARAM_NAME.Value = "ARBOL_PUC_SFIN_CUIF_NIIF";
+   Break;
+   
+When "FN"
+   /*Fondos de Inversión*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "HEAD_FN";
+   ETY_GL_INFM_AET.PARAM_NAME.Value = "ARBOL_PUC_SFIN_CUIF_NIIF";
+   Break;
+   /*Inicio #002*/
+When "F5"
+   /*Formato 524*/
+   ETY_GL_INFM_AET.AE_SECTION.Value = "HEADF524";
+   ETY_GL_INFM_AET.PARAM_NAME.Value = "ARBOL_PUC_SFIN_CUIF_NIIF";
+   Break;
+   /*Fin #002*/
+End-Evaluate;
+MessageBox(0, "", 0, 0, "Section: > " | ETY_GL_INFM_AET.AE_SECTION);
+/*FIN 001*/

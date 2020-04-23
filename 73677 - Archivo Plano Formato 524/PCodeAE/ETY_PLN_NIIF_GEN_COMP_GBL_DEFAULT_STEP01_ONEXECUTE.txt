@@ -1,0 +1,37 @@
+/*Generación del archivo plano a partir de los registros temporales cargados en el paso anterior*/
+/**/
+
+/*Se debe generar un rowset que servira de origen de datos al reporte FFPLCMPACCIO  el rowset debe tener la siguiente estructura*/
+
+/**RECORD.FF_GL_RT1_WRK
+**********RECORD.FF_GL_CAR2_TM
+*****************RECORD.FF_GL_CAR3_TM
+************************RECORD.FF_GL_CAR4_TM
+*******************************RECORD.FF_GL_CAR5_TM
+**********RECORD.FF_GL_CAR6_TM
+*/
+
+
+/*El rowset FF_GL_RT1_WRK se debe llenar con los datos del record RECORD.FF_GL_RT1_TMP*/
+/*el rowset FF_GL_CAR2_TM se debe llenar con los datos de la tabla RECORD.FF_GL_CAR2_TM*/
+/*el rowset FF_GL_CAR3_TM se debe llenar con los datos de la tabla RECORD.FF_GL_CAR3_TM*/
+/*el rowset FF_GL_CAR4_TM se debe llenar con los datos de la tabla RECORD.FF_GL_CAR4_TM Ordenado por el ID_REGISTRO*/
+/*el rowset FF_GL_CAR5_TM se debe llenar con los datos de la tabla RECORD.FF_GL_CAR5_TM filtrando el que FF_NUM_FORMATO = 209 o FF_NUM_FORMATO = 210 cuando el ID_REGISTRO del record FF_GL_CAR4_TM es 1*/
+/*el rowset FF_GL_CAR5_TM se debe llenar con los datos de la tabla RECORD.FF_GL_CAR5_TM filtrando el que FF_NUM_FORMATO = 211 cuando el ID_REGISTRO del record FF_GL_CAR4_TM es 2*/
+/*el rowset FF_GL_CAR6_TM se debe llenar con los datos de la tabla RECORD.FF_GL_CAR6_TM*/
+
+/*Por último se recorren todos los registros y se numeran desde el uno, el orden de recorrido para la numeración es */
+
+/**RECORD.FF_GL_RT1_WRK
+**********RECORD.FF_GL_CAR2_TM
+*****************RECORD.FF_GL_CAR3_TM
+************************RECORD.FF_GL_CAR4_TM
+*******************************RECORD.FF_GL_CAR5_TM
+**********RECORD.FF_GL_CAR6_TM
+
+El consecutivo que se asigne debe ir en el campo FF_ID_REGISTRO.  */
+
+/*Se actualiza el campo FF_GL_RT1_WRK.FF_TOTAL_REGISTRO con el número de registros totales dentro del rowset.*/
+
+/*Por último el rowset se debe pasar como parametro para la generación del reporte FFPLCMPACCIO  el cúal debe cumplir con 
+la estructura del archivo plano definido en el gap GL_GAPFIT0020_Archivo Plano Composición Accionaria*/
