@@ -1,0 +1,909 @@
+Local ApiObject &oSession, &oEtyPurchOrdCi;
+Local ApiObject &oPoChngReasonCollection, &oPoChngReason;
+Local ApiObject &oCntrctSrchVwCollection, &oCntrctSrchVw;
+Local ApiObject &oPoLineCollection, &oPoLine;
+Local ApiObject &oPoLineMiscCollection, &oPoLineMisc;
+Local ApiObject &oPoLineShipCollection, &oPoLineShip;
+Local ApiObject &oPoShipAddrVwCollection, &oPoShipAddrVw;
+Local ApiObject &oPoLnDistExsCollection, &oPoLnDistExs;
+Local ApiObject &oPoLineDistribCollection, &oPoLineDistrib;
+Local ApiObject &oPoValAdjPCollection, &oPoValAdjP;
+Local ApiObject &oPoValAdjSCollection, &oPoValAdjS;
+Local ApiObject &oPoShAddrVw1Collection, &oPoShAddrVw1;
+Local ApiObject &oPoAddrPoVwCollection, &oPoAddrPoVw;
+Local ApiObject &oPoLnShipSutCollection, &oPoLnShipSut;
+Local ApiObject &oPoLnShipSutdCollection, &oPoLnShipSutd;
+Local ApiObject &oPoLnShpMcWkCollection, &oPoLnShpMcWk;
+Local ApiObject &oVrbtListVwCollection, &oVrbtListVw;
+Local ApiObject &oPoLnShipExsCollection, &oPoLnShipExs;
+Local ApiObject &oPoLnShipExsdCollection, &oPoLnShipExsd;
+Local ApiObject &oCommentsTblCollection, &oCommentsTbl;
+Local ApiObject &oPoCommentsCollection, &oPoComments;
+Local ApiObject &oPoHdrMiscCollection, &oPoHdrMisc;
+Local ApiObject &oPoLnMiscWrkCollection, &oPoLnMiscWrk;
+Local ApiObject &oPoLnShipMiscCollection, &oPoLnShipMisc;
+Local ApiObject &oPoDispatchedCollection, &oPoDispatched;
+Local ApiObject &oVndrLookupWsCollection, &oVndrLookupWs;
+Local ApiObject &oItemProdVwCollection, &oItemProdVw;
+Local ApiObject &oInPegHdrTmpCollection, &oInPegHdrTmp;
+Local ApiObject &oInPegDetailCollection, &oInPegDetail;
+Local ApiObject &oPoLnDistReqCollection, &oPoLnDistReq;
+Local ApiObject &oItmCatWsCollection, &oItmCatWs;
+Local ApiObject &oPoEstShipCollection, &oPoEstShip;
+Local ApiObject &oPoFrtClcCollection, &oPoFrtClc;
+Local ApiObject &oPoHdrPhoneCollection, &oPoHdrPhone;
+Local ApiObject &oPoHdrEmailCollection, &oPoHdrEmail;
+Local ApiObject &oPoDfltDistribCollection, &oPoDfltDistrib;
+Local ApiObject &oPoDfltWsCollection, &oPoDfltWs;
+Local ApiObject &oVendorAddrVw1Collection, &oVendorAddrVw1;
+Local ApiObject &oPoHdrACollection, &oPoHdrA;
+Local ApiObject &oRtvLnFsCollection, &oRtvLnFs;
+Local ApiObject &oPoPoCopyVwCollection, &oPoPoCopyVw;
+Local ApiObject &oPoCntrctCopyCollection, &oPoCntrctCopy;
+Local ApiObject &oVatCalcWs2Collection, &oVatCalcWs2;
+Local ApiObject &oVatCalcPoxrf2Collection, &oVatCalcPoxrf2;
+Local ApiObject &oPoApprovalVwCollection, &oPoApprovalVw;
+Local ApiObject &oRunCntlPurVwCollection, &oRunCntlPurVw;
+Local ApiObject &oPurchKitWsCollection, &oPurchKitWs;
+Local ApiObject &oPoChngHdrFldCollection, &oPoChngHdrFld;
+Local ApiObject &oPoChngLnFldCollection, &oPoChngLnFld;
+Local ApiObject &oPoChngShpFldCollection, &oPoChngShpFld;
+Local ApiObject &oPoRecfieldDvwCollection, &oPoRecfieldDvw;
+Local ApiObject &oPoChngAddrVwCollection, &oPoChngAddrVw;
+Local ApiObject &oCntrctDstrbFsCollection, &oCntrctDstrbFs;
+Local ApiObject &oCntrctLnShFsCollection, &oCntrctLnShFs;
+Local ApiObject &oCntrctCommentsCollection, &oCntrctComments;
+Local ApiObject &oPriceAdjVwCollection, &oPriceAdjVw;
+Local ApiObject &oCntrctAdjVwCollection, &oCntrctAdjVw;
+Local ApiObject &oItmVndrMcVwCollection, &oItmVndrMcVw;
+Local ApiObject &oPoAddrReqVwCollection, &oPoAddrReqVw;
+Local ApiObject &oReqCommentsCollection, &oReqComments;
+Local ApiObject &oReqLineVwCollection, &oReqLineVw;
+Local ApiObject &oReqLineShpVwCollection, &oReqLineShpVw;
+Local ApiObject &oReqLnDistVwCollection, &oReqLnDistVw;
+Local ApiObject &oPoReqLnWsCollection, &oPoReqLnWs;
+Local ApiObject &oItmSubVw2Collection, &oItmSubVw2;
+Local ApiObject &oPoReqHComWsCollection, &oPoReqHComWs;
+Local ApiObject &oPoReqShipWsCollection, &oPoReqShipWs;
+Local ApiObject &oPoReqDistWsCollection, &oPoReqDistWs;
+Local ApiObject &oPoReqLComWsCollection, &oPoReqLComWs;
+Local ApiObject &oPoLineShipFsCollection, &oPoLineShipFs;
+Local ApiObject &oPoLineDistFsCollection, &oPoLineDistFs;
+Local ApiObject &oPoRcWbExpCollection, &oPoRcWbExp;
+Local ApiObject &oPoReqCnclVw0Collection, &oPoReqCnclVw0;
+
+Function errorHandler() Returns string
+   Local ApiObject &oPSMessageCollection, &oPSMessage;
+   Local number &i;
+   Local string &sErrMsgSetNum, &sErrMsgNum, &sErrMsgText, &sErrType, &sError;
+   
+   &oPSMessageCollection = &oSession.PSMessages;
+   For &i = 1 To &oPSMessageCollection.Count
+      &oPSMessage = &oPSMessageCollection.Item(&i);
+      &sErrMsgSetNum = &oPSMessage.MessageSetNumber;
+      &sErrMsgNum = &oPSMessage.MessageNumber;
+      &sErrMsgText = &oPSMessage.Text;
+      &sError = &sErrType | " (" | &sErrMsgSetNum | "," | &sErrMsgNum | ") - " | &sErrMsgText;
+   End-For;
+   rem ***** Delete the Messages from the collection *****;
+   &oPSMessageCollection.DeleteAll();
+   
+   Return &sError;
+End-Function;
+
+Function Func_Crear_Pedido(&MSG As Message) Returns string;
+   Local Rowset &rsMesReq;
+   Local string &ReqId, &LcTerceroId, &NationalIdType, &NationalId, &Valor, &InvItmID;
+   Local string &ETY_PO_RES;
+   Local string &Existe, &ErrorMessage, &Commnent;
+   Local number &ValorPago, &Cantidad;
+   
+   /* Se lee el rowset de entrada y se sacan los valores requeridos y se Cálcula el Id del Tercero */
+   &rsMesReq = &MSG.GetRowset();
+   
+   &ReqId = &rsMesReq(1).ETY_CREAPD_WRK.REQ_ID.Value;
+   &LcTerceroId = &rsMesReq(1).ETY_CREAPD_WRK.LC_TERCERO_ID.Value;
+   &NationalIdType = &rsMesReq(1).ETY_CREAPD_WRK.NATIONAL_ID_TYPE.Value;
+   &NationalId = &rsMesReq(1).ETY_CREAPD_WRK.NATIONAL_ID.Value;
+   &VendorLoc = &rsMesReq(1).ETY_CREAPD_WRK.VNDR_LOC.Value;
+   &BuyerId = &rsMesReq(1).ETY_CREAPD_WRK.BUYER_ID.Value;
+   &ValorPago = &rsMesReq(1).ETY_CREAPD_WRK.ETY_VALOR_PAGO.Value;
+   &Valor = &rsMesReq(1).ETY_CREAPD_WRK.DESCR254.Value;
+   &InvItmID = &rsMesReq(1).ETY_CREAPD_WRK.INV_ITEM_ID.Value;
+   &Cantidad = &rsMesReq(1).ETY_CREAPD_WRK.QTY.Value;
+   &Commnent = &rsMesReq(1).ETY_CREAPD_WRK.DESCR254.Value;
+   
+   &ETY_PO_RES = "";
+   &pBusiness_Unit = "PO593";
+   SQLExec("SELECT FF_TIPO_CONTRATO , FF_MOD_CONTRATO , CONTRACT_NUM FROM PS_FF_REQ_HDR A WHERE REQ_ID=:1 AND BUSINESS_UNIT=:2", &ReqId, &pBusiness_Unit, &FF_TIPO_CONTRATO, &FF_MOD_CONTRATO, &FF_NUMERO_CONTRATO);
+   
+   try
+      
+      rem ***** Get current PeopleSoft Session *****;
+      &oSession = %Session;
+      
+      rem ***** Set the PeopleSoft Session Error Message Mode *****;
+      rem ***** 0 - None *****;
+      rem ***** 1 - PSMessage Collection only (default) *****;
+      rem ***** 2 - Message Box only *****;
+      rem ***** 3 - Both collection and message box *****;
+      &oSession.PSMessagesMode = 1;
+      
+      rem ***** Get the Component Interface *****;
+      &oEtyPurchOrdCi = &oSession.GetCompIntfc(CompIntfc.ETY_PURCH_ORD_CI);
+      If &oEtyPurchOrdCi = Null Then
+         &ErrorHandler = errorHandler();
+         throw CreateException(0, 0, "GetCompIntfc failed " | &ErrorHandler);
+      End-If;
+      
+      rem ***** Set the Component Interface Mode *****;
+      &oEtyPurchOrdCi.InteractiveMode = True;
+      &oEtyPurchOrdCi.GetHistoryItems = True;
+      &oEtyPurchOrdCi.EditHistoryItems = False;
+      
+      rem ***** Set Component Interface Get/Create Keys *****;
+      &oEtyPurchOrdCi.BUSINESS_UNIT = &pBusiness_Unit;
+      &oEtyPurchOrdCi.PO_ID = "NEXT";
+      
+      <*
+      rem ***** Execute Get *****;
+      If Not &oEtyPurchOrdCi.Get() Then
+         rem ***** No rows exist for the specified keys.*****;
+         errorHandler();
+         throw CreateException(0, 0, "Get failed");
+      End-If; 
+      *>
+      
+      rem ***** Execute Create ******;
+      If Not &oEtyPurchOrdCi.Create() Then;
+         rem ***** Unable to Create Component Interface for the Add keys provided. *****;
+         &ErrorHandler = errorHandler();
+         throw CreateException(0, 0, "Create failed " | &ErrorHandler);
+      End-If;
+      
+      SQLExec("SELECT  A.REQ_NAME FROM PS_REQ_HDR A WHERE  A.BUSINESS_UNIT = :1 AND A.REQ_ID=:2", &pBusiness_Unit, &ReqId, &pReqName);
+      SQLExec("SELECT CATEGORY_ID, ITM_SETID FROM PS_REQ_LINE WHERE BUSINESS_UNIT = :1 AND REQ_ID=:2 AND INV_ITEM_ID=:3", &pBusiness_Unit, &ReqId, &InvItmID, &CategoryId, &ItmSetid);
+      SQLExec("SELECT CATEGORY_CD FROM PS_ITM_CAT_VW IC WHERE IC.SETID=:1 AND IC.CATEGORY_ID=:2 AND IC.EFF_STATUS='A' AND IC.EFFDT= (SELECT MAX(IC1.EFFDT) FROM PS_ITM_CAT_VW IC1 WHERE IC.SETID=IC1.SETID AND IC.CATEGORY_ID=IC1.CATEGORY_ID AND IC.EFF_STATUS=IC1.EFF_STATUS)", &ItmSetid, &CategoryId, &CategoryCd);
+      
+      
+      rem ***** Begin: Get/Set Component Interface Properties *****;
+      rem ***** Get/Set Level 0 Field Properties *****;
+      &oEtyPurchOrdCi.PO_LINE_GOTO = "0000";
+      &oEtyPurchOrdCi.HOLD_STATUS = "N";
+      &oEtyPurchOrdCi.DISP_METHOD = "PRN";
+      &oEtyPurchOrdCi.PO_DT_1 = %Date;
+      rem &oEtyPurchOrdCi.PO_REF_0 = [*];
+      &oEtyPurchOrdCi.BUYER_ID_0 = &BuyerId;
+      rem &oEtyPurchOrdCi.FF_EVTRSG_OPER = [*];
+      &oEtyPurchOrdCi.FF_TIPO_CONTRATO = &FF_TIPO_CONTRATO;
+      &oEtyPurchOrdCi.FF_MOD_CONTRATO = &FF_MOD_CONTRATO;
+      &oEtyPurchOrdCi.FF_NUMERO_CONTRATO = &FF_NUMERO_CONTRATO;
+      rem &oEtyPurchOrdCi.LINE_NBR_FROM = [*];
+      rem &oEtyPurchOrdCi.LINE_NBR_TO = [*];
+      rem &oEtyPurchOrdCi.CNTRCT_ID_0 = [*];
+      rem &oEtyPurchOrdCi.CNTRCT_PROC_OPT = [*];
+      &oEtyPurchOrdCi.VENDOR_ID_2 = &LcTerceroId;
+      &oEtyPurchOrdCi.VNDR_LOC_0 = &VendorLoc;
+      rem &oEtyPurchOrdCi.DESCR = [*];
+      rem &oEtyPurchOrdCi.MSTR_CNTRCT_ID = [*];
+      rem &oEtyPurchOrdCi.PO_CNTRCT_TYPE = [*];
+      &oEtyPurchOrdCi.INV_ITEM_ID_0 = &pInv_Item_id;
+      &oEtyPurchOrdCi.DESCR254_MIXED = &pReqName;
+      &oEtyPurchOrdCi.CATEGORY_CD = &CategoryCd;
+      &oEtyPurchOrdCi.CATEGORY_ID = &CategoryId;
+      rem &oEtyPurchOrdCi.CNTRCT_CORP_FLG = [*];
+      &oEtyPurchOrdCi.ADDRESS_SEQ_NUM = 1;
+      /* Voy a la página de copia de solicitud */
+      &oEtyPurchOrdCi.COPY_PO_FROM = "R";
+      &oEtyPurchOrdCi.REQ_ID = &ReqId;
+      /* Se ejecuta la búsqueda de solicitud */
+      &oEtyPurchOrdCi.REQ_SELECT = "Y";
+      &oEtyPurchOrdCi.REQ_SELECT = "N";
+      
+      rem ***** Set/Get PO_REQ_LN_WS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoReqLnWsCollection = &oEtyPurchOrdCi.PO_REQ_LN_WS;
+      Local integer &i11565;
+      For &i11565 = 1 To &oPoReqLnWsCollection.Count;
+         &oPoReqLnWs = &oPoReqLnWsCollection.Item(&i11565);
+         &oPoReqLnWs.REQ_LN_COPY_FLG = "Y";
+         
+         rem ***** Set/Get ITM_SUB_VW2 Collection Field Properties -- Parent: PO_REQ_LN_WS Collection *****;
+         &oItmSubVw2Collection = &oPoReqLnWs.ITM_SUB_VW2;
+         Local integer &i21609;
+         For &i21609 = 1 To &oItmSubVw2Collection.Count;
+            &oItmSubVw2 = &oItmSubVw2Collection.Item(&i21609);
+         End-For;
+      End-For;
+      
+      /* Se copia el pedido */
+      &oEtyPurchOrdCi.COPY_REQ = "Y";
+      &oEtyPurchOrdCi.COPY_REQ = "N";
+      /* Voy a la página de cabecera de IVA*/
+      &oEtyPurchOrdCi.GOTO_HDR_VAT = "Y";
+      &oEtyPurchOrdCi.GOTO_HDR_VAT = "N";
+      /* Se ejecuta la Actualización de datos de Iva a valores por defecto */
+      &oEtyPurchOrdCi.VAT_OPT_UPD_PB = "Y";
+      &oEtyPurchOrdCi.VAT_OPT_UPD_PB = "N";
+      /* Regreso a la página PRincipal  */
+      &oEtyPurchOrdCi.PO_RETURN_PAGE = "Y";
+      &oEtyPurchOrdCi.PO_RETURN_PAGE = "N";
+      
+      
+      rem ***** Set/Get PO_LINE Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoLineCollection = &oEtyPurchOrdCi.PO_LINE;
+      Local integer &i1557;
+      For &i1557 = 1 To &oPoLineCollection.Count;
+         &oPoLine = &oPoLineCollection.Item(&i1557);
+         &oPoLine.INV_ITEM_ID = &InvItmID;
+         &oPoLine.QTY_PO = &Cantidad;
+         
+         rem ***** Set/Get PO_LINE_MISC Collection Field Properties -- Parent: PO_LINE Collection *****;
+         &oPoLineMiscCollection = &oPoLine.PO_LINE_MISC;
+         Local integer &i2681;
+         For &i2681 = 1 To &oPoLineMiscCollection.Count;
+            &oPoLineMisc = &oPoLineMiscCollection.Item(&i2681);
+            rem &oPoLineMisc.CHARGE_AMOUNT = [*];
+            rem &oPoLineMisc.CURRENCY_CD_6 = [*];
+            rem &oPoLineMisc.LC_COMP_CALC = [*];
+            rem &oPoLineMisc.X_VENDOR_ID = [*];
+            rem &oPoLineMisc.X_VNDR_LOC = [*];
+            rem &oPoLineMisc.UNIT_PRICE = [*];
+            rem &oPoLineMisc.FLAT_AMOUNT = [*];
+            rem &oPoLineMisc.PCT_VALUE = [*];
+            rem &oPoLineMisc.UNIT_OF_MEASURE_2 = [*];
+            rem &oPoLineMisc.THIRD_PARTY_FLG = [*];
+         End-For;
+         
+         rem ***** Set/Get PO_LINE_SHIP Collection Field Properties -- Parent: PO_LINE Collection *****;
+         &oPoLineShipCollection = &oPoLine.PO_LINE_SHIP;
+         Local integer &i2694;
+         For &i2694 = 1 To &oPoLineShipCollection.Count;
+            &oPoLineShip = &oPoLineShipCollection.Item(&i2694);
+            &oPoLineShip.QTY_PO_0 = &Cantidad;
+            
+            rem ***** Set/Get PO_SHIP_ADDR_VW Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoShipAddrVwCollection = &oPoLineShip.PO_SHIP_ADDR_VW;
+            Local integer &i3966;
+            For &i3966 = 1 To &oPoShipAddrVwCollection.Count;
+               &oPoShipAddrVw = &oPoShipAddrVwCollection.Item(&i3966);
+            End-For;
+            
+            rem ***** Set/Get PO_LN_DIST_EXS Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoLnDistExsCollection = &oPoLineShip.PO_LN_DIST_EXS;
+            Local integer &i3984;
+            For &i3984 = 1 To &oPoLnDistExsCollection.Count;
+               &oPoLnDistExs = &oPoLnDistExsCollection.Item(&i3984);
+            End-For;
+            
+            rem ***** Set/Get PO_LINE_DISTRIB Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoLineDistribCollection = &oPoLineShip.PO_LINE_DISTRIB;
+            Local integer &i3986;
+            For &i3986 = 1 To &oPoLineDistribCollection.Count;
+               &oPoLineDistrib = &oPoLineDistribCollection.Item(&i3986);
+            End-For;
+            
+            rem ***** Set/Get PO_VAL_ADJ_P Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoValAdjPCollection = &oPoLineShip.PO_VAL_ADJ_P;
+            Local integer &i31051;
+            For &i31051 = 1 To &oPoValAdjPCollection.Count;
+               &oPoValAdjP = &oPoValAdjPCollection.Item(&i31051);
+            End-For;
+            
+            
+            rem ***** Set/Get PO_VAL_ADJ_S Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoValAdjSCollection = &oPoLineShip.PO_VAL_ADJ_S;
+            Local integer &i31064;
+            For &i31064 = 1 To &oPoValAdjSCollection.Count;
+               &oPoValAdjS = &oPoValAdjSCollection.Item(&i31064);
+            End-For;
+            
+            rem ***** Set/Get PO_SH_ADDR_VW1 Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoShAddrVw1Collection = &oPoLineShip.PO_SH_ADDR_VW1;
+            Local integer &i31080;
+            For &i31080 = 1 To &oPoShAddrVw1Collection.Count;
+               &oPoShAddrVw1 = &oPoShAddrVw1Collection.Item(&i31080);
+            End-For;
+            
+            rem ***** Set/Get PO_ADDR_PO_VW Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoAddrPoVwCollection = &oPoLineShip.PO_ADDR_PO_VW;
+            Local integer &i31099;
+            For &i31099 = 1 To &oPoAddrPoVwCollection.Count;
+               &oPoAddrPoVw = &oPoAddrPoVwCollection.Item(&i31099);
+            End-For;
+            
+            rem ***** Set/Get PO_LN_SHIP_SUT Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoLnShipSutCollection = &oPoLineShip.PO_LN_SHIP_SUT;
+            Local integer &i31120;
+            For &i31120 = 1 To &oPoLnShipSutCollection.Count;
+               &oPoLnShipSut = &oPoLnShipSutCollection.Item(&i31120);
+            End-For;
+            
+            rem ***** Set/Get PO_LN_SHIP_SUTD Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoLnShipSutdCollection = &oPoLineShip.PO_LN_SHIP_SUTD;
+            Local integer &i31131;
+            For &i31131 = 1 To &oPoLnShipSutdCollection.Count;
+               &oPoLnShipSutd = &oPoLnShipSutdCollection.Item(&i31131);
+            End-For;
+            
+            rem ***** Set/Get PO_LN_SHP_MC_WK Collection Field Properties -- Parent: PO_LINE_SHIP Collection *****;
+            &oPoLnShpMcWkCollection = &oPoLineShip.PO_LN_SHP_MC_WK;
+            Local integer &i31141;
+            For &i31141 = 1 To &oPoLnShpMcWkCollection.Count;
+               &oPoLnShpMcWk = &oPoLnShpMcWkCollection.Item(&i31141);
+            End-For;
+         End-For;
+         
+         
+         rem ***** Set/Get VRBT_LIST_VW Collection Field Properties -- Parent: PO_LINE Collection *****;
+         &oVrbtListVwCollection = &oPoLine.VRBT_LIST_VW;
+         Local integer &i21155;
+         For &i21155 = 1 To &oVrbtListVwCollection.Count;
+            &oVrbtListVw = &oVrbtListVwCollection.Item(&i21155);
+         End-For;
+         
+         rem ***** Set/Get PO_LN_SHIP_EXS Collection Field Properties -- Parent: PO_LINE Collection *****;
+         &oPoLnShipExsCollection = &oPoLine.PO_LN_SHIP_EXS;
+         Local integer &i21170;
+         For &i21170 = 1 To &oPoLnShipExsCollection.Count;
+            &oPoLnShipExs = &oPoLnShipExsCollection.Item(&i21170);
+            
+            rem ***** Set/Get PO_LN_SHIP_EXSD Collection Field Properties -- Parent: PO_LN_SHIP_EXS Collection *****;
+            &oPoLnShipExsdCollection = &oPoLnShipExs.PO_LN_SHIP_EXSD;
+            Local integer &i31208;
+            For &i31208 = 1 To &oPoLnShipExsdCollection.Count;
+               &oPoLnShipExsd = &oPoLnShipExsdCollection.Item(&i31208);
+            End-For;
+         End-For;
+         
+      End-For;
+      
+      rem ***** Set/Get COMMENTS_TBL Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oCommentsTblCollection = &oEtyPurchOrdCi.COMMENTS_TBL;
+      Local integer &i11226;
+      For &i11226 = 1 To &oCommentsTblCollection.Count;
+         &oCommentsTbl = &oCommentsTblCollection.Item(&i11226);
+      End-For;
+      
+      rem ***** Set/Get PO_COMMENTS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoCommentsCollection = &oEtyPurchOrdCi.PO_COMMENTS;
+      Local integer &i11228;
+      For &i11228 = 1 To &oPoCommentsCollection.Count;
+         &oPoComments = &oPoCommentsCollection.Item(&i11228);
+         &oPoComments.STD_COMMENT_TYPE = "HDR";
+         &oPoComments.COMMENTS_2000 = &Commnent;
+      End-For;
+      
+      rem ***** Set/Get PO_HDR_MISC Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoHdrMiscCollection = &oEtyPurchOrdCi.PO_HDR_MISC;
+      Local integer &i11236;
+      For &i11236 = 1 To &oPoHdrMiscCollection.Count;
+         &oPoHdrMisc = &oPoHdrMiscCollection.Item(&i11236);
+         
+         rem ***** Set/Get PO_LN_MISC_WRK Collection Field Properties -- Parent: PO_HDR_MISC Collection *****;
+         &oPoLnMiscWrkCollection = &oPoHdrMisc.PO_LN_MISC_WRK;
+         Local integer &i21243;
+         For &i21243 = 1 To &oPoLnMiscWrkCollection.Count;
+            &oPoLnMiscWrk = &oPoLnMiscWrkCollection.Item(&i21243);
+            
+            rem ***** Set/Get PO_LN_SHIP_MISC Collection Field Properties -- Parent: PO_LN_MISC_WRK Collection *****;
+            &oPoLnShipMiscCollection = &oPoLnMiscWrk.PO_LN_SHIP_MISC;
+            Local integer &i31254;
+            For &i31254 = 1 To &oPoLnShipMiscCollection.Count;
+               &oPoLnShipMisc = &oPoLnShipMiscCollection.Item(&i31254);
+            End-For;
+         End-For;
+      End-For;
+      
+      rem ***** Set/Get PO_DISPATCHED Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoDispatchedCollection = &oEtyPurchOrdCi.PO_DISPATCHED;
+      Local integer &i11264;
+      For &i11264 = 1 To &oPoDispatchedCollection.Count;
+         &oPoDispatched = &oPoDispatchedCollection.Item(&i11264);
+      End-For;
+      
+      rem ***** Set/Get VNDR_LOOKUP_WS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oVndrLookupWsCollection = &oEtyPurchOrdCi.VNDR_LOOKUP_WS;
+      Local integer &i11270;
+      For &i11270 = 1 To &oVndrLookupWsCollection.Count;
+         &oVndrLookupWs = &oVndrLookupWsCollection.Item(&i11270);
+      End-For;
+      
+      rem ***** Set/Get ITEM_PROD_VW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oItemProdVwCollection = &oEtyPurchOrdCi.ITEM_PROD_VW;
+      Local integer &i11278;
+      For &i11278 = 1 To &oItemProdVwCollection.Count;
+         &oItemProdVw = &oItemProdVwCollection.Item(&i11278);
+      End-For;
+      
+      rem ***** Set/Get IN_PEG_HDR_TMP Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oInPegHdrTmpCollection = &oEtyPurchOrdCi.IN_PEG_HDR_TMP;
+      Local integer &i11285;
+      For &i11285 = 1 To &oInPegHdrTmpCollection.Count;
+         &oInPegHdrTmp = &oInPegHdrTmpCollection.Item(&i11285);
+         
+         rem ***** Set/Get IN_PEG_DETAIL Collection Field Properties -- Parent: IN_PEG_HDR_TMP Collection *****;
+         &oInPegDetailCollection = &oInPegHdrTmp.IN_PEG_DETAIL;
+         Local integer &i21309;
+         For &i21309 = 1 To &oInPegDetailCollection.Count;
+            &oInPegDetail = &oInPegDetailCollection.Item(&i21309);
+         End-For;
+      End-For;
+      
+      rem ***** Set/Get PO_LN_DIST_REQ Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoLnDistReqCollection = &oEtyPurchOrdCi.PO_LN_DIST_REQ;
+      Local integer &i11322;
+      For &i11322 = 1 To &oPoLnDistReqCollection.Count;
+         &oPoLnDistReq = &oPoLnDistReqCollection.Item(&i11322);
+      End-For;
+      
+      rem ***** Set/Get ITM_CAT_WS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oItmCatWsCollection = &oEtyPurchOrdCi.ITM_CAT_WS;
+      Local integer &i11336;
+      For &i11336 = 1 To &oItmCatWsCollection.Count;
+         &oItmCatWs = &oItmCatWsCollection.Item(&i11336);
+      End-For;
+      
+      rem ***** Set/Get PO_EST_SHIP Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoEstShipCollection = &oEtyPurchOrdCi.PO_EST_SHIP;
+      Local integer &i11342;
+      For &i11342 = 1 To &oPoEstShipCollection.Count;
+         &oPoEstShip = &oPoEstShipCollection.Item(&i11342);
+         
+         rem ***** Set/Get PO_FRT_CLC Collection Field Properties -- Parent: PO_EST_SHIP Collection *****;
+         &oPoFrtClcCollection = &oPoEstShip.PO_FRT_CLC;
+         Local integer &i21359;
+         For &i21359 = 1 To &oPoFrtClcCollection.Count;
+            &oPoFrtClc = &oPoFrtClcCollection.Item(&i21359);
+         End-For;
+      End-For;
+      
+      rem ***** Set/Get PO_HDR_PHONE Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoHdrPhoneCollection = &oEtyPurchOrdCi.PO_HDR_PHONE;
+      Local integer &i11361;
+      For &i11361 = 1 To &oPoHdrPhoneCollection.Count;
+         &oPoHdrPhone = &oPoHdrPhoneCollection.Item(&i11361);
+      End-For;
+      
+      rem ***** Set/Get PO_HDR_EMAIL Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoHdrEmailCollection = &oEtyPurchOrdCi.PO_HDR_EMAIL;
+      Local integer &i11366;
+      For &i11366 = 1 To &oPoHdrEmailCollection.Count;
+         &oPoHdrEmail = &oPoHdrEmailCollection.Item(&i11366);
+      End-For;
+      
+      rem ***** Set/Get PO_DFLT_DISTRIB Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoDfltDistribCollection = &oEtyPurchOrdCi.PO_DFLT_DISTRIB;
+      Local integer &i11368;
+      For &i11368 = 1 To &oPoDfltDistribCollection.Count;
+         &oPoDfltDistrib = &oPoDfltDistribCollection.Item(&i11368);
+      End-For;
+      
+      rem ***** Set/Get PO_DFLT_WS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoDfltWsCollection = &oEtyPurchOrdCi.PO_DFLT_WS;
+      Local integer &i11401;
+      For &i11401 = 1 To &oPoDfltWsCollection.Count;
+         &oPoDfltWs = &oPoDfltWsCollection.Item(&i11401);
+      End-For;
+      
+      rem ***** Set/Get VENDOR_ADDR_VW1 Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oVendorAddrVw1Collection = &oEtyPurchOrdCi.VENDOR_ADDR_VW1;
+      Local integer &i11407;
+      For &i11407 = 1 To &oVendorAddrVw1Collection.Count;
+         &oVendorAddrVw1 = &oVendorAddrVw1Collection.Item(&i11407);
+      End-For;
+      
+      rem ***** Set/Get PO_HDR_A Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoHdrACollection = &oEtyPurchOrdCi.PO_HDR_A;
+      Local integer &i11425;
+      For &i11425 = 1 To &oPoHdrACollection.Count;
+         &oPoHdrA = &oPoHdrACollection.Item(&i11425);
+      End-For;
+      
+      rem ***** Set/Get RTV_LN_FS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oRtvLnFsCollection = &oEtyPurchOrdCi.RTV_LN_FS;
+      Local integer &i11428;
+      For &i11428 = 1 To &oRtvLnFsCollection.Count;
+         &oRtvLnFs = &oRtvLnFsCollection.Item(&i11428);
+      End-For;
+      
+      rem ***** Set/Get PO_PO_COPY_VW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoPoCopyVwCollection = &oEtyPurchOrdCi.PO_PO_COPY_VW;
+      Local integer &i11442;
+      For &i11442 = 1 To &oPoPoCopyVwCollection.Count;
+         &oPoPoCopyVw = &oPoPoCopyVwCollection.Item(&i11442);
+      End-For;
+      
+      rem ***** Set/Get PO_CNTRCT_COPY Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoCntrctCopyCollection = &oEtyPurchOrdCi.PO_CNTRCT_COPY;
+      Local integer &i11452;
+      For &i11452 = 1 To &oPoCntrctCopyCollection.Count;
+         &oPoCntrctCopy = &oPoCntrctCopyCollection.Item(&i11452);
+      End-For;
+      
+      rem ***** Set/Get VAT_CALC_WS2 Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oVatCalcWs2Collection = &oEtyPurchOrdCi.VAT_CALC_WS2;
+      Local integer &i11459;
+      For &i11459 = 1 To &oVatCalcWs2Collection.Count;
+         &oVatCalcWs2 = &oVatCalcWs2Collection.Item(&i11459);
+      End-For;
+      
+      rem ***** Set/Get VAT_CALC_POXRF2 Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oVatCalcPoxrf2Collection = &oEtyPurchOrdCi.VAT_CALC_POXRF2;
+      Local integer &i11462;
+      For &i11462 = 1 To &oVatCalcPoxrf2Collection.Count;
+         &oVatCalcPoxrf2 = &oVatCalcPoxrf2Collection.Item(&i11462);
+      End-For;
+      
+      rem ***** Set/Get PO_APPROVAL_VW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoApprovalVwCollection = &oEtyPurchOrdCi.PO_APPROVAL_VW;
+      Local integer &i11465;
+      For &i11465 = 1 To &oPoApprovalVwCollection.Count;
+         &oPoApprovalVw = &oPoApprovalVwCollection.Item(&i11465);
+      End-For;
+      
+      rem ***** Set/Get RUN_CNTL_PUR_VW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oRunCntlPurVwCollection = &oEtyPurchOrdCi.RUN_CNTL_PUR_VW;
+      Local integer &i11467;
+      For &i11467 = 1 To &oRunCntlPurVwCollection.Count;
+         &oRunCntlPurVw = &oRunCntlPurVwCollection.Item(&i11467);
+      End-For;
+      
+      rem ***** Set/Get PURCH_KIT_WS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPurchKitWsCollection = &oEtyPurchOrdCi.PURCH_KIT_WS;
+      Local integer &i11469;
+      For &i11469 = 1 To &oPurchKitWsCollection.Count;
+         &oPurchKitWs = &oPurchKitWsCollection.Item(&i11469);
+      End-For;
+      
+      rem ***** Set/Get PO_CHNG_HDR_FLD Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoChngHdrFldCollection = &oEtyPurchOrdCi.PO_CHNG_HDR_FLD;
+      Local integer &i11471;
+      For &i11471 = 1 To &oPoChngHdrFldCollection.Count;
+         &oPoChngHdrFld = &oPoChngHdrFldCollection.Item(&i11471);
+      End-For;
+      
+      rem ***** Set/Get PO_CHNG_LN_FLD Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoChngLnFldCollection = &oEtyPurchOrdCi.PO_CHNG_LN_FLD;
+      Local integer &i11473;
+      For &i11473 = 1 To &oPoChngLnFldCollection.Count;
+         &oPoChngLnFld = &oPoChngLnFldCollection.Item(&i11473);
+      End-For;
+      
+      rem ***** Set/Get PO_CHNG_SHP_FLD Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoChngShpFldCollection = &oEtyPurchOrdCi.PO_CHNG_SHP_FLD;
+      Local integer &i11475;
+      For &i11475 = 1 To &oPoChngShpFldCollection.Count;
+         &oPoChngShpFld = &oPoChngShpFldCollection.Item(&i11475);
+      End-For;
+      
+      rem ***** Set/Get PO_RECFIELD_DVW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoRecfieldDvwCollection = &oEtyPurchOrdCi.PO_RECFIELD_DVW;
+      Local integer &i11477;
+      For &i11477 = 1 To &oPoRecfieldDvwCollection.Count;
+         &oPoRecfieldDvw = &oPoRecfieldDvwCollection.Item(&i11477);
+      End-For;
+      
+      rem ***** Set/Get PO_CHNG_ADDR_VW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoChngAddrVwCollection = &oEtyPurchOrdCi.PO_CHNG_ADDR_VW;
+      Local integer &i11479;
+      For &i11479 = 1 To &oPoChngAddrVwCollection.Count;
+         &oPoChngAddrVw = &oPoChngAddrVwCollection.Item(&i11479);
+      End-For;
+      
+      rem ***** Set/Get CNTRCT_DSTRB_FS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oCntrctDstrbFsCollection = &oEtyPurchOrdCi.CNTRCT_DSTRB_FS;
+      Local integer &i11481;
+      For &i11481 = 1 To &oCntrctDstrbFsCollection.Count;
+         &oCntrctDstrbFs = &oCntrctDstrbFsCollection.Item(&i11481);
+      End-For;
+      
+      rem ***** Set/Get CNTRCT_LN_SH_FS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oCntrctLnShFsCollection = &oEtyPurchOrdCi.CNTRCT_LN_SH_FS;
+      Local integer &i11483;
+      For &i11483 = 1 To &oCntrctLnShFsCollection.Count;
+         &oCntrctLnShFs = &oCntrctLnShFsCollection.Item(&i11483);
+      End-For;
+      
+      rem ***** Set/Get CNTRCT_COMMENTS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oCntrctCommentsCollection = &oEtyPurchOrdCi.CNTRCT_COMMENTS;
+      Local integer &i11485;
+      For &i11485 = 1 To &oCntrctCommentsCollection.Count;
+         &oCntrctComments = &oCntrctCommentsCollection.Item(&i11485);
+      End-For;
+      
+      rem ***** Set/Get PRICE_ADJ_VW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPriceAdjVwCollection = &oEtyPurchOrdCi.PRICE_ADJ_VW;
+      Local integer &i11488;
+      For &i11488 = 1 To &oPriceAdjVwCollection.Count;
+         &oPriceAdjVw = &oPriceAdjVwCollection.Item(&i11488);
+      End-For;
+      
+      rem ***** Set/Get CNTRCT_ADJ_VW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oCntrctAdjVwCollection = &oEtyPurchOrdCi.CNTRCT_ADJ_VW;
+      Local integer &i11490;
+      For &i11490 = 1 To &oCntrctAdjVwCollection.Count;
+         &oCntrctAdjVw = &oCntrctAdjVwCollection.Item(&i11490);
+      End-For;
+      
+      rem ***** Set/Get ITM_VNDR_MC_VW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oItmVndrMcVwCollection = &oEtyPurchOrdCi.ITM_VNDR_MC_VW;
+      Local integer &i11492;
+      For &i11492 = 1 To &oItmVndrMcVwCollection.Count;
+         &oItmVndrMcVw = &oItmVndrMcVwCollection.Item(&i11492);
+      End-For;
+      
+      rem ***** Set/Get REQ_LINE_VW Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oReqLineVwCollection = &oEtyPurchOrdCi.REQ_LINE_VW;
+      Local integer &i11516;
+      For &i11516 = 1 To &oReqLineVwCollection.Count;
+         &oReqLineVw = &oReqLineVwCollection.Item(&i11516);
+         
+         rem ***** Set/Get REQ_LINE_SHP_VW Collection Field Properties -- Parent: REQ_LINE_VW Collection *****;
+         &oReqLineShpVwCollection = &oReqLineVw.REQ_LINE_SHP_VW;
+         Local integer &i21525;
+         For &i21525 = 1 To &oReqLineShpVwCollection.Count;
+            &oReqLineShpVw = &oReqLineShpVwCollection.Item(&i21525);
+            
+            rem ***** Set/Get REQ_LN_DIST_VW Collection Field Properties -- Parent: REQ_LINE_SHP_VW Collection *****;
+            &oReqLnDistVwCollection = &oReqLineShpVw.REQ_LN_DIST_VW;
+            Local integer &i31537;
+            For &i31537 = 1 To &oReqLnDistVwCollection.Count;
+               &oReqLnDistVw = &oReqLnDistVwCollection.Item(&i31537);
+            End-For;
+         End-For;
+      End-For;
+      
+      rem ***** Set/Get PO_REQ_H_COM_WS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoReqHComWsCollection = &oEtyPurchOrdCi.PO_REQ_H_COM_WS;
+      Local integer &i11614;
+      For &i11614 = 1 To &oPoReqHComWsCollection.Count;
+         &oPoReqHComWs = &oPoReqHComWsCollection.Item(&i11614);
+      End-For;
+      
+      rem ***** Set/Get PO_REQ_SHIP_WS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoReqShipWsCollection = &oEtyPurchOrdCi.PO_REQ_SHIP_WS;
+      Local integer &i11617;
+      For &i11617 = 1 To &oPoReqShipWsCollection.Count;
+         &oPoReqShipWs = &oPoReqShipWsCollection.Item(&i11617);
+      End-For;
+      
+      rem ***** Set/Get PO_REQ_DIST_WS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoReqDistWsCollection = &oEtyPurchOrdCi.PO_REQ_DIST_WS;
+      Local integer &i11621;
+      For &i11621 = 1 To &oPoReqDistWsCollection.Count;
+         &oPoReqDistWs = &oPoReqDistWsCollection.Item(&i11621);
+      End-For;
+      
+      rem ***** Set/Get PO_REQ_L_COM_WS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoReqLComWsCollection = &oEtyPurchOrdCi.PO_REQ_L_COM_WS;
+      Local integer &i11626;
+      For &i11626 = 1 To &oPoReqLComWsCollection.Count;
+         &oPoReqLComWs = &oPoReqLComWsCollection.Item(&i11626);
+      End-For;
+      
+      rem ***** Set/Get PO_LINE_SHIP_FS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoLineShipFsCollection = &oEtyPurchOrdCi.PO_LINE_SHIP_FS;
+      Local integer &i11629;
+      For &i11629 = 1 To &oPoLineShipFsCollection.Count;
+         &oPoLineShipFs = &oPoLineShipFsCollection.Item(&i11629);
+      End-For;
+      
+      rem ***** Set/Get PO_LINE_DIST_FS Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoLineDistFsCollection = &oEtyPurchOrdCi.PO_LINE_DIST_FS;
+      Local integer &i11631;
+      For &i11631 = 1 To &oPoLineDistFsCollection.Count;
+         &oPoLineDistFs = &oPoLineDistFsCollection.Item(&i11631);
+      End-For;
+      
+      rem ***** Set/Get PO_RC_WB_EXP Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoRcWbExpCollection = &oEtyPurchOrdCi.PO_RC_WB_EXP;
+      Local integer &i11635;
+      For &i11635 = 1 To &oPoRcWbExpCollection.Count;
+         &oPoRcWbExp = &oPoRcWbExpCollection.Item(&i11635);
+      End-For;
+      
+      rem ***** Set/Get PO_REQ_CNCL_VW0 Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oPoReqCnclVw0Collection = &oEtyPurchOrdCi.PO_REQ_CNCL_VW0;
+      Local integer &i11638;
+      For &i11638 = 1 To &oPoReqCnclVw0Collection.Count;
+         &oPoReqCnclVw0 = &oPoReqCnclVw0Collection.Item(&i11638);
+      End-For;
+      
+      rem ***** End: Get/Set Component Interface Properties *****;
+      rem ***** Execute Save *****;
+      
+      If Not &oEtyPurchOrdCi.Save() Then;
+         &ErrorHandler = errorHandler();
+         rem &ETY_PO_RES = &ErrorHandler;
+         throw CreateException(0, 0, "Save failed " | &ErrorHandler);
+      End-If;
+      
+      &ETY_PO_RES = &oEtyPurchOrdCi.PO_ID_1;
+      
+      SQLExec("UPDATE PS_PO_COMMENTS SET COMMENT_TYPE = 'HDR' WHERE BUSINESS_UNIT = 'PO593' AND PO_ID = :1", &ETY_PO_RES);
+      
+      rem ***** Execute Cancel *****;
+      rem If Not &oEtyPurchOrdCi.Cancel() Then;
+      rem 	errorHandler();
+      rem 	throw CreateException(0, 0, "Cancel failed");
+      rem End-If;
+      
+   catch Exception &ex
+      &ErrorHandler = &ErrorHandler | "Catch: " | &ex.ToString();
+   end-try;
+   
+   <* If None(&ETY_PO_RES) Then
+      &ETY_PO_RES = "El Pedido no pudo ser creado.";
+   End-If;*>
+   
+   rem &ETY_PO_RES = &ErrorHandler;
+   
+   Return &ETY_PO_RES;
+   
+End-Function;
+
+/*Mensaje de respuesta Mantenimiento.*/
+Function Func_Consulta_Solc(&MSG As Message) Returns string
+   
+   Local Rowset &rsMesReq;
+   Local string &ReqId, &LcTerceroId, &NationalIdType, &NationalId, &Valor, &InvItmID, &strExisteReqIdTercero, &ExisteUbicTer, &ExisteAutCreaPed, &ExisteItemReq, &ExisteNatIdType;
+   Local string &ETY_PO_RES;
+   Local string &Existe, &ErrorMessage;
+   Local number &ValorPago, &Cantidad, &numDispMerchandiseAmt, &numQtyReq;
+   
+   /* Se lee el rowset de entrada y se sacan los valores requeridos y se Cálcula el Id del Tercero */
+   
+   &strExisteReqIdTercero = "";
+   &ExisteUbicTer = "";
+   &ExisteAutCreaPed = "";
+   &ExisteItemReq = "";
+   &ExisteNatIdType = "";
+   
+   &rsMesReq = &MSG.GetRowset();
+   
+   If None(&rsMesReq(1).ETY_CREAPD_WRK.REQ_ID.Value) Then
+      &ETY_PO_RES = "Error 01: Campo REQ_ID es necesario. ";
+      Return &ETY_PO_RES;
+   Else
+      &ReqId = &rsMesReq(1).ETY_CREAPD_WRK.REQ_ID.Value;
+   End-If;
+   
+   If None(&rsMesReq(1).ETY_CREAPD_WRK.LC_TERCERO_ID.Value) Then
+      If None(&rsMesReq(1).ETY_CREAPD_WRK.NATIONAL_ID_TYPE.Value) Then
+         &ETY_PO_RES = "Error 02: Campo NATIONAL_ID_TYPE es necesario. ";
+         Return &ETY_PO_RES;
+      Else
+         &NationalIdType = &rsMesReq(1).ETY_CREAPD_WRK.NATIONAL_ID_TYPE.Value;
+         SQLExec("SELECT 'X' FROM PS_NID_TYPE_TBL WHERE COUNTRY = 'COL' AND NATIONAL_ID_TYPE = :1", &NationalIdType, &ExisteNatIdType);
+         If None(&ExisteNatIdType) Then
+            &ETY_PO_RES = "Error 03: El Tipo de documento no es valido. ";
+            Return &ETY_PO_RES;
+         End-If;
+      End-If;
+      If None(&rsMesReq(1).ETY_CREAPD_WRK.NATIONAL_ID.Value) Then
+         &ETY_PO_RES = "Error 04: Campo NATIONAL_ID es necesario. ";
+         Return &ETY_PO_RES;
+      Else
+         &NationalId = &rsMesReq(1).ETY_CREAPD_WRK.NATIONAL_ID.Value;
+      End-If;
+      
+      SQLExec("SELECT LC_TERCERO_ID FROM PS_LC_TERCERO_NID WHERE NATIONAL_ID_TYPE = :1 AND NATIONAL_ID = :2", &NationalIdType, &NationalId, &LcTerceroId);
+      If None(&LcTerceroId) Then
+         &ETY_PO_RES = "Error 05: El Número de Documento del prestador no existe en la base de datos.";
+         Return &ETY_PO_RES;
+      End-If;
+   Else
+      &LcTerceroId = &rsMesReq(1).ETY_CREAPD_WRK.LC_TERCERO_ID.Value;
+      SQLExec("SELECT 'X' FROM PS_LC_TERCERO WHERE LC_TERCERO_ID = :1", &LcTerceroId, &ExisteTer);
+      If None(&ExisteTer) Then
+         &ETY_PO_RES = "Error 06: El Id de Tercero del prestador no existe en la base de datos.";
+         Return &ETY_PO_RES;
+      End-If;
+   End-If;
+   
+   SQLExec("SELECT 'X' FROM PS_REQ_LN_DISTRIB WHERE BUSINESS_UNIT = 'PO593' AND REQ_ID = :1 AND CHARTFIELD3 = :2", &ReqId, &LcTerceroId, &strExisteReqIdTercero);
+   
+   If None(&strExisteReqIdTercero) Then
+      &ETY_PO_RES = "Error 07: El Id de Tercero no esta asociada a la solicitud.";
+      Return &ETY_PO_RES;
+   End-If;
+   
+   
+   
+   If None(&rsMesReq(1).ETY_CREAPD_WRK.VNDR_LOC.Value) Then
+      &ETY_PO_RES = "Error 08: Campo VNDR_LOC es necesario. ";
+      Return &ETY_PO_RES;
+   Else
+      &VendorLoc = &rsMesReq(1).ETY_CREAPD_WRK.VNDR_LOC.Value;
+      SQLExec("SELECT 'X' FROM PS_LC_CIUDAD_TBL WHERE LC_CIUDAD = :1", &VendorLoc, &ExisteLoc);
+      If None(&ExisteLoc) Then
+         &ETY_PO_RES = "Error 09: El valor del Campo VNDR_LOC no es valido. ";
+         Return &ETY_PO_RES;
+      End-If;
+      
+      SQLExec("SELECT 'X' FROM PS_VENDOR_LOC WHERE SETID = 'SHARE' AND VENDOR_ID = :1 AND VNDR_LOC = :2", &LcTerceroId, &VendorLoc, &ExisteUbicTer);
+      
+      If None(&ExisteUbicTer) Then
+         &ETY_PO_RES = "Error 10: La ubicación no está creada para el prestador relacionado.";
+         Return &ETY_PO_RES;
+      End-If;
+      
+   End-If;
+   
+   If None(&rsMesReq(1).ETY_CREAPD_WRK.BUYER_ID.Value) Then
+      &ETY_PO_RES = "Error 11: Campo BUYER_ID es necesario. ";
+      Return &ETY_PO_RES;
+   Else
+      &BuyerId = &rsMesReq(1).ETY_CREAPD_WRK.BUYER_ID.Value;
+      
+      SQLExec("SELECT 'X' FROM PS_OPR_DEF_TBL_PM A, PS_OPR_PO_BUYER B WHERE A.OPRID = B.OPRID AND A.OPRID = :1 AND A.PO_APPROVAL_AUTH = 'Y' AND B.ADD_AUTH = 'Y'", &BuyerId, &ExisteAutCreaPed);
+      If None(&ExisteAutCreaPed) Then
+         &ETY_PO_RES = "Error 12: El usuario no está autorizado para realizar el trámite. ";
+         Return &ETY_PO_RES;
+      End-If;
+   End-If;
+   
+   &Valor = &rsMesReq(1).ETY_CREAPD_WRK.DESCR254.Value;
+   
+   If None(&rsMesReq(1).ETY_CREAPD_WRK.INV_ITEM_ID.Value) Then
+      &ETY_PO_RES = "Error 13: Campo INV_ITEM_ID es necesario. ";
+      Return &ETY_PO_RES;
+   Else
+      &InvItmID = &rsMesReq(1).ETY_CREAPD_WRK.INV_ITEM_ID.Value;
+      SQLExec("SELECT 'X' FROM PS_MASTER_ITEM_TBL WHERE INV_ITEM_ID = :1", &InvItmID, &ExisteItem);
+      If None(&ExisteItem) Then
+         &ETY_PO_RES = "Error 14: El valor del Campo INV_ITEM_ID no es valido. ";
+         Return &ETY_PO_RES;
+      End-If;
+      
+      SQLExec("SELECT 'X' FROM PS_REQ_LINE WHERE BUSINESS_UNIT = 'PO593' AND REQ_ID = :1 AND INV_ITEM_ID = :2", &ReqId, &InvItmID, &ExisteItemReq);
+      If None(&ExisteItemReq) Then
+         &ETY_PO_RES = "Error 15: El Artículo no está relacionado a la solicitud.";
+         Return &ETY_PO_RES;
+      End-If;
+   End-If;
+   
+   SQLExec(SQL.ETY_SALDO_SOLICITUD_SQL, "PO593", &ReqId, &InvItmID, &numDispMerchandiseAmt, &numQtyReq);
+   
+   If None(&rsMesReq(1).ETY_CREAPD_WRK.ETY_VALOR_PAGO.Value) Then
+      &ETY_PO_RES = "Error 16: Campo ETY_VALOR_PAGO es necesario. ";
+      Return &ETY_PO_RES;
+   Else
+      &ValorPago = Value(&rsMesReq(1).ETY_CREAPD_WRK.ETY_VALOR_PAGO.Value);
+      If &ValorPago <= 0 Then
+         &ETY_PO_RES = "Error 17: El valor del Campo ETY_VALOR_PAGO no es valido. ";
+         Return &ETY_PO_RES;
+      End-If;
+      If &ValorPago > &numDispMerchandiseAmt Then
+         &ETY_PO_RES = "Error 18: El valor del pedido es mayor que el disponible. ";
+         Return &ETY_PO_RES;
+      End-If;
+   End-If;
+   
+   If None(&rsMesReq(1).ETY_CREAPD_WRK.QTY.Value) Then
+      &ETY_PO_RES = "Error 19: Campo QTY es necesario. ";
+      Return &ETY_PO_RES;
+   Else
+      &Cantidad = &rsMesReq(1).ETY_CREAPD_WRK.QTY.Value;
+      If &Cantidad <= 0 Then
+         &ETY_PO_RES = "Error 20: El valor del Campo QTY no es valido. ";
+         Return &ETY_PO_RES;
+      End-If;
+      If &Cantidad > &numQtyReq Then
+         &ETY_PO_RES = "Error 21: La cantidad del pedido es mayor que el disponible. ";
+         Return &ETY_PO_RES;
+      End-If;
+   End-If;
+   
+   &ETY_PO_RES = "";
+   &ExisteReqId = "";
+   SQLExec("SELECT 'X' FROM PS_REQ_HDR A, PS_REQ_LN_DISTRIB B  WHERE A.BUSINESS_UNIT = B.BUSINESS_UNIT AND A.REQ_ID = B.REQ_ID AND A.BUSINESS_UNIT = 'PO593' AND A.REQ_ID=:1", &ReqId, &ExisteReqId);
+   
+   If &ExisteReqId = "X" Then
+      &ETY_PO_RES = Func_Crear_Pedido(&MSG As Message);
+   Else
+      &ETY_PO_RES = "Error 22: La solicitud no fue encontrada. ";
+   End-If;
+   Return &ETY_PO_RES;
+End-Function;
+
