@@ -1,0 +1,164 @@
+import FS_ALLOCATIONS:DefnFields;
+import FS_ALLOCATIONS:Ledgers;
+
+Component FS_ALLOCATIONS:DefnFields &AppcDefnFields;
+Component FS_ALLOCATIONS:Ledgers &AppcLedgers;
+Component boolean &gBuildTarget, &gBuildOffset;
+Local array of string &TargFlds;
+Local integer &I, &J, &K;
+Local string &SQLSelect, &SQLFldsAET, &SQLWhere, &SQLWhere2, &SQLOrderBy, &CloseSQL, &Delm, &Delm2, &JLnStateRec, &IntraUnitCF;
+
+FS_ALLC_WRK_AET.WHERE_TXT_LONG = "";
+FS_ALLC_WRK_AET.FIELD_LIST = "";
+FS_ALLC_WRK_AET.FIELD_LIST2 = "";
+FS_ALLC_WRK_AET.ORDER_BY_LONG = "";
+FS_ALLC_GEN_AET.DUMMY_STMT = %DbType;
+
+&JLnStateRec = Record.FS_ALLC_JLN_AET;
+
+&TargFlds = CreateArrayRept(" ", 0);
+
+REM --> The fields in array &TargFlds are used to build the journal lines (each unique combination will have a different line).  This includes the target/offset fields, foreign currency, and ledger for multibook KLS off;
+
+REM --> Load Target fields;
+
+If &gBuildTarget Then
+   For &J = 1 To &AppcDefnFields.TargetFlds.Len;
+      &TargFlds.Push(&AppcDefnFields.TargetFlds [&J].FIELDNAME.Value);
+      REM --> For IntraUnit include intraunit fields (this is not the actual chartfield, it is the generic fieldname that is used as the place holder to store the intraunit value);
+      If &AppcDefnFields.IntraUnit Then
+         If &AppcLedgers.BalanceCF(FS_ALLC_STP_AET.TARGET_LEDGER, &AppcDefnFields.TargetFlds [&J].FIELDNAME.Value) Then
+            &K = &AppcLedgers.BalCFIdx;
+            &IntraUnitCF = &AppcLedgers.LedGrpBalCF [&K].FIELDNAME.Value;
+            If All(&IntraUnitCF) And
+                  &TargFlds.Find(&IntraUnitCF) = 0 Then
+               &TargFlds.Push(&IntraUnitCF);
+            End-If;
+         End-If;
+      End-If;
+   End-For;
+End-If;
+
+REM --> Load Offset fields;
+
+If &gBuildOffset Then
+   For &J = 1 To &AppcDefnFields.OffsetFlds.Len;
+      If &TargFlds.Find(&AppcDefnFields.OffsetFlds [&J].FIELDNAME.Value) = 0 Then
+         &TargFlds.Push(&AppcDefnFields.OffsetFlds [&J].FIELDNAME.Value);
+      End-If;
+      REM --> For IntraUnit include intraunit fields (this is not the actual chartfield, it is the generic fieldname that is used as the place holder to store the intraunit value);
+      If &AppcDefnFields.IntraUnit Then
+         If &AppcLedgers.BalanceCF(FS_ALLC_STP_AET.OFFSET_LEDGER, &AppcDefnFields.OffsetFlds [&J].FIELDNAME.Value) Then
+            &K = &AppcLedgers.BalCFIdx;
+            &IntraUnitCF = &AppcLedgers.LedGrpBalCF [&K].FIELDNAME.Value;
+            If All(&IntraUnitCF) And
+                  &TargFlds.Find(&IntraUnitCF) = 0 Then
+               &TargFlds.Push(&IntraUnitCF);
+            End-If;
+         End-If;
+      End-If;
+   End-For;
+End-If;
+
+REM --> Include Foreign Currency;
+
+If &TargFlds.Find(Field.FOREIGN_CURRENCY) = 0 Then
+   &TargFlds.Push(Field.FOREIGN_CURRENCY);
+End-If;
+
+REM --> MultiBook/KLS Off, Include Ledger;
+
+/*1589474000
+If FS_ALLC_LED_AET.LEDGERS_SYNC = "N" And
+      FS_ALLC_LED_AET.SECOND_LEDGERS = "Y" Then
+   If &TargFlds.Find(Field.LEDGER) = 0 Then
+      &TargFlds.Push(Field.LEDGER);
+   End-If;
+End-If; */
+
+REM --> String order by clause for MultiBook Ledger Groups;
+
+If FS_ALLC_LED_AET.SECOND_LEDGERS = "Y" Then
+   
+   REM --> Build order by string;
+   
+   For &J = 1 To &TargFlds.Len;
+      &SQLOrderBy = &SQLOrderBy | &Delm | "A." | &TargFlds [&J];
+      &Delm = ", ";
+   End-For;
+   
+   /*1589474000
+   If &TargFlds.Find(Field.LEDGER) = 0 Then
+      &SQLOrderBy = &SQLOrderBy | &Delm | "A." | Field.LEDGER;
+   End-If; */
+   
+End-If;
+
+REM --> String SQL;
+
+&Delm = "";
+For &J = 1 To &TargFlds.Len
+   
+   REM --> String fields to select in state record;
+   
+   &SQLFldsAET = &SQLFldsAET | &Delm | &JLnStateRec | "." | &TargFlds [&J];
+   &SQLSelect = &SQLSelect | &Delm | "A." | &TargFlds [&J];
+   
+   REM --> String update join clause;
+   
+   &SQLWhere = &SQLWhere | " AND " | &TargFlds [&J] | " = %Bind(" | &JLnStateRec | "." | &TargFlds [&J] | ")";
+   If &TargFlds [&J] = Field.FOREIGN_CURRENCY And
+         FS_ALLC_OUT_AET.TRANSL_LEDGER = "Y" Then
+      &SQLWhere2 = &SQLWhere2 | &Delm | "A.BASE_CURRENCY";
+   Else
+      &SQLWhere2 = &SQLWhere2 | &Delm | "A." | &TargFlds [&J];
+   End-If;
+   &Delm = ", ";
+End-For;
+
+REM --> Add order by fields to select list (required for Informix)for MultiBook Ledger Groups;
+
+/*1589474000
+If FS_ALLC_LED_AET.SECOND_LEDGERS = "Y" Then
+   If &TargFlds.Find(Field.LEDGER) = 0 Then
+      &SQLFldsAET = &SQLFldsAET | ", " | &JLnStateRec | "." | Field.LEDGER;
+      &SQLSelect = &SQLSelect | ", " | "A." | Field.LEDGER;
+   End-If
+End-If; */
+
+
+REM --> Update target lines only;
+
+If &gBuildTarget And
+      Not (&gBuildOffset) Then
+   REM --> Only string logical record if not one sided journal (no offset), otherwise the logical record field is blank;
+   If All(FS_ALLC_STP_AET.OFFSET_TYPE) Then
+      &SQLWhere = " AND " | Field.LOGICAL_RECORD | " = 'T'" | &SQLWhere;
+   End-If;
+End-If;
+
+REM --> Update offset lines only;
+
+If &gBuildOffset And
+      Not (&gBuildTarget) Then
+   REM --> Only string logical record if not one sided journal (no target), otherwise the logical record field is blank;
+   If All(FS_ALLC_STP_AET.TARGET_TYPE) Then
+      &SQLWhere = " AND " | Field.LOGICAL_RECORD | " = 'O'" | &SQLWhere;
+   End-If;
+End-If;
+
+REM --> Assign where clause for subquery;
+
+
+FS_ALLC_WRK_AET.FIELD_LIST = &SQLFldsAET;
+FS_ALLC_WRK_AET.FIELD_LIST2 = &SQLSelect;
+FS_ALLC_WRK_AET.WHERE_TXT_LONG = &SQLWhere;
+FS_ALLC_WRK_AET.WHERE_TXT_LONG2 = &SQLWhere2;
+MessageBox(0, "", 0, 0, "FS_ALLC_WRK_AET.WHERE_TXT_LONG2 = %1 ", FS_ALLC_WRK_AET.WHERE_TXT_LONG2.Value);
+If All(&SQLOrderBy) Then
+   FS_ALLC_WRK_AET.ORDER_BY_LONG = " ORDER BY " | &SQLOrderBy;
+End-If;
+
+REM --> Intialize line number to 1;
+
+FS_ALLC_JHD_AET.JOURNAL_LINE = 1;

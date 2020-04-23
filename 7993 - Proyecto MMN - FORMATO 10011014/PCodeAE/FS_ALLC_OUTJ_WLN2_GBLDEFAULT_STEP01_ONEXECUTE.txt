@@ -1,0 +1,26 @@
+Component boolean &gBuildTarget, &gBuildOffset;
+
+REM FS_ALLC_GEN_AET.FIELD_LIST = " rank() over (partition by A." | Field.BUSINESS_UNIT_IU | ",A." | Field.FISCAL_YEAR | ",A." | Field.ACCOUNTING_PERIOD | " order by A." | Field.BUSINESS_UNIT_IU | ",A." | Field.FISCAL_YEAR | ",A." | Field.ACCOUNTING_PERIOD | ",A." | Field.BUSINESS_UNIT | "," | FS_ALLC_WRK_AET.WHERE_TXT_LONG2 | ")";
+REM FS_ALLC_GEN_AET.FIELD_LIST = " rank() over (partition by A." | Field.BUSINESS_UNIT_IU | ",A." | Field.FISCAL_YEAR | ",A." | Field.ACCOUNTING_PERIOD | " order by A." | Field.BUSINESS_UNIT_IU | ",A." | Field.FISCAL_YEAR | ",A." | Field.ACCOUNTING_PERIOD | ",A." | Field.BUSINESS_UNIT | ",A." | Field.LEDGER | ",A." | Field.RATE_MULT | "," | FS_ALLC_WRK_AET.WHERE_TXT_LONG2 | ")";
+FS_ALLC_GEN_AET.FIELD_LIST = " ROW_NUMBER() over (partition by A." | Field.BUSINESS_UNIT_IU | ",A." | Field.FISCAL_YEAR | ",A." | Field.ACCOUNTING_PERIOD | " order by A." | Field.BUSINESS_UNIT_IU | ",A." | Field.FISCAL_YEAR | ",A." | Field.ACCOUNTING_PERIOD | ",A." | Field.BUSINESS_UNIT | "," | FS_ALLC_WRK_AET.WHERE_TXT_LONG2 | ")";
+FS_ALLC_GEN_AET.DUMMY_STMT = "";
+
+REM --> Update target lines only;
+
+If &gBuildTarget And
+      Not (&gBuildOffset) Then
+   REM --> Only string logical record if not one sided journal (no offset), otherwise the logical record field is blank;
+   If All(FS_ALLC_STP_AET.OFFSET_TYPE) Then
+      FS_ALLC_GEN_AET.DUMMY_STMT = " AND " | Field.LOGICAL_RECORD | " = 'T'";
+   End-If;
+End-If;
+
+REM --> Update offset lines only;
+
+If &gBuildOffset And
+      Not (&gBuildTarget) Then
+   REM --> Only string logical record if not one sided journal (no target), otherwise the logical record field is blank;
+   If All(FS_ALLC_STP_AET.TARGET_TYPE) Then
+      FS_ALLC_GEN_AET.DUMMY_STMT = " AND " | Field.LOGICAL_RECORD | " = 'O'";
+   End-If;
+End-If;

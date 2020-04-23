@@ -1,0 +1,236 @@
+import FS_ALLOCATIONS:DefnFields;
+import FS_ALLOCATIONS:Ledgers;
+import FS_ALLOCATIONS:CCFields;
+import FS_ALLOCATIONS:DynCCFlds;
+
+Component FS_ALLOCATIONS:DefnFields &AppcDefnFields;
+Component FS_ALLOCATIONS:Ledgers &AppcLedgers;
+Component FS_ALLOCATIONS:CCFields &AppcCCFields;
+Component FS_ALLOCATIONS:DynCCFlds &AppcDynCC;
+Component boolean &gBalanceOffset, &gDiffOffsetTAO;
+Local Record &TargetTAO, &CCRec, &StateRec;
+Local integer &I, &J, &CorrPos;
+Local string &SQLFlds, &SQLFlds_AET, &SQLFrom, &SQLWhereS, &SQLWhere1, &SQLWhere2, &SQLSet1, &SQLSet2;
+Local string &Delm, &Delm2, &RecStr, &CCFld, &CorrStr, &CorrID, &AmtFld, &SavAmtFld, &OperStr1, &OperStr2;
+Local boolean &UseRateFactor, &RoundAmount;
+
+&CCRec = CreateRecord(Record.CURRENCY_CD_TBL);
+&StateRec = CreateRecord(Record.FS_ALLC_DYN_AET);
+
+If &gDiffOffsetTAO Then
+   FS_ALLC_GEN_AET.RECNAME = FS_ALLC_STP_AET.RECNAME_OFFSET_TAO;
+Else
+   FS_ALLC_GEN_AET.RECNAME = FS_ALLC_STP_AET.RECNAME_ALLOC_WRK;
+End-If;
+
+&UseRateFactor = False;
+
+&RecStr = "RECORD." | FS_ALLC_GEN_AET.RECNAME;
+&TargetTAO = CreateRecord(@(&RecStr));
+
+If FS_ALLC_STP_AET.ALLOC_ROUND_OPTN <> "4" Then
+   &RoundAmount = True;
+   
+   Rem *** Round up;
+   If FS_ALLC_STP_AET.ALLOC_ROUND_OPTN = "2" Then
+      &UseRateFactor = True;
+      &OperStr1 = " + ";
+      &OperStr2 = " - ";
+   End-If;
+   
+   Rem *** Round down;
+   If FS_ALLC_STP_AET.ALLOC_ROUND_OPTN = "3" Then
+      &UseRateFactor = True;
+      &OperStr1 = " - ";
+      &OperStr2 = " + ";
+   End-If;
+End-If;
+
+
+Rem *** String currency control fields;
+
+&CorrStr = "BCDEFGHIJKLMNOPQRSTUVWXYZ";
+&CorrPos = 1;
+&SQLWhereS = "";
+&SQLWhere1 = "";
+&SQLWhere2 = "";
+&SQLSet1 = "";
+&SQLSet2 = "";
+
+For &J = 1 To &AppcDefnFields.AmtFlds.Len;
+   
+   If All(&AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET.Value) Then
+      Rem *** Get CC field;
+      &AmtFld = &AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET.Value;
+      &SavAmtFld = &AmtFld;
+      &CCFld = &AppcCCFields.GetCCField(&AmtFld);
+      
+      If All(&CCFld) Then
+         &CorrID = Substring(&CorrStr, &CorrPos, 1);
+         
+         Rem *** Get dynamic CC state record fields;
+         If &AppcDynCC.GetCCFld(&CCFld) Then
+            &SQLFlds_AET = &SQLFlds_AET | &Delm | &StateRec.Name | "." | &AppcDynCC.CCFld | ", " | &StateRec.Name | "." | &AppcDynCC.DecPosFld;
+            &SQLFlds = &SQLFlds | &Delm | "A." | &CCFld | ", " | &CorrID | "." | Field.DECIMAL_POSITIONS;
+            &SQLFrom = &SQLFrom | ", %Table(" | &CCRec.Name | ") " | &CorrID;
+            &SQLWhereS = &SQLWhereS | &Delm2 | "A." | &CCFld | " = " | &CorrID | "." | Field.CURRENCY_CD;
+            &SQLWhere1 = &SQLWhere1 | &Delm2 | &CCFld | " = " | "%Bind(" | &StateRec.Name | "." | &AppcDynCC.CCFld | ")";
+            &SQLWhere2 = &SQLWhere2 | &Delm2 | &CCFld | " = " | "%Bind(" | &StateRec.Name | "." | &AppcDynCC.CCFld | ")";
+            
+            If &RoundAmount Then
+               If &UseRateFactor Then
+                  &SQLSet1 = &SQLSet1 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | &OperStr1 | " %Bind(" | &StateRec.Name | "." | &AppcDynCC.RateFld | ")" | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+                  &SQLSet2 = &SQLSet2 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | &OperStr2 | " %Bind(" | &StateRec.Name | "." | &AppcDynCC.RateFld | ")" | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+               Else
+                  &SQLSet1 = &SQLSet1 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+                  &SQLSet2 = &SQLSet2 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+               End-If
+            Else
+               &SQLSet1 = &SQLSet1 | &Delm | &AmtFld | " =  %Truncate(" | &AmtFld | ", %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+               &SQLSet2 = &SQLSet2 | &Delm | &AmtFld | " =  %Truncate(" | &AmtFld | ", %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+            End-If;
+            &Delm = ", ";
+            &Delm2 = " AND ";
+            &CorrPos = &CorrPos + 1;
+         Else
+            FS_ALLC_AET.STATUS = "E";
+            GL_LOG_MSG_AET.MESSAGE_SET_NBR = 5810;
+            GL_LOG_MSG_AET.MESSAGE_NBR = 59;
+            GL_LOG_MSG_AET.MESSAGE_PARM1 = &AmtFld;
+            GL_LOG_MSG_AET.MESSAGE_PARM2 = FS_ALLC_GEN_AET.RECNAME;
+            GL_LOG_MSG_AET.MESSAGE_PARM3 = FS_ALLC_STP_AET.PROCESS_STEP;
+            Exit (1);
+         End-If;
+      End-If;
+   End-If;
+   
+   If All(&AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET_B.Value) And
+         (&AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET_B.Value <> &AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET.Value) Then
+      Rem *** Get CC field;
+      &AmtFld = &AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET_B.Value;
+      &CCFld = &AppcCCFields.GetCCField(&AmtFld);
+      
+      If All(&CCFld) Then
+         &CorrID = Substring(&CorrStr, &CorrPos, 1);
+         Rem *** Get dynamic CC state record fields;
+         If &AppcDynCC.GetCCFld(&CCFld) Then
+            &SQLFlds_AET = &SQLFlds_AET | &Delm | &StateRec.Name | "." | &AppcDynCC.CCFld | ", " | &StateRec.Name | "." | &AppcDynCC.DecPosFld;
+            &SQLFlds = &SQLFlds | &Delm | "A." | &CCFld | ", " | &CorrID | "." | Field.DECIMAL_POSITIONS;
+            &SQLFrom = &SQLFrom | ", %Table(" | &CCRec.Name | ") " | &CorrID;
+            &SQLWhereS = &SQLWhereS | &Delm2 | "A." | &CCFld | " = " | &CorrID | "." | Field.CURRENCY_CD;
+            &SQLWhere1 = &SQLWhere1 | &Delm2 | &CCFld | " = " | "%Bind(" | &StateRec.Name | "." | &AppcDynCC.CCFld | ")";
+            &SQLWhere2 = &SQLWhere2 | &Delm2 | &CCFld | " = " | "%Bind(" | &StateRec.Name | "." | &AppcDynCC.CCFld | ")";
+            
+            If &RoundAmount Then
+               If &UseRateFactor Then
+                  &SQLSet1 = &SQLSet1 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | &OperStr1 | " %Bind(" | &StateRec.Name | "." | &AppcDynCC.RateFld | ")" | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+                  &SQLSet2 = &SQLSet2 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | &OperStr2 | " %Bind(" | &StateRec.Name | "." | &AppcDynCC.RateFld | ")" | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+               Else
+                  &SQLSet1 = &SQLSet1 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+                  &SQLSet2 = &SQLSet2 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+               End-If
+            Else
+               &SQLSet1 = &SQLSet1 | &Delm | &AmtFld | " =  %Truncate(" | &AmtFld | ", %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+               &SQLSet2 = &SQLSet2 | &Delm | &AmtFld | " =  %Truncate(" | &AmtFld | ", %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+            End-If;
+            &Delm = ", ";
+            &Delm2 = " AND ";
+            &CorrPos = &CorrPos + 1;
+         Else
+            FS_ALLC_AET.STATUS = "E";
+            GL_LOG_MSG_AET.MESSAGE_SET_NBR = 5810;
+            GL_LOG_MSG_AET.MESSAGE_NBR = 59;
+            GL_LOG_MSG_AET.MESSAGE_PARM1 = &AmtFld;
+            GL_LOG_MSG_AET.MESSAGE_PARM2 = FS_ALLC_GEN_AET.RECNAME;
+            GL_LOG_MSG_AET.MESSAGE_PARM3 = FS_ALLC_STP_AET.PROCESS_STEP;
+            Exit (1);
+         End-If;
+      End-If;
+   End-If;
+   
+   If All(&AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET_T.Value) And
+         (&AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET_T.Value <> &AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET.Value) And
+         (&AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET_T.Value <> &AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET_B.Value) Then
+      Rem *** Get CC field;
+      &AmtFld = &AppcDefnFields.AmtFlds [&J].FIELDNAME_OFFSET_T.Value;
+      &CCFld = &AppcCCFields.GetCCField(&AmtFld);
+      
+      If All(&CCFld) Then
+         &CorrID = Substring(&CorrStr, &CorrPos, 1);
+         Rem *** Get dynamic CC state record fields;
+         If &AppcDynCC.GetCCFld(&CCFld) Then
+            &SQLFlds_AET = &SQLFlds_AET | &Delm | &StateRec.Name | "." | &AppcDynCC.CCFld | ", " | &StateRec.Name | "." | &AppcDynCC.DecPosFld;
+            &SQLFlds = &SQLFlds | &Delm | "A." | &CCFld | ", " | &CorrID | "." | Field.DECIMAL_POSITIONS;
+            &SQLFrom = &SQLFrom | ", %Table(" | &CCRec.Name | ") " | &CorrID;
+            &SQLWhereS = &SQLWhereS | &Delm2 | "A." | &CCFld | " = " | &CorrID | "." | Field.CURRENCY_CD;
+            &SQLWhere1 = &SQLWhere1 | &Delm2 | &CCFld | " = " | "%Bind(" | &StateRec.Name | "." | &AppcDynCC.CCFld | ")";
+            &SQLWhere2 = &SQLWhere2 | &Delm2 | &CCFld | " = " | "%Bind(" | &StateRec.Name | "." | &AppcDynCC.CCFld | ")";
+            
+            If &RoundAmount Then
+               If &UseRateFactor Then
+                  &SQLSet1 = &SQLSet1 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | &OperStr1 | " %Bind(" | &StateRec.Name | "." | &AppcDynCC.RateFld | ")" | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+                  &SQLSet2 = &SQLSet2 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | &OperStr2 | " %Bind(" | &StateRec.Name | "." | &AppcDynCC.RateFld | ")" | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+               Else
+                  &SQLSet1 = &SQLSet1 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+                  &SQLSet2 = &SQLSet2 | &Delm | &AmtFld | " =  %Round(%DecMult(" | &AmtFld | ", 1.0), %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+               End-If
+            Else
+               &SQLSet1 = &SQLSet1 | &Delm | &AmtFld | " =  %Truncate(" | &AmtFld | ", %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+               &SQLSet2 = &SQLSet2 | &Delm | &AmtFld | " =  %Truncate(" | &AmtFld | ", %Bind(" | &StateRec.Name | "." | &AppcDynCC.DecPosFld | "))";
+            End-If;
+            &Delm = ", ";
+            &Delm2 = " AND ";
+            &CorrPos = &CorrPos + 1;
+         Else
+            FS_ALLC_AET.STATUS = "E";
+            GL_LOG_MSG_AET.MESSAGE_SET_NBR = 5810;
+            GL_LOG_MSG_AET.MESSAGE_NBR = 59;
+            GL_LOG_MSG_AET.MESSAGE_PARM1 = &AmtFld;
+            GL_LOG_MSG_AET.MESSAGE_PARM2 = FS_ALLC_GEN_AET.RECNAME;
+            GL_LOG_MSG_AET.MESSAGE_PARM3 = FS_ALLC_STP_AET.PROCESS_STEP;
+            Exit (1);
+         End-If;
+      End-If;
+   End-If;
+   
+End-For;
+
+If All(&SQLWhereS) Then
+   &SQLWhereS = " AND " | &SQLWhereS | " AND " | Field.LOGICAL_RECORD | " = 'O'";
+Else
+   &SQLWhereS = " AND " | Field.LOGICAL_RECORD | " = 'O'";
+End-If;
+
+If All(&SQLWhere1) Then
+   &SQLWhere1 = " AND " | &SQLWhere1 | " AND " | Field.LOGICAL_RECORD | " IN ('O','Q')";
+   &SQLWhere2 = " AND " | &SQLWhere2 | " AND " | Field.LOGICAL_RECORD | " IN ('O','Q')";
+Else
+   &SQLWhere1 = " AND " | Field.LOGICAL_RECORD | " IN ('O','Q')";
+   &SQLWhere2 = " AND " | Field.LOGICAL_RECORD | " IN ('O','Q')";
+End-If;
+
+If &UseRateFactor And
+      All(&SavAmtFld) Then
+   &SQLWhere1 = &SQLWhere1 | " AND " | &SavAmtFld | " > 0.0";
+   &SQLWhere2 = &SQLWhere2 | " AND " | &SavAmtFld | " < 0.0";
+End-If;
+
+Rem *** String used to Select the distinct currency control field data;
+
+If All(&SQLFlds) And
+      All(&SQLFlds_AET) Then
+   FS_ALLC_WRK_AET.FIELD_LIST = &SQLFlds;
+   FS_ALLC_WRK_AET.FIELD_LIST2 = &SQLFlds_AET;
+Else
+   Exit (1);
+End-If;
+
+FS_ALLC_WRK_AET.SQL_TEXT_LONG = &SQLFrom;
+FS_ALLC_WRK_AET.WHERE_TXT_LONG = &SQLWhereS;
+
+Rem *** String used to build Update SQL;
+FS_ALLC_WRK_AET.WHERE_TXT_LONG2 = &SQLWhere1;
+FS_ALLC_WRK_AET.HAVING_TXT_LONG = &SQLWhere2;
+FS_ALLC_WRK_AET.UPDATE_CLAUSE_LONG = &SQLSet1;
+FS_ALLC_WRK_AET.SQL_TEXT_LONG2 = &SQLSet2;
+MessageBox(0, "", 0, 0, "FS_ALLC_WRK_AET.WHERE_TXT_LONG2 = ", FS_ALLC_WRK_AET.WHERE_TXT_LONG2.Value);
