@@ -1,0 +1,3 @@
+If VCHR_HDR_WRK.XFR_WTHD_ERR_PB.Style = "PSERROR" Then
+   Error ("Debe validar las retenciones a reversar. ");
+End-If;

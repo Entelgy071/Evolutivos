@@ -1,0 +1,7 @@
+If AP_REALTIME_AET.EXIST <> "X" Then
+   /*** Set message number and parameters to log the process terminated error message ***/
+   AP_REALTIME_AET.MESSAGE_NBR = 3;
+   AP_REALTIME_AET.MESSAGE_PARM1 = AP_REALTIME_AET.RUN_CNTL_ID;
+   AP_REALTIME_AET.MESSAGE_PARM2 = AP_REALTIME_AET.OPRID;
+   Exit 1;
+End-If;

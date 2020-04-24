@@ -1,0 +1,80 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 001       ETY_ERP_AP_EVO_90595     John Diaz          09 dic 2019       Se inicializa la pagina con los datos de las retenciones 
+                                                                         del anticipo.
+*************************************************************************************************************************************/
+/*Inicio 001*/
+Function Dsply_RevInfo()
+   Local Rowset &RowVCHR_LIN, &RowVHR_WTHD;
+   Local SQL &CIIU_CM, &VCHR_LINE_WTHD;
+   Local string &BU, &VOUCHER_ID;
+   Local boolean &CIIU;
+   
+   &BU = VOUCHER.BUSINESS_UNIT.Value;
+   &VOUCHER_ID = VOUCHER.VOUCHER_ID.Value;
+   
+   SQLExec("SELECT PREPAID_APPLIED_BU, PREPAID_APPL_VCHR FROM PS_PYMNT_VCHR_XREF WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND PYMNT_CNT = 1", &BU, &VOUCHER_ID, &APPLIED_BU, &APPL_VCHR);
+   
+   If All(&APPL_VCHR) Then
+      
+      SQLExec("SELECT INVOICE_ID, VENDOR_ID, VAT_ENTITY, INVOICE_DT, VENDOR_SETID FROM PS_VOUCHER WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", &APPLIED_BU, &APPL_VCHR, &INVOICE_ID, &VENDOR_ID, &VAT_ENTITY, &INVOICE_DT, &SETID);
+      
+      ETY_VOUCHER_WK.BUSINESS_UNIT.Value = &APPLIED_BU;
+      ETY_VOUCHER_WK.VOUCHER_ID.Value = &APPL_VCHR;
+      ETY_VOUCHER_WK.INVOICE_ID.Value = &INVOICE_ID;
+      ETY_VOUCHER_WK.VENDOR_ID.Value = &VENDOR_ID;
+      ETY_VOUCHER_WK.VAT_ENTITY.Value = &VAT_ENTITY;
+      ETY_VOUCHER_WK.INVOICE_DT.Value = &INVOICE_DT;
+      
+      &RowVHR_WTHD = GetLevel0().GetRow(1).GetRowset(Scroll.ETY_REV_RET_TBL);
+      &RowVHR_WTHD.Flush();
+      
+      SQLExec("SELECT DISTINCT VOUCHER_LINE_NUM FROM PS_VCHR_LINE_WTHD WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", &APPLIED_BU, &APPL_VCHR, &LINE_NUM);
+      
+      SQLExec("SELECT A.WTHD_CD, A.WTHD_SW, B.LC_C_CIIU_4 FROM PS_VOUCHER_LINE A, PS_ETY_ART_CIIU_CM B WHERE A.BUSINESS_UNIT = B.BUSINESS_UNIT AND A.VOUCHER_ID = B.VOUCHER_ID AND A.VOUCHER_LINE_NUM = B.VOUCHER_LINE_NUM AND A.BUSINESS_UNIT = :1 AND A.VOUCHER_ID = :2 AND A.VOUCHER_LINE_NUM = :3", &APPLIED_BU, &APPL_VCHR, &LINE_NUM, &WTHD_CD, &WTHD_SW, &C_CIIU_APPL);
+      
+      ETY_VOUCHER_WK.VOUCHER_LINE_NUM.Value = &LINE_NUM;
+      ETY_VOUCHER_WK.WTHD_SW.Value = &WTHD_SW;
+      ETY_VOUCHER_WK.WTHD_CD.Value = &WTHD_CD;
+      ETY_VOUCHER_WK.LC_C_CIIU_4.Value = &C_CIIU_APPL;
+      &CIIU = False;
+      
+      &CIIU_CM = CreateSQL("SELECT VOUCHER_LINE_NUM, LC_C_CIIU_4 FROM PS_ETY_ART_CIIU_CM WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", &BU, &VOUCHER_ID);
+      
+      While &CIIU_CM.Fetch(&VOUCHER_LINE_NUM, &C_CIIU)
+         If &C_CIIU_APPL = &C_CIIU Then
+            &CIIU = True;
+            &LINE_CIIU = &VOUCHER_LINE_NUM;
+         End-If;
+      End-While;
+      
+      &RowVHR_WTHD.Select(Record.VCHR_LINE_WTHD, "WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND VOUCHER_LINE_NUM =:3", &APPLIED_BU, &APPL_VCHR, &LINE_NUM);
+      
+      For &i = &RowVHR_WTHD.ActiveRowCount To 1 Step - 1
+         &RowVHR_WTHD.GetRow(&i).ETY_VOUCHER_WK.VENDOR_SETID.Value = &SETID;
+         &RowVHR_WTHD.GetRow(&i).ETY_REV_RET_TBL.BUSINESS_UNIT_FROM.Value = &BU;
+         &RowVHR_WTHD.GetRow(&i).ETY_REV_RET_TBL.VOUCHER_ID_FROM.Value = &VOUCHER_ID;
+         
+         If &CIIU Then
+            &ENTITY = &RowVHR_WTHD.GetRow(&i).ETY_REV_RET_TBL.WTHD_ENTITY.Value;
+            &TYPE = &RowVHR_WTHD.GetRow(&i).ETY_REV_RET_TBL.WTHD_TYPE.Value;
+            &JUR_CD = &RowVHR_WTHD.GetRow(&i).ETY_REV_RET_TBL.WTHD_JUR_CD.Value;
+            &CLASS = &RowVHR_WTHD.GetRow(&i).ETY_REV_RET_TBL.WTHD_CLASS.Value;
+            
+            SQLExec("SELECT 'X' FROM PS_VCHR_LINE_WTHD WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND VOUCHER_LINE_NUM = :3 AND WTHD_ENTITY = :4 AND WTHD_TYPE = :5 AND WTHD_JUR_CD = :6 AND WTHD_CLASS = :7", &BU, &VOUCHER_ID, &LINE_CIIU, &ENTITY, &TYPE, &JUR_CD, &CLASS, &ALL_RET);
+            
+            If All(&ALL_RET) And
+                  &CIIU Then
+               &RowVHR_WTHD.DeleteRow(&i);
+            End-If;
+            
+         End-If;
+      End-For;
+   End-If;
+End-Function;
+
+VCHR_HDR_WRK.XFR_WTHD_ERR_PB.Style = "PSHYPERLINK";
+Dsply_RevInfo();
+TransferPanel(Panel.ETY_VCHR_WTHD_EXP);
+/*Inicio 001*/

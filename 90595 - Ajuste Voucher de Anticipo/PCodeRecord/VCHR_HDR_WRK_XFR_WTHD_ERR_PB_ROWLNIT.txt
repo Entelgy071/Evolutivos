@@ -1,0 +1,63 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 001       ETY_ERP_AP_EVO_90595     John Diaz          09 dic 2019       Se habilita botón que activa la pagina de las retenciones 
+                                                                         del anticipo
+*************************************************************************************************************************************/
+/*Inicio 001*/
+Local SQL &CIIU_CM, &VCHR_LINE;
+Local boolean &RETENCION, &CIIU, &EX_RET;
+Local string &BU_ORG, &VOUCHER_ID_ORG;
+
+Hide(VCHR_HDR_WRK.XFR_WTHD_ERR_PB);
+
+If VOUCHER.POST_STATUS_AP.Value <> "P" Then
+   
+   SQLExec("SELECT PREPAID_APPLIED_BU, PREPAID_APPL_VCHR FROM PS_PYMNT_VCHR_XREF WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND PYMNT_CNT = 1", VOUCHER.BUSINESS_UNIT.Value, VOUCHER.VOUCHER_ID.Value, &APPLIED_BU, &APPL_VCHR);
+   
+   SQLExec("SELECT 'X' FROM PS_PYMNT_VCHR_WTHD WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", &APPLIED_BU, &APPL_VCHR, &EX_RETENCION);
+   
+   If All(&APPL_VCHR) And
+         All(&EX_RETENCION) Then
+      &CIIU = False;
+      &EX_RET = False;
+      
+      SQLExec("SELECT LC_C_CIIU_4 FROM PS_ETY_ART_CIIU_CM WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND VOUCHER_LINE_NUM = :3", &APPLIED_BU, &APPL_VCHR, 1, &C_CIIU_APPL);
+      
+      &CIIU_CM = CreateSQL("SELECT VOUCHER_LINE_NUM, LC_C_CIIU_4 FROM PS_ETY_ART_CIIU_CM WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", VOUCHER.BUSINESS_UNIT.Value, VOUCHER.VOUCHER_ID.Value);
+      
+      While &CIIU_CM.Fetch(&VOUCHER_LINE_NUM, &C_CIIU)
+         If &C_CIIU_APPL = &C_CIIU And
+               Not &EX_RET Then
+            &CIIU = True;
+            &RETENCION = True;
+            &LINE_CIIU = &VOUCHER_LINE_NUM;
+            
+            &VCHR_LINE = CreateSQL("SELECT WTHD_ENTITY, WTHD_TYPE, WTHD_JUR_CD, WTHD_CLASS FROM PS_VCHR_LINE_WTHD WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", &APPLIED_BU, &APPL_VCHR);
+            
+            While &VCHR_LINE.Fetch(&ENTITY, &TYPE, &JUR_CD, &CLASS)
+               
+               SQLExec("SELECT 'X' FROM PS_VCHR_LINE_WTHD WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND VOUCHER_LINE_NUM = :3 AND WTHD_ENTITY = :4 AND WTHD_TYPE = :5 AND WTHD_JUR_CD = :6 AND WTHD_CLASS = :7", VOUCHER.BUSINESS_UNIT.Value, VOUCHER.VOUCHER_ID.Value, &VOUCHER_LINE_NUM, &ENTITY, &TYPE, &JUR_CD, &CLASS, &ALL_RET);
+               
+               If None(&ALL_RET) Then
+                  &RETENCION = False;
+               End-If;
+            End-While;
+            
+            If &RETENCION Then
+               &EX_RET = True;
+            End-If;
+            
+         End-If;
+      End-While;
+      
+      If Not &EX_RET Or
+            Not &CIIU Then
+         MessageBox(0, "", 0, 0, "Se encuentras diferencias de retenciones con el anticipo.");
+         VCHR_HDR_WRK.XFR_WTHD_ERR_PB.Style = "PSERROR";
+         VCHR_HDR_WRK.XFR_WTHD_ERR_PB.Visible = True;
+      End-If;
+      
+   End-If;
+End-If;
+/*Fin 001*/

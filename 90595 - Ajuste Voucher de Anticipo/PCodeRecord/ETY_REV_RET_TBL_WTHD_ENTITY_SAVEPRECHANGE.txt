@@ -1,0 +1,46 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 001       ETY_ERP_AP_EVO_90595     John Diaz          09 dic 2019       Se inicializa la pagina con los datos de las retenciones 
+                                                                         del anticipo.
+*************************************************************************************************************************************/
+/*Inicio 001*/
+Local Rowset &RowVCHR_LIN, &RowVHR_WTHD;
+Local SQL &VCHR_LINE_WTHD;
+Local Record &recRevRet, &recUpdate, &recRevLine;
+
+&RowVHR_WTHD = GetLevel0().GetRow(1).GetRowset(Scroll.ETY_REV_RET_TBL);
+&recRevRet = CreateRecord(Record.ETY_REV_RET_TBL);
+&recUpdate = CreateRecord(Record.ETY_REV_RET_TBL);
+
+For &i = 1 To &RowVHR_WTHD.ActiveRowCount
+   &recRevLine = &RowVHR_WTHD.GetRow(&i).GetRecord(Record.ETY_REV_RET_TBL);
+   
+   If &recRevLine.VOUCHER_LINE_NUM.Value > 0 Then
+      &recRevRet.BUSINESS_UNIT.Value = &recRevLine.BUSINESS_UNIT.Value;
+      &recRevRet.VOUCHER_ID.Value = &recRevLine.VOUCHER_ID.Value;
+      &recRevRet.VOUCHER_LINE_NUM.Value = &recRevLine.VOUCHER_LINE_NUM.Value;
+      &recRevRet.WTHD_ENTITY.Value = &recRevLine.WTHD_ENTITY.Value;
+      &recRevRet.WTHD_TYPE.Value = &recRevLine.WTHD_TYPE.Value;
+      &recRevRet.WTHD_JUR_CD.Value = &recRevLine.WTHD_JUR_CD.Value;
+      &recRevRet.WTHD_CLASS.Value = &recRevLine.WTHD_CLASS.Value;
+      
+      If &recRevRet.SelectByKey() Then
+         &recUpdate.WTHD_RULE.Value = &recRevLine.WTHD_RULE.Value;
+         &recUpdate.WTHD_BASIS_AMT.Value = &recRevLine.WTHD_BASIS_AMT.Value;
+         &recUpdate.WTHD_SW.Value = &recRevLine.WTHD_SW.Value;
+         &recUpdate.WTHD_APPL_FLG.Value = &recRevLine.WTHD_APPL_FLG.Value;
+         &recUpdate.WTHD_CONT_REF.Value = &recRevLine.WTHD_CONT_REF.Value;
+         &recUpdate.WTHD_CALC_BASIS.Value = &recRevLine.WTHD_CALC_BASIS.Value;
+         &recUpdate.BUSINESS_UNIT_FROM.Value = &recRevLine.BUSINESS_UNIT_FROM.Value;
+         &recUpdate.VOUCHER_ID_FROM.Value = &recRevLine.VOUCHER_ID_FROM.Value;
+         &recUpdate.Update(&recRevRet);
+      Else
+         &recRevLine.Insert();
+      End-If;
+      
+   End-If;
+   
+End-For;
+
+/*Inicio 001*/

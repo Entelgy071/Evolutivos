@@ -1,0 +1,13 @@
+/**********************************************************************************
+Proyecto: 		ETY_ERP_AP_EVO_90595
+Fecha: 			6/12/2019
+Responsable: 	John Diaz
+Descripción: 	Descripción Regla Retención
+Referencia:		001
+/************************************************************************/
+/*Inicio 001*/
+SQLExec(SQL.ETY_DESC_RULE_RET, ETY_REV_RET_TBL.WTHD_ENTITY.Value, ETY_REV_RET_TBL.WTHD_TYPE.Value, ETY_REV_RET_TBL.WTHD_JUR_CD.Value, ETY_REV_RET_TBL.WTHD_CLASS.Value, &porcentajeRetenido, &Descr);
+
+ETY_VOUCHER_WK.ETY_PRCNT_WTHHLD.Value = &porcentajeRetenido;
+ETY_VOUCHER_WK.DESCR.Value = &Descr;
+/*Fin 001*/

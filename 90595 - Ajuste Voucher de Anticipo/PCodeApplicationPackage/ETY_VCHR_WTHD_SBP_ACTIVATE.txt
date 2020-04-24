@@ -1,0 +1,32 @@
+/*ScrollSelect(1, Record.VOUCHER_LINE, Record.VOUCHER_LINE, "WHERE BUSINESS_UNIT = 'APFID' AND VOUCHER_ID = '00029522' AND VOUCHER_LINE_NUM = 1");
+
+ScrollSelect(2, Record.VCHR_LINE_WTHD, Record.VCHR_LINE_WTHD, "WHERE BUSINESS_UNIT = 'APFID' AND VOUCHER_ID = '00029522' AND VOUCHER_LINE_NUM = 2");
+
+Local Rowset &RowLevel1, &RowLevel2;
+
+&RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.VOUCHER_LINE);
+
+For &i = 1 To &RowLevel1.ActiveRowCount
+   &RowLevel2 = &RowLevel1.GetRow(&i).GetRowset(Scroll.VCHR_LINE_WTHD);
+   
+      For &j = 1 To &RowLevel2.ActiveRowCount
+         &INVOICE_ID = &RowLevel2.GetRow(&j).CK_MISC_VRL_TBL.INVOICE_ID.Value;
+      End-For;   
+   
+End-For;
+
+*/
+Local Rowset &RowLevel1, &RowLevel2;
+
+&RowLevel1 = GetLevel0().GetRow(1).GetRowset(Scroll.VOUCHER_LINE);
+&RowLevel1.GetRow(1).VOUCHER_LINE.VOUCHER_LINE_NUM.Value = 1;
+
+&RowLevel2 = &RowLevel1.GetRow(1).GetRowset(Scroll.VCHR_LINE_WTHD);
+For &j = 1 To 2
+   
+   &RowLevel2.GetRow(&j).VCHR_LINE_WTHD.WTHD_ENTITY.Value = "13001";
+   &RowLevel2.GetRow(&j).VCHR_LINE_WTHD.WTHD_TYPE.Value = "RTICA";
+   &RowLevel2.GetRow(&j).VCHR_LINE_WTHD.WTHD_JUR_CD.Value = "13001";
+   &RowLevel2.GetRow(&j).VCHR_LINE_WTHD.WTHD_CLASS.Value = "306";
+End-For;
+&RowLevel2.Flush();

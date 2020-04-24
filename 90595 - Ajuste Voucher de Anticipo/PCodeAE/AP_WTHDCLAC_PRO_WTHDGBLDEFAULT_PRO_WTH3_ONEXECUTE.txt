@@ -1,0 +1,441 @@
+/*********************************************************************
+* Proyecto:	    FF_AP_CESIONES_000
+* Actividad:  	001
+* Responsable: 	Quanam RETOS – César Hernán 
+* Fecha:		07nov2013
+* Descripción:	Se actualiza el valor calculado cuando la retención ees por UVT
+*********************************************************************/
+/**********************************************************************************************************
+* Proyecto:	    ETY_ERP_AP_EVO_90595
+* Actividad:  	002
+* Responsable: 	John Diaz - JH
+* Fecha:		02dic2019
+* Descripción:	Se insertan lineas de retencion del voucher estandar que no coinciden con el del anticipo
+**********************************************************************************************************/
+
+
+Declare Function wthd_round PeopleCode FUNCLIB_AP.WITHHOLDING FieldFormula;
+
+/*----------------------------------------------------------------------------*/
+/* Skip record if an exception has been previously written for this voucher   */
+/*----------------------------------------------------------------------------*/
+If WTHD_CALC_AET.XREF_ERROR_FLG = "Y" Then
+   Exit 1
+End-If;
+
+/*----------------------------------------------------------------------------*/
+/* If calendar ID is blank then period based withholding does not apply.      */
+/* And if no contract reference then don_t need to accumulate.                */
+/*----------------------------------------------------------------------------*/
+If WTHD_CALC_AET.CALENDAR_ID = " " And
+      WTHD_CALC_AET.WTHD_CONT_REF = " " Then
+   WTHD_CALC_AET.ACCUM_BASIS = 0;
+   WTHD_CALC_AET.ACCUM_WTHD = 0;
+   WTHD_CALC_AET.ACCUM_SURCHRG = 0;
+   WTHD_CALC_AET.ACCUM_ADDSRCHRG = 0;
+   WTHD_CALC_AET.ACCUM_WTHDCESSAMT = 0;
+   WTHD_CALC_AET.ACCUM_BASIS_ENT = WTHD_CALC_AET.WTHD_BASIS_AMT_ENT;
+   REM WTHD_CALC_AET.ACCUM_BASIS_ENT = WTHD_CALC_AET.ACCUM_BASIS_ENT * WTHD_CALC_AET.BSE_RATE_MULT / WTHD_CALC_AET.BSE_RATE_DIV;
+End-If;
+
+WTHD_CALC_AET.LOG_WTHD_FLG = "Y";
+
+/*----------------------------------------------------------------------------*/
+/* Calculates withholding basis                                               */
+/*----------------------------------------------------------------------------*/
+WTHD_CALC_AET.WTHD_BASIS_AMT_BSE = WTHD_CALC_AET.WTHD_BASIS_AMT * WTHD_CALC_AET.BSE_RATE_MULT / WTHD_CALC_AET.BSE_RATE_DIV;
+
+/*----------------------------------------------------------------------------*/
+/* If it is specified to hold Both withholding and regular payment, we will   */
+/* need to reset the regular PYMNT_VCHR_XREF record accordingly               */
+/*----------------------------------------------------------------------------*/
+If WTHD_CALC_AET.HOLD_PAY_FLG = "B" Then
+   WTHD_CALC_AET.ORIG_SELCT_STATUS = "N";
+   WTHD_CALC_AET.ORIG_PROC_INSTANCE = 0;
+   WTHD_CALC_AET.ORIG_PAY_CYCLE = " ";
+   WTHD_CALC_AET.ORIG_PAY_CYCLE_SEQ = 0;
+   If WTHD_CALC_AET.ORIG_PYMNT_HOLD <> "Y" Then
+      WTHD_CALC_AET.ORIG_PYMNT_HOLD = "Y";
+      WTHD_CALC_AET.ORIG_HOLD_REASON = "WTH";
+   End-If;
+End-If;
+
+/* All other REMIT_WTHD_TO issues will have been taken care of during the Pre-processing phase.
+   We assume that if the withholding is going to the vendor, that we need to include it in this
+   pay cycle which is why we are setting Process_instance,pay_cycle and pay_cycle_seq_num here. */
+WTHD_CALC_AET.REMIT_ADDR_SEQ_NUM = WTHD_CALC_AET.ENT_ADDR_SEQ_NUM;
+WTHD_CALC_AET.PYMNT_SELCT_STATUS = "N";
+WTHD_CALC_AET.WTHD_PROC_INSTANCE = 0;
+WTHD_CALC_AET.WTHD_PAY_CYCLE = " ";
+WTHD_CALC_AET.WTHD_PAY_CYCLE_SEQ = 0;
+If WTHD_CALC_AET.HOLD_PAY_FLG = "N" Then
+   If WTHD_CALC_AET.PYMNT_HOLD = "N" Then
+      WTHD_CALC_AET.PYMNT_HOLD_REASON = " ";
+   End-If;
+Else
+   WTHD_CALC_AET.PYMNT_HOLD = "Y";
+   WTHD_CALC_AET.PYMNT_HOLD_REASON = "WTH";
+End-If;
+
+If WTHD_CALC_AET.REMIT_WTHD_TO_FLG = "V" Then
+   WTHD_CALC_AET.REMIT_ADDR_SEQ_NUM = WTHD_CALC_AET.VJUR_REM_ADDR_SEQ;
+End-If;
+If WTHD_CALC_AET.HOLD_PAY_FLG = "N" And
+      WTHD_CALC_AET.AE_PAY_CYCLE <> " " And
+      WTHD_CALC_AET.EXPRESS_PYMNT_FLG <> "Y" Then
+   WTHD_CALC_AET.PYMNT_SELCT_STATUS = "R";
+   WTHD_CALC_AET.WTHD_PROC_INSTANCE = WTHD_CALC_AET.ORIG_PROC_INSTANCE;
+   WTHD_CALC_AET.WTHD_PAY_CYCLE = WTHD_CALC_AET.ORIG_PAY_CYCLE;
+   WTHD_CALC_AET.WTHD_PAY_CYCLE_SEQ = WTHD_CALC_AET.ORIG_PAY_CYCLE_SEQ;
+End-If;
+
+/*----------------------------------------------------------------------------*/
+/* We do not withhold if the ACCUMULATED basis amount is less than            */
+/* the basis minimum set in the withholding entity.                           */
+/* NOTE that PYMNT_VCHR_WTHD is still populate for reporting purposes         */
+/*----------------------------------------------------------------------------*/
+If WTHD_CALC_AET.ACCUM_BASIS_ENT < WTHD_CALC_AET.BASE_MIN And
+      WTHD_CALC_AET.CREDIT_NOTE_FLG = "N" Then
+   WTHD_CALC_AET.LOG_WTHD_FLG = "N";
+End-If;
+If WTHD_CALC_AET.WTHD_CUMUL_FLG = "Y" Then
+   If WTHD_CALC_AET.PRCNT_WTHHLD > 0 And
+         WTHD_CALC_AET.ACCUM_WTHD > 0 Then
+      SQLExec("SELECT SUM(WTHD_BASIS_AMT),SUM(WTHD_AMT) FROM PS_WTHD_PERIOD_LOG WHERE BU_REGIST_ID = :1 AND VNDR_REGIST_ID = :2 AND WTHD_ENTITY = :3 AND WTHD_TYPE = :4 AND WTHD_JUR_CD = :5 AND WTHD_CLASS = :6 AND WTHD_RULE= :7 AND CALENDAR_SETID = :8 AND CALENDAR_ID= :9 AND FISCAL_YEAR= :10 AND ACCOUNTING_PERIOD = :11 AND SETID = :12 AND VENDOR_ID = :13 AND VNDR_LOC = :14 AND WTHD_CONT_REF = :15 AND WTHD_DECL_DATE >=%DATEIN(:16)", WTHD_CALC_AET.BU_REGIST_ID, WTHD_CALC_AET.VNDR_REGIST_ID, WTHD_CALC_AET.WTHD_ENTITY, WTHD_CALC_AET.WTHD_TYPE, WTHD_CALC_AET.WTHD_JUR_CD, WTHD_CALC_AET.WTHD_CLASS, WTHD_CALC_AET.WTHD_RULE, WTHD_CALC_AET.CALENDAR_SETID, WTHD_CALC_AET.CALENDAR_ID, WTHD_CALC_AET.FISCAL_YEAR, WTHD_CALC_AET.ACCOUNTING_PERIOD, WTHD_CALC_AET.APPL_VENDOR_SETID, WTHD_CALC_AET.APPL_VENDOR_ID, WTHD_CALC_AET.APPL_VNDR_LOC, WTHD_CALC_AET.WTHD_CONT_REF, WTHD_CALC_AET.WTHD_RULE_EFFDT, &CUMM_WTHD_BASIS_AMT, &CUMM_WTHD_AMT);
+      WTHD_CALC_AET.ACCUM_SURCHRG = 0;
+      WTHD_CALC_AET.ACCUM_ADDSRCHRG = 0;
+      WTHD_CALC_AET.ACCUM_WTHDCESSAMT = 0;
+      If &CUMM_WTHD_AMT = 0 Then
+         WTHD_CALC_AET.ACCUM_BASIS_ENT = WTHD_CALC_AET.WTHD_BASIS_AMT_ENT + &CUMM_WTHD_BASIS_AMT;
+      Else
+         WTHD_CALC_AET.ACCUM_BASIS_ENT = WTHD_CALC_AET.WTHD_BASIS_AMT_ENT;
+      End-If;
+   End-If;
+End-If;
+/*----------------------------------------------------------------------------*/
+/* We start calculating the actual withholding amount                         */
+/*----------------------------------------------------------------------------*/
+
+SQLExec("SELECT PREPAID_APPLIED_BU,PREPAID_APPL_VCHR FROM PS_WTHD_CALC1_TAO WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND PYMNT_CNT = :3", WTHD_CALC_AET.BUSINESS_UNIT, WTHD_CALC_AET.VOUCHER_ID, WTHD_CALC_AET.PYMNT_CNT, &PPAY_BU, &PPAY_VCHR);
+MessageBox(0, "", 0, 0, "&PPAY_BU: " | &PPAY_BU);
+MessageBox(0, "", 0, 0, "&PPAY_VCHR: " | &PPAY_VCHR);
+If All(&PPAY_BU, &PPAY_VCHR) Then
+   SQLExec("SELECT WTHD_AMT,WTHD_BASIS_AMT FROM PS_PYMNT_VCHR_WTHD WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND WTHD_ENTITY = :3 AND WTHD_TYPE = :4 AND WTHD_JUR_CD = :5 AND WTHD_CLASS = :6 AND WTHD_RULE = :7", &PPAY_BU, &PPAY_VCHR, WTHD_CALC_AET.WTHD_ENTITY, WTHD_CALC_AET.WTHD_TYPE, WTHD_CALC_AET.WTHD_JUR_CD, WTHD_CALC_AET.WTHD_CLASS, WTHD_CALC_AET.WTHD_RULE, &PPAY_WTHD_AMT, &PPAY_WTHD_BASIS_AMT);
+   MessageBox(0, "", 0, 0, "&PPAY_WTHD_AMT: " | &PPAY_WTHD_AMT);
+   MessageBox(0, "", 0, 0, "&PPAY_WTHD_BASIS_AMT: " | &PPAY_WTHD_BASIS_AMT);
+   /*INICIO 002*/
+   /*If &PPAY_WTHD_AMT = 0 Then
+      WTHD_CALC_AET.ACCUM_BASIS_ENT = 0;
+   End-If;*/
+   /*FIN 002*/
+End-If;
+/*INICIO CHGA 001*/
+If LC_UVT_WTHD_AET.LC_UVT_FLAG.Value = "Y" Then
+   WTHD_CALC_AET.CALC_WTHD_ENT = LC_UVT_WTHD_AET.LC_UVT_RET_CALC.Value;
+Else
+   /*FIN CHGA 001*/
+   If WTHD_CALC_AET.WTHD_CUMUL_FLG = "Y" Then
+      WTHD_CALC_AET.CALC_WTHD_ENT = (((WTHD_CALC_AET.ACCUM_BASIS_ENT) * (WTHD_CALC_AET.PRCNT_WTHHLD / 100) + WTHD_CALC_AET.ADDTL_AMT));
+   Else
+      WTHD_CALC_AET.CALC_WTHD_ENT = (((WTHD_CALC_AET.ACCUM_BASIS_ENT - WTHD_CALC_AET.DED_BASIS_AMT) * (WTHD_CALC_AET.PRCNT_WTHHLD / 100) + WTHD_CALC_AET.ADDTL_AMT));
+   End-If;
+   /*INICIO CHGA 001*/
+End-If;
+/*FIN CHGA 001*/
+/*----------------------------------------------------------------------------*/
+/* Calculate surcharge and add to the withholding amount                      */
+/*----------------------------------------------------------------------------*/
+WTHD_CALC_AET.WTHD_SURCHRG_AMT = WTHD_CALC_AET.CALC_WTHD_ENT * (WTHD_CALC_AET.WTHD_SURCHRG_PCT / 100);
+WTHD_CALC_AET.CALC_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT + WTHD_CALC_AET.WTHD_SURCHRG_AMT;
+If WTHD_CALC_AET.WTHD_CUMUL_FLG <> "Y" Then
+   WTHD_CALC_AET.WTHD_SURCHRG_AMT = WTHD_CALC_AET.WTHD_SURCHRG_AMT - WTHD_CALC_AET.ACCUM_SURCHRG;
+End-If;
+WTHD_CALC_AET.CALC_WTHD_ENT_HSC = WTHD_CALC_AET.CALC_WTHD_ENT;
+/*---------------------------------------------------------------------------------*/
+/* Calculate Additional Surcharge/Education Cess and add to the withholding amount */
+/*---------------------------------------------------------------------------------*/
+WTHD_CALC_AET.ADDL_SRCHRG_AMT = WTHD_CALC_AET.CALC_WTHD_ENT * (WTHD_CALC_AET.ADDL_SRCHRG_PCT / 100);
+WTHD_CALC_AET.CALC_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT + WTHD_CALC_AET.ADDL_SRCHRG_AMT;
+If WTHD_CALC_AET.WTHD_CUMUL_FLG <> "Y" Then
+   WTHD_CALC_AET.ADDL_SRCHRG_AMT = WTHD_CALC_AET.ADDL_SRCHRG_AMT - WTHD_CALC_AET.ACCUM_ADDSRCHRG;
+End-If;
+/*---------------------------------------------------------------------------------*/
+/* Calculate Higher Secondary Education Cess and add to the withholding amount */
+/*---------------------------------------------------------------------------------*/
+
+WTHD_CALC_AET.WTHD_CESS_AMT = WTHD_CALC_AET.CALC_WTHD_ENT_HSC * (WTHD_CALC_AET.WTHD_CESS_PCT / 100);
+WTHD_CALC_AET.CALC_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT + WTHD_CALC_AET.WTHD_CESS_AMT;
+If WTHD_CALC_AET.WTHD_CUMUL_FLG <> "Y" Then
+   WTHD_CALC_AET.WTHD_CESS_AMT = WTHD_CALC_AET.WTHD_CESS_AMT - WTHD_CALC_AET.ACCUM_WTHDCESSAMT;
+End-If;
+WTHD_CALC_AET.CALC_WTHD_ENT_HSC = 0;
+
+/* Calculate Additional Withholding % and add to the withholding amount */
+/*---------------------------------------------------------------------------------*/
+WTHD_CALC_AET.CALC_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT * (1 + (WTHD_CALC_AET.ADDTL_WTHD_PCT / 100));
+If WTHD_CALC_AET.WTHD_CUMUL_FLG <> "Y" Then
+   WTHD_CALC_AET.CALC_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT - WTHD_CALC_AET.ACCUM_WTHD;
+End-If;
+
+&PP_GROSS_AMT = WTHD_CALC_AET.PP_GROSS_AMT;
+&CALC_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT;
+
+/*----------------------------------------------------------------------------*/
+/* This amount is used to populate the period totals. This amount will not    */
+/* include any special vendor condition considerations.                       */
+/*----------------------------------------------------------------------------*/
+WTHD_CALC_AET.CALC_UPD_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT;
+
+
+/*----------------------------------------------------------------------------*/
+/* Withhold Condition is set up on the VENDOR WITHHOLD Jurisdiction page      */
+/* Users may choose NONE, EXEMPT, or Exonerate                                */
+/* If NONE is chosen, CONDITION_PCT is set to 0 and CONDITION_UNTIL is NULL   */
+/* Otherwise users will need to enter the percentage and condition until date */
+/*----------------------------------------------------------------------------*/
+If All(WTHD_CALC_AET.CONDITION_UNTIL) Then
+   If (WTHD_CALC_AET.FROM_POST <> "Y" And
+         WTHD_CALC_AET.CONDITION_UNTIL < WTHD_CALC_AET.WTHD_DECL_DATE) Or
+         (WTHD_CALC_AET.FROM_POST = "Y" And
+            WTHD_CALC_AET.CONDITION_UNTIL < WTHD_CALC_AET.PAYMENT_DT) Then
+      WTHD_CALC_AET.CONDITION_PCT = 0
+   End-If;
+Else
+   WTHD_CALC_AET.CONDITION_PCT = 0
+End-If;
+
+/*----------------------------------------------------------------------------*/
+/* CONDITION_PCT of 100% means it is exempted.                                */
+/* Setting this flag will ensure that no row is inserted into WTHD_PERIOD_LOG */
+/*----------------------------------------------------------------------------*/
+If WTHD_CALC_AET.CONDITION_PCT = 100 Then
+   WTHD_CALC_AET.EXEMPT_FLAG = "Y";
+Else
+   WTHD_CALC_AET.EXEMPT_FLAG = "N";
+End-If;
+
+/* If credit note withholding amount exceeds the amount of withholding on this payment. This
+**   will be handled through Negative balance during the pay cycle process and is therefore 
+**   commented for the time being.
+** If WTHD_CALC_AET.CREDIT_NOTE_FLG = "Y" And
+**      (WTHD_CALC_AET.CALC_WTHD_ENT * - 1) > WTHD_CALC_AET.PYMNT_TOT_WTHD_ENT Then
+**   WTHD_CALC_AET.CALC_WTHD_ENT = WTHD_CALC_AET.PYMNT_TOT_WTHD_ENT * - 1;
+**   WTHD_CALC_AET.CALC_UPD_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT / (1 - (WTHD_CALC_AET.CONDITION_PCT/100));
+** End-If;
+*/
+
+/*------------------------------------------------------------------------------*/
+/* We do not withhold if the accumulated backup withholding is less than        */
+/* the withholding minimum amt set in the withholding entity.                   */
+/* NOTE that PYMNT_VCHR_WTHD is still populate for reporting purposes           */
+/*------------------------------------------------------------------------------*/
+If (WTHD_CALC_AET.CALC_WTHD_ENT + WTHD_CALC_AET.ACCUM_WTHD) <= WTHD_CALC_AET.WTHD_MIN And
+      WTHD_CALC_AET.CREDIT_NOTE_FLG = "N" Then
+   WTHD_CALC_AET.LOG_WTHD_FLG = "N";
+End-If;
+/*----------------------------------------------------------------------------*/
+/* Transfer calculated withholding back to the transaction currency}          */
+/*----------------------------------------------------------------------------*/
+REM WTHD_CALC_AET.CALC_WTHD_TXN = WTHD_CALC_AET.CALC_WTHD_ENT * WTHD_CALC_AET.BSE_RATE_DIV / WTHD_CALC_AET.BSE_RATE_MULT;
+WTHD_CALC_AET.CALC_WTHD_TXN = WTHD_CALC_AET.CALC_WTHD_ENT * WTHD_CALC_AET.ENT_RATE_DIV / WTHD_CALC_AET.ENT_RATE_MULT;
+WTHD_CALC_AET.WTHD_SURCHRG_AMT = WTHD_CALC_AET.WTHD_SURCHRG_AMT * WTHD_CALC_AET.ENT_RATE_DIV / WTHD_CALC_AET.ENT_RATE_MULT;
+WTHD_CALC_AET.ADDL_SRCHRG_AMT = WTHD_CALC_AET.ADDL_SRCHRG_AMT * WTHD_CALC_AET.ENT_RATE_DIV / WTHD_CALC_AET.ENT_RATE_MULT;
+WTHD_CALC_AET.WTHD_CESS_AMT = WTHD_CALC_AET.WTHD_CESS_AMT * WTHD_CALC_AET.ENT_RATE_DIV / WTHD_CALC_AET.ENT_RATE_MULT;
+
+/*******CONVERT SURCHARGE,ADD SURCHARGE AND EDUCATION CESS TO BASE CURRENCY*****/
+
+WTHD_CALC_AET.WTH_SRCHRG_AMT_BSE = WTHD_CALC_AET.WTHD_SURCHRG_AMT * WTHD_CALC_AET.BSE_RATE_MULT / WTHD_CALC_AET.BSE_RATE_DIV;
+WTHD_CALC_AET.ADD_SRCHRG_AMT_BSE = WTHD_CALC_AET.ADDL_SRCHRG_AMT * WTHD_CALC_AET.BSE_RATE_MULT / WTHD_CALC_AET.BSE_RATE_DIV;
+WTHD_CALC_AET.WTHD_CESS_AMT_BSE = WTHD_CALC_AET.WTHD_CESS_AMT * WTHD_CALC_AET.BSE_RATE_MULT / WTHD_CALC_AET.BSE_RATE_DIV;
+
+/*-----------------------------------------------------------------------------*/
+/* Calculate Withholding amount including vendor condition such as exoneration */
+/*-----------------------------------------------------------------------------*/
+WTHD_CALC_AET.CALC_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT * (1 - (WTHD_CALC_AET.CONDITION_PCT / 100));
+WTHD_CALC_AET.WTHD_SURCHRG_AMT = WTHD_CALC_AET.WTHD_SURCHRG_AMT * (1 - (WTHD_CALC_AET.CONDITION_PCT / 100));
+WTHD_CALC_AET.ADDL_SRCHRG_AMT = WTHD_CALC_AET.ADDL_SRCHRG_AMT * (1 - (WTHD_CALC_AET.CONDITION_PCT / 100));
+WTHD_CALC_AET.WTHD_CESS_AMT = WTHD_CALC_AET.WTHD_CESS_AMT * (1 - (WTHD_CALC_AET.CONDITION_PCT / 100));
+
+WTHD_CALC_AET.WTH_SRCHRG_AMT_BSE = WTHD_CALC_AET.WTH_SRCHRG_AMT_BSE * (1 - (WTHD_CALC_AET.CONDITION_PCT / 100));
+WTHD_CALC_AET.ADD_SRCHRG_AMT_BSE = WTHD_CALC_AET.ADD_SRCHRG_AMT_BSE * (1 - (WTHD_CALC_AET.CONDITION_PCT / 100));
+WTHD_CALC_AET.WTHD_CESS_AMT_BSE = WTHD_CALC_AET.WTHD_CESS_AMT_BSE * (1 - (WTHD_CALC_AET.CONDITION_PCT / 100));
+
+
+
+/* For period based withholdings, it is possible that a certain point in time we have a backlog of withholding due to an increase in rate when combined with Tier withholdings. If this happens, it is possible that a credit note would calculate withholding to be positive.We check for this here to avoid a positive withholding on a credit note. */
+If WTHD_CALC_AET.CREDIT_NOTE_FLG = "Y" And
+      WTHD_CALC_AET.CALC_WTHD_TXN > 0 Then
+   WTHD_CALC_AET.LOG_WTHD_FLG = "N";
+End-If;
+
+/* Calculate absolute value of the accumulated withholdings */
+If (WTHD_CALC_AET.XREF_TOT_WTHD_TXN + WTHD_CALC_AET.CALC_WTHD_TXN) > 0 Then
+   WTHD_CALC_AET.ABS_SUM_AMT = WTHD_CALC_AET.XREF_TOT_WTHD_TXN + WTHD_CALC_AET.CALC_WTHD_TXN
+Else
+   WTHD_CALC_AET.ABS_SUM_AMT = (WTHD_CALC_AET.XREF_TOT_WTHD_TXN + WTHD_CALC_AET.CALC_WTHD_TXN) * - 1
+End-If;
+
+/*----------------------------------------------------------------------------*/
+/* Calculates absolute value of the PAYMENT amount                            */
+/*----------------------------------------------------------------------------*/
+If WTHD_CALC_AET.ORIG_GROSS_AMT > 0 Then
+   WTHD_CALC_AET.ABS_PYMNT_GROSS = WTHD_CALC_AET.ORIG_GROSS_AMT
+Else
+   WTHD_CALC_AET.ABS_PYMNT_GROSS = WTHD_CALC_AET.ORIG_GROSS_AMT * - 1
+End-If;
+
+
+/* If withholdings for a voucher exceeds the voucher_s payment (note that we use the ABSolute value to account for credit notes). */
+/* Instead of letting the withholding be a portion of its calculation to avoid a negative payment
+   we will instead throw an exception (see next step/action)
+** If WTHD_CALC_AET.ABS_SUM_AMT > WTHD_CALC_AET.ABS_PYMNT_GROSS Then
+**    WTHD_CALC_AET.CALC_WTHD_TXN = WTHD_CALC_AET.ORIG_GROSS_AMT - WTHD_CALC_AET.XREF_TOT_WTHD_TXN;
+**    WTHD_CALC_AET.CALC_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_TXN * WTHD_CALC_AET.ENT_RATE_MULT / ** WTHD_CALC_AET.ENT_RATE_DIV;
+**    WTHD_CALC_AET.CALC_UPD_WTHD_ENT = WTHD_CALC_AET.CALC_WTHD_ENT / (1 - (WTHD_CALC_AET.CONDITION_PCT / 100));
+End-If;
+*/
+
+/*----------------------------------------------------------------------------*/
+/* We do not withhold if the calculated withholding turns out to be zero.     */
+/*----------------------------------------------------------------------------*/
+If WTHD_CALC_AET.CALC_WTHD_TXN = 0 Then
+   WTHD_CALC_AET.LOG_WTHD_FLG = "N";
+End-If;
+
+
+/*----------------------------------------------------------------------------*/
+/* If withholding is creating a payment, the remit bank setid must be set to  */
+/* the value of the bank setid to ensure correct online behavior              */
+/*----------------------------------------------------------------------------*/
+
+If WTHD_CALC_AET.LOG_WTHD_FLG = "Y" And
+      WTHD_CALC_AET.CREATE_PAY_FLG = "Y" And
+      WTHD_CALC_AET.XREF_ERROR_FLG = "N" Then
+   WTHD_CALC_AET.LOC_BANK_SETID = WTHD_CALC_AET.BANK_SETID;
+End-If;
+
+/*----------------------------------------------------------------------------*/
+/* Calculates the withholding in Base Currency                                */
+/*----------------------------------------------------------------------------*/
+WTHD_CALC_AET.CALC_WTHD_BSE = WTHD_CALC_AET.CALC_WTHD_TXN * WTHD_CALC_AET.BSE_RATE_MULT / WTHD_CALC_AET.BSE_RATE_DIV;
+
+
+If WTHD_CALC_AET.LOG_WTHD_FLG = "Y" And
+      WTHD_CALC_AET.CREATE_PAY_FLG = "Y" Then
+   If WTHD_CALC_AET.XREF_ERROR_FLG = "N" Then
+      /* These totals are kept to update the originating (Regular payment) PYMNT_VCHR_XREF */
+      
+      WTHD_CALC_AET.XREF_TOT_WTHD_TXN = WTHD_CALC_AET.XREF_TOT_WTHD_TXN + WTHD_CALC_AET.CALC_WTHD_TXN;
+      WTHD_CALC_AET.XREF_TOT_WTHD_BSE = WTHD_CALC_AET.XREF_TOT_WTHD_TXN * WTHD_CALC_AET.BSE_RATE_MULT / WTHD_CALC_AET.BSE_RATE_DIV;
+   Else
+      /* Will reset PYMNT_VCHR_XREF to orig values in case of Wthd Exception */
+      
+      WTHD_CALC_AET.XREF_TOT_WTHD_TXN = 0;
+      WTHD_CALC_AET.XREF_TOT_WTHD_BSE = 0;
+   End-If;
+Else
+   WTHD_CALC_AET.CALC_WTHD_TXN = 0;
+   WTHD_CALC_AET.CALC_WTHD_ENT = 0;
+   WTHD_CALC_AET.CALC_UPD_WTHD_ENT = 0;
+   WTHD_CALC_AET.CALC_WTHD_BSE = 0;
+End-If;
+If WTHD_CALC_AET.FROM_POST = "Y" Then
+   PST_VCHR_AET.WTHD_ROUND_OPT = WTHD_CALC_AET.WTHD_ROUND_OPT;
+End-If;
+
+
+Evaluate WTHD_CALC_AET.WTHD_ROUND_OPT
+When = "N"
+   If WTHD_CALC_AET.BASE_CURRENCY = WTHD_CALC_AET.TXN_CURRENCY_CD Then
+      WTHD_CALC_AET.ABS_SUM_AMT = Round(WTHD_CALC_AET.ABS_SUM_AMT, WTHD_CALC_AET.DECIMAL_POS_TXN);
+      WTHD_CALC_AET.WTHD_SURCHRG_AMT = Round(WTHD_CALC_AET.WTHD_SURCHRG_AMT, WTHD_CALC_AET.DECIMAL_POS_TXN);
+      WTHD_CALC_AET.CALC_WTHD_TXN = Round(WTHD_CALC_AET.CALC_WTHD_TXN, WTHD_CALC_AET.DECIMAL_POS_TXN);
+      WTHD_CALC_AET.CALC_WTHD_ENT = Round(WTHD_CALC_AET.CALC_WTHD_ENT, WTHD_CALC_AET.DECIMAL_POS_ENT);
+      WTHD_CALC_AET.CALC_UPD_WTHD_ENT = Round(WTHD_CALC_AET.CALC_UPD_WTHD_ENT, WTHD_CALC_AET.DECIMAL_POS_ENT);
+      WTHD_CALC_AET.XREF_TOT_WTHD_TXN = Round(WTHD_CALC_AET.XREF_TOT_WTHD_TXN, WTHD_CALC_AET.DECIMAL_POS_TXN);
+      WTHD_CALC_AET.CALC_WTHD_BSE = Round(WTHD_CALC_AET.CALC_WTHD_BSE, WTHD_CALC_AET.DECIMAL_POS_BSE);
+      WTHD_CALC_AET.XREF_TOT_WTHD_BSE = Round(WTHD_CALC_AET.XREF_TOT_WTHD_BSE, WTHD_CALC_AET.DECIMAL_POS_BSE);
+      WTHD_CALC_AET.WTHD_BASIS_AMT_BSE = Round(WTHD_CALC_AET.WTHD_BASIS_AMT_BSE, WTHD_CALC_AET.DECIMAL_POS_BSE);
+   End-If;
+   
+When = "R"
+   /*COMMENTED THIS PIECE OF CODE FOR ROUNDING TO WORK CORRECTLY WHEN CUMMULATIVE WITHHOLDING IS INVOLVED*/
+   /* WTHD_CALC_AET.WTHD_SURCHRG_AMT = Round(WTHD_CALC_AET.WTHD_SURCHRG_AMT, 0);
+      WTHD_CALC_AET.ADDL_SRCHRG_AMT = Round(WTHD_CALC_AET.ADDL_SRCHRG_AMT, 0);
+      WTHD_CALC_AET.WTHD_CESS_AMT = Round(WTHD_CALC_AET.WTHD_CESS_AMT, 0);
+WTHD_CALC_AET.CALC_WTHD_TXN = Round(WTHD_CALC_AET.CALC_WTHD_TXN, 0);
+        */
+   If WTHD_CALC_AET.BASE_CURRENCY = WTHD_CALC_AET.TXN_CURRENCY_CD Then
+      
+      
+      WTHD_CALC_AET.ABS_SUM_AMT = Round(WTHD_CALC_AET.ABS_SUM_AMT, 0);
+      WTHD_CALC_AET.CALC_UPD_WTHD_ENT = Round(WTHD_CALC_AET.CALC_UPD_WTHD_ENT, 0);
+      WTHD_CALC_AET.XREF_TOT_WTHD_TXN = Round(WTHD_CALC_AET.XREF_TOT_WTHD_TXN, 0);
+      WTHD_CALC_AET.CALC_WTHD_ENT = Round(WTHD_CALC_AET.CALC_WTHD_ENT, 0);
+      
+   End-If;
+   WTHD_CALC_AET.CALC_WTHD_BSE = Round(WTHD_CALC_AET.CALC_WTHD_BSE, 0);
+   WTHD_CALC_AET.XREF_TOT_WTHD_BSE = Round(WTHD_CALC_AET.XREF_TOT_WTHD_BSE, 0);
+   WTHD_CALC_AET.WTHD_BASIS_AMT_BSE = Round(WTHD_CALC_AET.WTHD_BASIS_AMT_BSE, 0);
+   
+When = "I"
+   /*Save off accumulated withholding prior to TDS rounding for later process */
+   WTHD_CALC_AET.ACCUM_WTHD2 = WTHD_CALC_AET.ACCUM_WTHD2 + WTHD_CALC_AET.CALC_WTHD_ENT;
+   
+   If WTHD_CALC_AET.BASE_CURRENCY = WTHD_CALC_AET.TXN_CURRENCY_CD Then
+      WTHD_CALC_AET.ABS_SUM_AMT = Round(WTHD_CALC_AET.ABS_SUM_AMT / 10, 0) * 10;
+      /*
+      WTHD_CALC_AET.WTHD_SURCHRG_AMT = Round(WTHD_CALC_AET.WTHD_SURCHRG_AMT / 10, 0) * 10;
+      WTHD_CALC_AET.ADDL_SRCHRG_AMT = Round(WTHD_CALC_AET.ADDL_SRCHRG_AMT / 10, 0) * 10;
+      WTHD_CALC_AET.WTHD_CESS_AMT = Round(WTHD_CALC_AET.WTHD_CESS_AMT / 10, 0) * 10;
+      WTHD_CALC_AET.CALC_WTHD_ENT = Round(WTHD_CALC_AET.CALC_WTHD_ENT / 10, 0) * 10;
+WTHD_CALC_AET.CALC_WTHD_TXN = Round(WTHD_CALC_AET.CALC_WTHD_TXN / 10, 0) * 10;
+*/
+      
+      WTHD_CALC_AET.CALC_WTHD_BSE = Round(WTHD_CALC_AET.CALC_WTHD_BSE / 10, 0) * 10;
+      /*Accumulating the withholding amount rounding to nearest 10, causes subsequent withholding
+		to be inccorect, therefore accumulating the withholding by natural rounding*/
+      REM WTHD_CALC_AET.CALC_UPD_WTHD_ENT = Round(WTHD_CALC_AET.CALC_UPD_WTHD_ENT, WTHD_CALC_AET.DECIMAL_POS_ENT);
+      WTHD_CALC_AET.XREF_TOT_WTHD_TXN = Round(WTHD_CALC_AET.XREF_TOT_WTHD_TXN / 10, 0) * 10;
+      WTHD_CALC_AET.XREF_TOT_WTHD_BSE = Round(WTHD_CALC_AET.XREF_TOT_WTHD_BSE / 10, 0) * 10;
+      WTHD_CALC_AET.WTHD_BASIS_AMT_BSE = Round(WTHD_CALC_AET.WTHD_BASIS_AMT_BSE / 10, 0) * 10;
+   End-If;
+When-Other
+   If WTHD_CALC_AET.BASE_CURRENCY = WTHD_CALC_AET.TXN_CURRENCY_CD Then
+      If Mod(WTHD_CALC_AET.ABS_SUM_AMT * 100, 100) <> 0 Then
+         WTHD_CALC_AET.ABS_SUM_AMT = wthd_round(WTHD_CALC_AET.WTHD_ROUND_OPT, WTHD_CALC_AET.ABS_SUM_AMT);
+      End-If;
+      If Mod(WTHD_CALC_AET.WTHD_SURCHRG_AMT * 100, 100) <> 0 Then
+         WTHD_CALC_AET.WTHD_SURCHRG_AMT = wthd_round(WTHD_CALC_AET.WTHD_ROUND_OPT, WTHD_CALC_AET.WTHD_SURCHRG_AMT);
+      End-If;
+      
+      If Mod(WTHD_CALC_AET.CALC_WTHD_TXN * 100, 100) <> 0 Then
+         WTHD_CALC_AET.CALC_WTHD_TXN = wthd_round(WTHD_CALC_AET.WTHD_ROUND_OPT, WTHD_CALC_AET.CALC_WTHD_TXN);
+      End-If;
+      If Mod(WTHD_CALC_AET.CALC_WTHD_ENT * 100, 100) <> 0 Then
+         WTHD_CALC_AET.CALC_WTHD_ENT = wthd_round(WTHD_CALC_AET.WTHD_ROUND_OPT, WTHD_CALC_AET.CALC_WTHD_ENT);
+      End-If;
+      
+      If Mod(WTHD_CALC_AET.CALC_UPD_WTHD_ENT * 100, 100) <> 0 Then
+         WTHD_CALC_AET.CALC_UPD_WTHD_ENT = wthd_round(WTHD_CALC_AET.WTHD_ROUND_OPT, WTHD_CALC_AET.CALC_UPD_WTHD_ENT);
+      End-If;
+      If Mod(WTHD_CALC_AET.XREF_TOT_WTHD_TXN * 100, 100) <> 0 Then
+         WTHD_CALC_AET.XREF_TOT_WTHD_TXN = wthd_round(WTHD_CALC_AET.WTHD_ROUND_OPT, WTHD_CALC_AET.XREF_TOT_WTHD_TXN);
+      End-If;
+      If Mod(WTHD_CALC_AET.CALC_WTHD_BSE * 100, 100) <> 0 Then
+         WTHD_CALC_AET.CALC_WTHD_BSE = wthd_round(WTHD_CALC_AET.WTHD_ROUND_OPT, WTHD_CALC_AET.CALC_WTHD_BSE);
+      End-If;
+      If Mod(WTHD_CALC_AET.XREF_TOT_WTHD_BSE * 100, 100) <> 0 Then
+         WTHD_CALC_AET.XREF_TOT_WTHD_BSE = wthd_round(WTHD_CALC_AET.WTHD_ROUND_OPT, WTHD_CALC_AET.XREF_TOT_WTHD_BSE);
+      End-If;
+      If Mod(WTHD_CALC_AET.WTHD_BASIS_AMT_BSE * 100, 100) <> 0 Then
+         WTHD_CALC_AET.WTHD_BASIS_AMT_BSE = wthd_round(WTHD_CALC_AET.WTHD_ROUND_OPT, WTHD_CALC_AET.WTHD_BASIS_AMT_BSE);
+      End-If;
+   End-If;
+   
+End-Evaluate;
+
+/* Save  for later use */
+WTHD_CALC_AET.PREV_RATE_MULT = WTHD_CALC_AET.BSE_RATE_MULT;
+WTHD_CALC_AET.PREV_RATE_DIV = WTHD_CALC_AET.BSE_RATE_DIV;
+WTHD_CALC_AET.WTHD_ROUND_OPT2 = WTHD_CALC_AET.WTHD_ROUND_OPT;
