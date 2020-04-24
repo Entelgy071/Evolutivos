@@ -1,0 +1,25 @@
+/***********************************************************************************************************************************/
+/* PROYECTO			ACTIVIDAD			RESPONSABLE			FECHA		DESCRIPCIÓN											       */
+/* ETY_ERP_AP_8143		001				John Diaz	      23/04/2020	Valida que el campo prevoucher sea un valor valido.        */
+/***********************************************************************************************************************************/
+SQLExec("Select ENTRY_STATUS from PS_VOUCHER WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &Est_Entrada);
+
+/*Inicio 001*/
+If &Est_Entrada = "R" Then
+   ETY_REP_PAG_TBL.VOUCHER_ID.Style = "PSERROR";
+   MessageBox(0, "", 22000, 22006, "Mensage no encontrado", ETY_REP_PAG_TBL.VOUCHER_ID, ETY_REP_PAG_TBL.BUSINESS_UNIT);
+End-If;
+
+If %Page = Page.ETY_ING_PAG_PG Then
+   SQLExec("SELECT 'X' FROM PS_ETY_VCHR_NO_PAY WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &EXIST);
+End-If;
+
+If %Page = Page.ETY_INCONS_PAG_PG Then
+   SQLExec("SELECT 'X' FROM PS_ETY_REP_PAG_TBL WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &EXIST);
+End-If;
+
+If None(&EXIST) Then
+   ETY_REP_PAG_TBL.VOUCHER_ID.Style = "PSERROR";
+   Error ("No hay valores coincidentes");
+End-If;
+/*Fin 001*/

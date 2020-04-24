@@ -1,0 +1,71 @@
+/***********************************************************************************************************************************/
+/* PROYECTO			ACTIVIDAD			RESPONSABLE			FECHA		DESCRIPCIÓN											       */
+/* ETY_ERP_AP_8143		001				John Diaz	      23/04/2020	Valida que el campo prevoucher sea un valor valido.        */
+/***********************************************************************************************************************************/
+Declare Function Enviar_Notificacion PeopleCode ETY_REP_PAG_WRK.BTN_SEND_NOTIFY FieldFormula;
+
+Local Record &rc_ETY_REP_PAG_TBL;
+
+/*Inicio 001*/
+SQLExec("SELECT 'X' FROM PS_ETY_REP_PAG_TBL WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &EXIST);
+
+If None(&EXIST) Then
+   ETY_REP_PAG_TBL.VOUCHER_ID.Style = "PSERROR";
+   Error ("No hay valores coincidentes");
+End-If;
+/*Fin 001*/
+
+If All(ETY_REP_PAG_TBL.ETY_COD_EVENTO) Then
+   REM If ETY_REP_PAG_TBL.NOTIFIED_FLAG <> "Y" Then;
+   /*inicio 001*/
+   rem &RET_CODE = Enviar_Notificacion();
+   
+   REM   &strSql = "SELECT ACCTLOCK FROM OPRDEFNDESC WHERE OPRID = :1";
+   &strSql = "SELECT ACCTLOCK FROM PSOPRDEFN WHERE OPRID = :1";
+   SQLExec(&strSql, ETY_REP_PAG_TBL.OPRID_FROM, &cierre);
+   If (&cierre <> 1) Then
+      &RET_CODE = Enviar_Notificacion();
+   Else
+      &RET_CODE = 1;
+   End-If;
+   /*fin 001*/
+   If &RET_CODE = 0 Then
+      ETY_REP_PAG_TBL.NOTIFIED_FLAG = "Y";
+   Else
+      ETY_REP_PAG_TBL.NOTIFIED_FLAG = "N";
+   End-If;
+   REM End-If;
+   
+   
+   &rc_ETY_REP_PAG_TBL = CreateRecord(Record.ETY_REP_PAG_TBL);
+   
+   &rc_ETY_REP_PAG_TBL.BUSINESS_UNIT.Value = ETY_REP_PAG_TBL.BUSINESS_UNIT;
+   &rc_ETY_REP_PAG_TBL.ENTERED_DT.Value = ETY_REP_PAG_TBL.ENTERED_DT;
+   &rc_ETY_REP_PAG_TBL.ENTERED_TM.Value = ETY_REP_PAG_TBL.ENTERED_TM;
+   &rc_ETY_REP_PAG_TBL.BUSINESS_UNIT_PO.Value = ETY_REP_PAG_TBL.BUSINESS_UNIT_PO;
+   &rc_ETY_REP_PAG_TBL.RECEIVER_ID.Value = ETY_REP_PAG_TBL.RECEIVER_ID;
+   &rc_ETY_REP_PAG_TBL.FF_ID_RADICADO.Value = ETY_REP_PAG_TBL.FF_ID_RADICADO;
+   &rc_ETY_REP_PAG_TBL.INVOICE_ID_FROM.Value = ETY_REP_PAG_TBL.INVOICE_ID_FROM;
+   
+   If &rc_ETY_REP_PAG_TBL.SelectByKey() Then
+      &rc_ETY_REP_PAG_TBL.BUSINESS_UNIT.Value = ETY_REP_PAG_TBL.BUSINESS_UNIT;
+      &rc_ETY_REP_PAG_TBL.ENTERED_DT.Value = ETY_REP_PAG_TBL.ENTERED_DT;
+      &rc_ETY_REP_PAG_TBL.ENTERED_TM.Value = ETY_REP_PAG_TBL.ENTERED_TM;
+      &rc_ETY_REP_PAG_TBL.BUSINESS_UNIT_PO.Value = ETY_REP_PAG_TBL.BUSINESS_UNIT_PO;
+      &rc_ETY_REP_PAG_TBL.RECEIVER_ID.Value = ETY_REP_PAG_TBL.RECEIVER_ID;
+      &rc_ETY_REP_PAG_TBL.FF_ID_RADICADO.Value = ETY_REP_PAG_TBL.FF_ID_RADICADO;
+      &rc_ETY_REP_PAG_TBL.INVOICE_ID_FROM.Value = ETY_REP_PAG_TBL.INVOICE_ID_FROM;
+      &rc_ETY_REP_PAG_TBL.ETY_COD_EVENTO.Value = ETY_REP_PAG_TBL.ETY_COD_EVENTO;
+      &rc_ETY_REP_PAG_TBL.PYMNT_CNT.Value = ETY_REP_PAG_TBL.PYMNT_CNT;
+      &rc_ETY_REP_PAG_TBL.DOCUMENT.Value = ETY_REP_PAG_TBL.DOCUMENT;
+      &rc_ETY_REP_PAG_TBL.NOTIFIED_FLAG.Value = ETY_REP_PAG_TBL.NOTIFIED_FLAG;
+      &rc_ETY_REP_PAG_TBL.DESCR254.Value = ETY_REP_PAG_TBL.DESCR254;
+      &rc_ETY_REP_PAG_TBL.OPRID_MODIFIED_BY.Value = %OperatorId;
+      &rc_ETY_REP_PAG_TBL.DTTM_MODIFIED.Value = %Datetime;
+      &rc_ETY_REP_PAG_TBL.Update();
+   End-If;
+   
+   
+Else
+   MessageBox(0, "", 0, 0, "Seleccione el Código del Evento");
+End-If;

@@ -1,0 +1,75 @@
+/****************************************************************************************************************************************/
+/* PROYECTO			ACTIVIDAD			RESPONSABLE			FECHA dmy		DESCRIPCIÓN								        	        */
+/* ETY_ERP_PO_7329		001				Mauricio González	04/03/2020	Adición del campo de fecha hora en la tabla ETY_REP_PAG_TBL		*/
+/****************************************************************************************************************************************/
+Declare Function Enviar_Notificacion PeopleCode ETY_REP_PAG_WRK.BTN_SEND_NOTIFY FieldFormula;
+
+Local Record &rc_ETY_REP_PAG_TBL;
+Local datetime &enter_dttm;
+Local string &enter_dttm_char;
+
+/* Inicio #84282 */
+If GetRow().IsChanged Then
+   /* Fin #84282 */
+   If All(ETY_REP_PAG_TBL.ETY_COD_EVENTO) Then
+      If ETY_REP_PAG_TBL.NOTIFIED_FLAG <> "Y" Then
+         &RET_CODE = Enviar_Notificacion();
+         If &RET_CODE = 0 Then
+            ETY_REP_PAG_TBL.NOTIFIED_FLAG = "Y";
+         Else
+            ETY_REP_PAG_TBL.NOTIFIED_FLAG = "N";
+         End-If;
+      End-If;
+      
+      
+      &rc_ETY_REP_PAG_TBL = CreateRecord(Record.ETY_REP_PAG_TBL);
+      
+      &rc_ETY_REP_PAG_TBL.BUSINESS_UNIT.Value = ETY_REP_PAG_TBL.BUSINESS_UNIT;
+      &rc_ETY_REP_PAG_TBL.ENTERED_DT.Value = ETY_REP_PAG_TBL.ENTERED_DT;
+      &rc_ETY_REP_PAG_TBL.ENTERED_TM.Value = ETY_REP_PAG_TBL.ENTERED_TM;
+      &rc_ETY_REP_PAG_TBL.BUSINESS_UNIT_PO.Value = ETY_REP_PAG_TBL.BUSINESS_UNIT_PO;
+      &rc_ETY_REP_PAG_TBL.RECEIVER_ID.Value = ETY_REP_PAG_TBL.RECEIVER_ID;
+      &rc_ETY_REP_PAG_TBL.FF_ID_RADICADO.Value = ETY_REP_PAG_TBL.FF_ID_RADICADO;
+      &rc_ETY_REP_PAG_TBL.INVOICE_ID_FROM.Value = ETY_REP_PAG_TBL.INVOICE_ID_FROM;
+      
+      
+      
+      
+      If &rc_ETY_REP_PAG_TBL.SelectByKey() Then
+         &rc_ETY_REP_PAG_TBL.BUSINESS_UNIT.Value = ETY_REP_PAG_TBL.BUSINESS_UNIT;
+         &rc_ETY_REP_PAG_TBL.ENTERED_DT.Value = ETY_REP_PAG_TBL.ENTERED_DT;
+         &rc_ETY_REP_PAG_TBL.ENTERED_TM.Value = ETY_REP_PAG_TBL.ENTERED_TM;
+         &rc_ETY_REP_PAG_TBL.BUSINESS_UNIT_PO.Value = ETY_REP_PAG_TBL.BUSINESS_UNIT_PO;
+         &rc_ETY_REP_PAG_TBL.RECEIVER_ID.Value = ETY_REP_PAG_TBL.RECEIVER_ID;
+         &rc_ETY_REP_PAG_TBL.FF_ID_RADICADO.Value = ETY_REP_PAG_TBL.FF_ID_RADICADO;
+         &rc_ETY_REP_PAG_TBL.INVOICE_ID_FROM.Value = ETY_REP_PAG_TBL.INVOICE_ID_FROM;
+         &rc_ETY_REP_PAG_TBL.ETY_COD_EVENTO.Value = ETY_REP_PAG_TBL.ETY_COD_EVENTO;
+         &rc_ETY_REP_PAG_TBL.PYMNT_CNT.Value = ETY_REP_PAG_TBL.PYMNT_CNT;
+         &rc_ETY_REP_PAG_TBL.DOCUMENT.Value = ETY_REP_PAG_TBL.DOCUMENT;
+         &rc_ETY_REP_PAG_TBL.NOTIFIED_FLAG.Value = ETY_REP_PAG_TBL.NOTIFIED_FLAG;
+         &rc_ETY_REP_PAG_TBL.DESCR254.Value = ETY_REP_PAG_TBL.DESCR254;
+         &rc_ETY_REP_PAG_TBL.OPRID_MODIFIED_BY.Value = %OperatorId;
+         &rc_ETY_REP_PAG_TBL.DTTM_MODIFIED.Value = %Datetime;
+         &enter_dttm = %Datetime;
+         
+         &hora = Substring(ETY_REP_PAG_TBL.ENTERED_TM.Value, 1, 2) | ":" | Substring(ETY_REP_PAG_TBL.ENTERED_TM.Value, 4, 2) | ":" | Substring(ETY_REP_PAG_TBL.ENTERED_TM.Value, 7, 2);
+         REM MessageBox(0, "", 0, 0, "&hora " | &hora);
+         rem malo         &enter_dttm_char = String(DateValue(ETY_REP_PAG_TBL.ENTERED_DT.Value)) | " " | Substring(ETY_REP_PAG_TBL.ENTERED_TM.Value, 10, 27);
+         
+         &enter_dttm_char = "20" | Substring(ETY_REP_PAG_TBL.ENTERED_DT.Value, 3, 2) | "-" | Substring(ETY_REP_PAG_TBL.ENTERED_DT.Value, 6, 2) | "-" | Substring(ETY_REP_PAG_TBL.ENTERED_DT.Value, 9, 2) | "-" | &hora;
+         rem ejm         &enter_dttm_char = "20" | Substring(ETY_REP_PAG_WRK.ENTERED_DT.Value, 3, 2) | "-" | Substring(ETY_REP_PAG_WRK.ENTERED_DT.Value, 6, 2) | "-" | Substring(ETY_REP_PAG_WRK.ENTERED_DT.Value, 9, 2) | "-" | &hora_final;
+         rem ejm      &dttm_mod_Fin_char = "20" | Substring(ETY_REP_PAG_WRK.TO_DATE.Value, 3, 2) | "-" | Substring(ETY_REP_PAG_WRK.FROM_DATE.Value, 6, 2) | "-" | Substring(ETY_REP_PAG_WRK.TO_DATE.Value, 9, 2) | "-" | &hora_final;
+         
+         REM  MessageBox(0, "", 0, 0, "&enter_dttm_char " | &enter_dttm_char);
+         &rc_ETY_REP_PAG_TBL.ENTERED_DTTM.Value = &enter_dttm;
+         &rc_ETY_REP_PAG_TBL.Update();
+         
+         /* Inicio #84282 */
+         ETY_REP_PAG_TBL.OPRID_MODIFIED_BY.Value = &rc_ETY_REP_PAG_TBL.OPRID_MODIFIED_BY.Value;
+         ETY_REP_PAG_TBL.DTTM_MODIFIED.Value = &rc_ETY_REP_PAG_TBL.DTTM_MODIFIED.Value;
+         /* Fin #84282 */
+      End-If;
+   Else
+      MessageBox(0, "", 0, 0, "Seleccione el Código del Evento");
+   End-If;
+End-If;

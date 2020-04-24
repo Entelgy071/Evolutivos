@@ -1,0 +1,134 @@
+import PTFP_FEED:FeedFactory;
+import PTFP_FEED:Feed;
+import PT_QUERY_AS_FEED:QueryAsFeed;
+
+Declare Function IsQueryDisabled PeopleCode QRYFUNCTIONS.QRYQUERYFUNCS FieldFormula;
+
+Function CheckSessionMessages(&bDisplayErrors As boolean) Returns number;
+   Local ApiObject &PSMessages;
+   Local number &i, &MsgSetNbr, &MsgNbr, &NbrErrors;
+   
+   &PSMessages = %Session.PSmessages;
+   &NbrErrors = &PSMessages.Count;
+   
+   If &NbrErrors > 0 Then
+      For &i = 1 To &NbrErrors
+         &MsgSetNbr = &PSMessages.Item(&i).MessageSetNumber;
+         &MsgNbr = &PSMessages.Item(&i).MessageNumber;
+         If &bDisplayErrors Then
+            MessageBox(0, "", &MsgSetNbr, &MsgNbr, "Message Not Found : " | &MsgSetNbr | "," | &MsgNbr);
+         End-If;
+      End-For;
+      &PSMessages.DeleteAll();
+   End-If;
+   
+   Return &NbrErrors;
+   
+End-Function; /* CheckSessionMessages */
+
+Function ExecQuery() Returns boolean;
+   Local string &sOutFile;
+   Local Record &rcdQryRunParms;
+   Local Record &rcdQryPrompts;
+   Local SQL &sqlSelectQryParms;
+   Local number &cnt, &i, &Result;
+   Local ApiObject &aQry, &QryRunTimePrompts;
+   Local boolean &bPublic;
+   Local number &nOrigPSMessagesMode, &nTreePromptcount;
+   
+   Local PT_QUERY_AS_FEED:QueryAsFeed &prePubFeed;
+   Local string &sFeedID;
+   
+   /* ICE ReportID:1159031000 - Add the following new variables */
+   Local ApiObject &PSMessages;
+   Local number &MsgSetNbr, &MsgNbr;
+   Local boolean &bResult;
+   /*1631204000 Added the following variables*/
+   Local Record &rcdQryRunTreeParms;
+   Local ApiObject &qsel, &qselcol, &qcrtcol, &qcrt;
+   &nTreePromptcount = 0;
+   &bResult = True;
+   &nOrigPSMessagesMode = %Session.PSMessagesMode;
+   %Session.PSMessagesMode = 1;
+   
+   &sOutFile = %FilePath | "Reporte_Pagos" | "-" | ETY_REP_PAG_AET.PROCESS_INSTANCE;
+   &aQry = %Session.GetQuery();
+   
+   &bPublic = True;
+   
+   /*1961839000 */
+   If IsQueryDisabled("AP_CONSOLIDADO_PAGOS_QRY", &bPublic) Then
+      MessageBox(%MsgStyle_OK, "", 50, 580, "###This query has been disabled by an administrator. Contact your query administrator for assistance.", PSQUERY_AET.QRYNAME);
+      &bResult = False;
+   Else
+      If &aQry.Open("AP_CONSOLIDADO_PAGOS_QRY", &bPublic, False) = 0 Then
+         
+         
+         /*1631204000 - to handle the intree prompts parameters*/
+         &rcdQryRunTreeParms = CreateRecord(Record.ETY_REP_PAG_RUN);
+         &sqlSelectQryParms = CreateSQL("%Selectall(:1) WHERE OPRID = :2 AND RUN_CNTL_ID = :3");
+         rem &sqlSelectQryParms = CreateSQL("SELECT * FROM PS_QRY_RUN_TREEPRM WHERE OPRID='" | %OperatorId | "' AND RUN_CNTL_ID='" | PSQUERY_AET.RUN_CNTL_ID | "'");
+         &sqlSelectQryParms.Execute(&rcdQryRunTreeParms, %OperatorId, ETY_REP_PAG_AET.RUN_CNTL_ID);
+         
+         &rcdQryPrompts = &aQry.PromptRecord;
+         If &rcdQryPrompts <> Null Then
+            
+            &rcdQryPrompts.FROM_DATE.Value = ETY_REP_PAG_AET.FROM_DATE.Value;
+            &rcdQryPrompts.TO_DATE.Value = ETY_REP_PAG_AET.TO_DATE.Value;
+            
+         End-If;
+         REM &aQry.AddTrackingURL(PSQUERY_AET.URL);
+         /* 1814433001 */
+         If %OutDestType = 8 Then
+            If PSQUERY_AET.PTFP_FEED_ID <> "-OF\" And
+                  PSQUERY_AET.PTFP_FEED_ID <> "-OF/" Then
+               &prePubFeed = create PT_QUERY_AS_FEED:QueryAsFeed();
+               If Find("/", PSQUERY_AET.PTFP_FEED_ID) = Len(PSQUERY_AET.PTFP_FEED_ID) Or
+                     Find("\", PSQUERY_AET.PTFP_FEED_ID) = Len(PSQUERY_AET.PTFP_FEED_ID) Then
+                  &sFeedID = Left(PSQUERY_AET.PTFP_FEED_ID, Len(PSQUERY_AET.PTFP_FEED_ID) - 1);
+               Else
+                  &sFeedID = PSQUERY_AET.PTFP_FEED_ID;
+               End-If;
+               If All(&sFeedID) Then
+                  &prePubFeed.Publish(&sFeedID, String(ETY_REP_PAG_AET.PROCESS_INSTANCE));
+               End-If
+            Else
+               MessageBox(0, "", 139, 313, "###Unable to find the requested feed.");
+               &bResult = False;
+            End-If;
+            /* 1814433001 */
+         Else
+            &Result = &aQry.RunToFile(&rcdQryPrompts, &sOutFile, %OutDestFormat, 0);
+         End-If;
+         
+         If &sqlSelectQryParms.IsOpen Then /*1631204000*/
+            &sqlSelectQryParms.Close();
+         End-If;
+         &aQry.Close();
+      End-If;
+   End-If;
+   %Session.PSMessagesMode = &nOrigPSMessagesMode;
+   
+   If %Session.PSmessages.Count = 0 Then
+      Return &bResult;
+   Else
+      /* ICE ReportID:1159031000 - Check message type before returning "No Success(False)" */
+      /* If Message Type = Cancel(0) or Message Type = Error (1) then return false */
+      &bResult = True;
+      &PSMessages = %Session.PSmessages;
+      For &i = 1 To &PSMessages.Count
+         If (&PSMessages.Item(&i).MessageType <= 1) Then
+            &bResult = False;
+            Break;
+         End-If;
+      End-For;
+      Return &bResult;
+   End-If;
+   
+End-Function; /* ExecQuery */
+
+If ExecQuery() = True Then
+   Exit (0);
+Else
+   Exit (1);
+End-If;

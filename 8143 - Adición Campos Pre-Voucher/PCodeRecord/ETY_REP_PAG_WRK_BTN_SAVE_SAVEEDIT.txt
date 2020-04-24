@@ -1,0 +1,7 @@
+If All(ETY_REP_PAG_TBL.BUSINESS_UNIT) Then
+   If None(ETY_REP_PAG_TBL.RECEIVER_ID) And
+         None(ETY_REP_PAG_TBL.FF_ID_RADICADO) And
+         None(ETY_REP_PAG_TBL.INVOICE_ID_FROM) Then
+      Error MsgGet(0, 0, "Es necesario que ingrese el número de la recepción, el número del radicado o el número de factura");
+   End-If;
+End-If;

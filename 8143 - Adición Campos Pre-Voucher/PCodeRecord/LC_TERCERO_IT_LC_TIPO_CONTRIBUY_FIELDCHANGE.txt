@@ -1,0 +1,79 @@
+rem+************************************************************************************************************************+;
+rem+	PROYECTO				AUTOR				FECHA		SEQNUM		DESCRIPCIÓN:									+;
+rem+ ETY_CREACION_TERCEROS_NJ	Laura Zorro			31/01/2017	001			Funciones para carga de retenciones.			+;
+rem+ ETY_ERP_PO_7329		    Mauricio González	18/02/2020	002			Activación automática del flag Registro IVA		+;
+rem+************************************************************************************************************************+;
+
+/*Inicio 001*/
+Local Rowset &rs1, &rs2;
+Local number &i;
+
+&rs1 = GetLevel0()(1).GetRowset(Scroll.LC_TERCERO_IT);
+
+&rs2 = &rs1(CurrentRowNumber(1)).GetRowset(Scroll.ETY_TERINF_CIIU);
+For &i = 1 To &rs2.ActiveRowCount
+   &rs2(&i).GetRecord(Record.ETY_TERINF_CIIU).GetField(Field.LC_TIPO_CONTRIBUY).Value = LC_TERCERO_IT.LC_TIPO_CONTRIBUY.Value;
+End-For;
+
+/*Fin 001*/
+
+/*Inicio 002*/
+If %Page = Page.ETY_TERCERO_IT Then
+   
+   If LC_TERCERO_IT.LC_TIPO_CONTRIBUY.Value = "01" Or
+         LC_TERCERO_IT.LC_TIPO_CONTRIBUY.Value = "02" Or
+         LC_TERCERO_IT.LC_TIPO_CONTRIBUY.Value = "03" Or
+         LC_TERCERO_IT.LC_TIPO_CONTRIBUY.Value = "04" Or
+         LC_TERCERO_IT.LC_TIPO_CONTRIBUY.Value = "08" Or
+         LC_TERCERO_IT.LC_TIPO_CONTRIBUY.Value = "09" Or
+         LC_TERCERO_IT.LC_TIPO_CONTRIBUY.Value = "13" Or
+         LC_TERCERO_IT.LC_TIPO_CONTRIBUY.Value = "15" Then
+      
+      /*VNDR_PANELS_WK2.SCHEDULE_TYPE_FLG.Value = "Y";
+   UnHide(VNDR_MAINT_WRK.VAT_RGSTRN_PB);*/
+      SQLExec("Select 'X' FROM PS_ETY_VNDR_VAT_RG A WHERE A.SETID = :1 AND A.VENDOR_ID = :2 ", LC_TERCERO_IT.SETID.Value, LC_TERCERO_IT.LC_TERCERO_ID.Value, &StrExiste);
+      REM MessageBox(0, "", 0, 0, "&StrExiste: " | &StrExiste);
+      /*If All(&StrExiste) Then;
+         SQLExec("Select 'X' FROM PS_VNDR_VAT_RGSTRN WHERE SETID = :1 AND VENDOR_ID = :2", &setid, &lc_tercero_id, &Existe_std);
+         If All(&Existe_std) Then
+            REM MessageBox(0, "", 0, 0, "1I" | &setid | "," | &lc_tercero_id | "," | LC_VNDR_VAT_RGS.COUNTRY | "," | LC_VNDR_VAT_RGS.COUNTRY_2CHAR | "," | LC_VNDR_VAT_RGS.VAT_RGSTRN_ID | "," | LC_VNDR_VAT_RGS.HOME_COUNTRY_FLG);
+            SQLExec("Update PS_VNDR_VAT_RGSTRN set COUNTRY=:3, COUNTRY_2CHAR=:4,VAT_RGSTRN_ID=:5 ,HOME_COUNTRY_FLG=:6 WHERE SETID = :1 AND VENDOR_ID = :2", &setid, &lc_tercero_id, LC_VNDR_VAT_RGS.COUNTRY, LC_VNDR_VAT_RGS.COUNTRY_2CHAR, LC_VNDR_VAT_RGS.VAT_RGSTRN_ID, LC_VNDR_VAT_RGS.HOME_COUNTRY_FLG);
+         Else
+            SQLExec("insert into PS_VNDR_VAT_RGSTRN values (:1,:2,:3,:4,:5,:6)", &setid, &lc_tercero_id, LC_VNDR_VAT_RGS.COUNTRY, LC_VNDR_VAT_RGS.COUNTRY_2CHAR, LC_VNDR_VAT_RGS.VAT_RGSTRN_ID, LC_VNDR_VAT_RGS.HOME_COUNTRY_FLG);
+         End-If;
+         REM SQLExec("Select 'X' FROM PS_LC_VNDR_VAT_RGS WHERE SETID = :1 AND LC_TERCERO_ID = :2", &setid, &lc_tercero_id, &Existe);
+         If All(&Existe) Then
+            REM  MessageBox(0, "", 0, 0, "3I");
+            SQLExec("Update PS_LC_VNDR_VAT_RGS set COUNTRY=:3, COUNTRY_2CHAR=:4,VAT_RGSTRN_ID=:5 ,HOME_COUNTRY_FLG=:6 WHERE SETID = :1 AND LC_TERCERO_ID= :2", &setid, &lc_tercero_id, LC_VNDR_VAT_RGS.COUNTRY, LC_VNDR_VAT_RGS.COUNTRY_2CHAR, LC_VNDR_VAT_RGS.VAT_RGSTRN_ID, LC_VNDR_VAT_RGS.HOME_COUNTRY_FLG);
+         Else
+            REM MessageBox(0, "", 0, 0, "4I" | &setid | "," | &lc_tercero_id | "," | LC_VNDR_VAT_RGS.COUNTRY | "," | LC_VNDR_VAT_RGS.COUNTRY_2CHAR | "," | LC_VNDR_VAT_RGS.VAT_RGSTRN_ID | "," | LC_VNDR_VAT_RGS.HOME_COUNTRY_FLG);
+            SQLExec("INSERT INTO PS_LC_VNDR_VAT_RGS (SETID, LC_TERCERO_ID, COUNTRY, COUNTRY_2CHAR, VAT_RGSTRN_ID, HOME_COUNTRY_FLG) VALUES (STRING(:1),STRING(:2),STRING(:3),STRING(:4),STRING(:5),STRING(:6))", &setid, &lc_tercero_id, LC_VNDR_VAT_RGS.COUNTRY, LC_VNDR_VAT_RGS.COUNTRY_2CHAR, LC_VNDR_VAT_RGS.VAT_RGSTRN_ID, LC_VNDR_VAT_RGS.HOME_COUNTRY_FLG);
+         End-If;*/
+      
+      /*SQLExec("Update PS_VENDOR set VAT_SW = 'Y' where SETID = :1 AND VENDOR_ID = :2", &setid, &lc_tercero_id);
+         EndModal(0);*/
+      /*Else
+         If None(LC_VNDR_VAT_RGS.COUNTRY) Then
+            MessageBox(0, "", 0, 0, "Pais en blanco, Por favor diligéncielo, es obligatorio");
+         End-If;
+         
+         If None(LC_VNDR_VAT_RGS.VAT_RGSTRN_ID) Then
+            MessageBox(0, "", 0, 0, "ID Registro IVA en blanco, Por favor diligéncielo, es obligatorio");
+         End-If;
+         If LC_VNDR_VAT_RGS.HOME_COUNTRY_FLG <> "Y" Then
+            MessageBox(0, "", 0, 0, "País Origen en blanco, Por favor diligéncielo, es obligatorio");
+         End-If;*/
+      rem End-If;
+   End-If;
+   
+Else
+   VNDR_PANELS_WK2.SCHEDULE_TYPE_FLG.Value = "N";
+   If VNDR_PANELS_WK2.SCHEDULE_TYPE_FLG.Value <> "Y" Then
+      rem 
+      rem MessageBox(0, "", 0, 0, "Flag de Registro de IVA desactivado");
+      Hide(VNDR_MAINT_WRK.VAT_RGSTRN_PB);
+   Else
+      UnHide(VNDR_MAINT_WRK.VAT_RGSTRN_PB);
+   End-If;
+End-If;
+/*Inicio 002*/

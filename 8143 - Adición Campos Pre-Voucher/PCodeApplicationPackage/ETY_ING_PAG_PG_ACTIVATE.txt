@@ -1,0 +1,23 @@
+/*
+Local Rowset &rs_ETY_REP_PAG_VW;
+
+&rs_ETY_REP_PAG_VW = GetLevel0()(1).GetRowset(Scroll.ETY_REP_PAG_VW);
+*/
+ETY_REP_PAG_WRK.FROM_DATE = %Date;
+ETY_REP_PAG_WRK.TO_DATE = %Date;
+
+rem &rs_ETY_REP_PAG_VW.Select(Record.ETY_REP_PAG_VW, " WHERE ENTERED_DT > :1", AddToDate(%Date, 0, 0, - Day(%Date)));
+/*
+&rs_ETY_REP_PAG_VW.Select(Record.ETY_REP_PAG_VW, " WHERE ENTERED_DT >= :1", %Date);
+
+&rs_ETY_REP_PAG_VW.Sort(ETY_REP_PAG_VW.ENTERED_DT, "D");
+*/
+/*
+For &i = 1 To &rs_ETY_REP_PAG_VW.ActiveRowCount
+   &rs_ETY_REP_PAG_VW(&i).ETY_REP_PAG_VW.BUSINESS_UNIT.DisplayOnly = True;
+   &rs_ETY_REP_PAG_VW(&i).ETY_REP_PAG_VW.RECEIVER_ID.DisplayOnly = True;
+   &rs_ETY_REP_PAG_VW(&i).ETY_REP_PAG_VW.OPRID_FROM.DisplayOnly = True;
+   &rs_ETY_REP_PAG_VW(&i).ETY_REP_PAG_VW.OPRID_OWNER.DisplayOnly = True;
+   &rs_ETY_REP_PAG_VW(&i).ETY_REP_PAG_VW.FF_ID_RADICADO.DisplayOnly = True;
+End-For;
+*/

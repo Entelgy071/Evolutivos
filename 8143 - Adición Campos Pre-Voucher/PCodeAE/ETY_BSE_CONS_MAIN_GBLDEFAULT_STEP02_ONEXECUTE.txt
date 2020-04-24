@@ -1,0 +1,50 @@
+/**********************************************************************************************
+Actividad: 	  Tipo: 	PROYECTO: 					Autor: 				Fecha: 		
+#00001 		  Actlz. 	ETY_ERP_AP_FLP_OPTI_AP001 	Alexandro Pachón 	19 May 2015 
+Descripción:  Generaciónde informe de ciclo de pagos, para tesoreria, relación de archivos pagos
+              electonicos.
+***********************************************************************************************/
+/* Inicio Actividad #00001 */
+
+import PSXP_RPTDEFNMANAGER:*;
+
+
+Local Record &rcdQryPrompts;
+Local string &MyReportName, &MyTemplate, &LanguageCd;
+Local date &AsOfDate;
+Local PSXP_RPTDEFNMANAGER:ReportDefn &oReportDefn;
+
+/* Setup Report */
+&LanguageCd = %Language_User;
+&AsOfDate = %Date;
+/* GetURL(URL.QQ_XMLP_PATH);*/
+&FileXMLPath = "";
+/*Nombre del archivo XML*/
+&FileXMLGen = " ";
+/* Setup Defn XML */
+&MyReportName = "ETY_BSE_CONS";
+
+&MyTemplate = "ETY_BSE_CONS_1";
+
+
+&OutputPDFFilename = "BaseConsol";
+
+/* Creo Reporte en función del reporte*/
+&oReportDefn = create PSXP_RPTDEFNMANAGER:ReportDefn(&MyReportName);
+rem &sOutFormat = &oReportDefn.GetOutDestFormatString(%OutDestFormat);
+&sOutFormat = "XLS";
+&oReportDefn.Get();
+
+
+MessageBox(0, "", 0, 0, ETY_REP_PAG_AET.FROM_DATE | " " | ETY_REP_PAG_AET.TO_DATE);
+
+&rcdQryPrompts = &oReportDefn.GetPSQueryPromptRecord();
+If Not &rcdQryPrompts = Null Then
+   &oReportDefn.SetPSQueryPromptRecord(&rcdQryPrompts);
+   &rcdQryPrompts.FROM_DATE.Value = ETY_REP_PAG_AET.FROM_DATE;
+   &rcdQryPrompts.TO_DATE.Value = ETY_REP_PAG_AET.TO_DATE;
+End-If;
+
+rem &oReportDefn.ReportFileName = PYCYCL_STAT.PAY_CYCLE | "_" | PYCYCL_STAT.PAY_CYCLE_SEQ_NUM | "_" | %Date;
+&oReportDefn.ProcessReport(&MyTemplate, &LanguageCd, &AsOfDate, &sOutFormat);
+&oReportDefn.Publish("", "", "", ETY_REP_PAG_AET.PROCESS_INSTANCE);

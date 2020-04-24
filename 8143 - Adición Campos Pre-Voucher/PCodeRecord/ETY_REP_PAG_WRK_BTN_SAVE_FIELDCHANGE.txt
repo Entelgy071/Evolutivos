@@ -1,0 +1,27 @@
+/***************************************************************************************************************************/
+/* PROYECTO			ACTIVIDAD			RESPONSABLE			FECHA		DESCRIPCIÓN										   */
+/* ETY_ERP_AP_8143		001				Mauricio González	03/03/2020	Pobla la grilla de recepción de Pagos              */
+/***************************************************************************************************************************/
+
+Local Rowset &rs_ETY_REP_PAG_VW, &rs_ETY_REP_PAG_VW_2;
+Local string &Where, &Where_All, &dttm_inicio_char, &dttm_final_char;
+
+
+If %Page = Page.ETY_ING_PAG_PG Then
+   /*********** Formateo de las fechas digitadas **********/
+   &dttm_inicio_char = "'" | ETY_REP_PAG_WRK.FROM_DATE.Value | " " | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 1, 2) | "." | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 4, 2) | "." | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 7, 2) | ".000000'";
+   &dttm_final_char = "'" | ETY_REP_PAG_WRK.TO_DATE.Value | " " | Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 1, 2) | "." | Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 4, 2) | "." | Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 7, 2) | ".000000'";
+   
+   &rs_ETY_REP_PAG_VW = GetLevel0()(1).GetRowset(Scroll.ETY_REP_PAG_VW);
+   &rs_ETY_REP_PAG_VW_2 = CreateRowset(Record.ETY_REP_PAG_VW);
+   
+   &Where = (" WHERE (ENTERED_DTTM >= (" | &dttm_inicio_char | ") AND ENTERED_DTTM <= (" | &dttm_final_char | "))");
+   &Where_All = &Where | " AND BUSINESS_UNIT IN (SELECT A.BUSINESS_UNIT FROM PS_SP_BU_AP_CLSVW A, PSOPRDEFN U WHERE A.OPRCLASS = U.OPRCLASS AND U.OPRID = '" | %OperatorId | "')";
+   
+   &rs_ETY_REP_PAG_VW_2.Fill(&Where_All);
+   &rs_ETY_REP_PAG_VW_2.CopyTo(&rs_ETY_REP_PAG_VW, Record.ETY_REP_PAG_VW, Record.ETY_REP_PAG_VW);
+   
+   &rs_ETY_REP_PAG_VW.Sort(ETY_REP_PAG_VW.ENTERED_DTTM, "A");
+   
+   SetComponentChanged();
+End-If;

@@ -1,0 +1,17 @@
+/***********************************************************************************************************************************/
+/* PROYECTO			ACTIVIDAD			RESPONSABLE			FECHA		DESCRIPCIÓN											       */
+/* ETY_ERP_AP_8143		001				John Diaz	      23/04/2020	Carga la vista dinamica con los datos solicitados.         */
+/***********************************************************************************************************************************/
+SQLExec("SELECT BUSINESS_UNIT FROM PS_BUS_UNIT_TBL_PM WHERE BUSINESS_UNIT_AP = :1", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.BUSINESS_UNIT_PO);
+
+/*Inicio 001*/
+If %Page = Page.ETY_ING_PAG_PG Then
+   &SELECT = "SELECT BUSINESS_UNIT, VOUCHER_ID FROM (SELECT BUSINESS_UNIT, VOUCHER_ID FROM PS_ETY_VCHR_NO_PAY)";
+   ETY_REP_PAG_TBL.VOUCHER_ID.SqlText = &SELECT;
+End-If;
+
+If %Page = Page.ETY_INCONS_PAG_PG Then
+   &SELECT = "SELECT BUSINESS_UNIT, VOUCHER_ID FROM (SELECT BUSINESS_UNIT, VOUCHER_ID FROM PS_ETY_REP_PAG_TBL WHERE VOUCHER_ID <> ' ')";
+   ETY_REP_PAG_TBL.VOUCHER_ID.SqlText = &SELECT;
+End-If;
+/*Fin 001*/

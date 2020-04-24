@@ -1,0 +1,73 @@
+/***********************************************************************************************************************************************/
+/* PROYECTO			ACTIVIDAD			RESPONSABLE			FECHA		DESCRIPCIÓN											             	   */
+/* ETY_ERP_AP_8143		001				Mauricio González	03/032/2020	construcción del filtro para la página de Registro Inconsitencias      */
+/***********************************************************************************************************************************************/
+
+Local Rowset &rs_ETY_REP_PAG_TBL;
+Local string &Where, &dttm_mod_Ini_chr, &dttm_mod_Fin_chr;
+Local datetime &dttm_mod_Ini, &dttm_mod_Fin, &Hora_Fin_nbr_completa;
+
+
+If %Page = Page.ETY_INCONS_PAG_PG Then
+   
+   &rs_ETY_REP_PAG_TBL = GetLevel0()(1).GetRowset(Scroll.ETY_REP_PAG_TBL);
+   &rs_ETY_REP_PAG_TBL.Flush();
+   &Where = " WHERE BUSINESS_UNIT IN (SELECT A.BUSINESS_UNIT FROM PS_SP_BU_AP_CLSVW A, PSOPRDEFN U WHERE A.OPRCLASS = U.OPRCLASS AND U.OPRID = '" | %OperatorId | "')";
+   
+   If All(ETY_REP_PAG_WRK.FROM_DATE) And
+         All(ETY_REP_PAG_WRK.TO_DATE) Then
+      
+      &hora_i_nbr = Value(Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 1, 2));
+      If &hora_i_nbr >= 12 Then
+         &hora_inicio = (&hora_i_nbr - 12);
+         If &hora_inicio = 0 Then
+            &hora_inicio = "01:" | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 4, 2) | ":" | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 7, 2) | ",000000000 PM";
+         Else
+            &hora_inicio = &hora_inicio | ":" | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 4, 2) | ":" | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 7, 2) | ",000000000 PM";
+         End-If;
+      Else
+         If &hora_i_nbr = 0 Then
+            &hora_inicio = "01:" | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 4, 2) | ":" | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 7, 2) | ",000000000 AM";
+         Else
+            &hora_inicio = "0" | &hora_i_nbr | ":" | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 4, 2) | ":" | Substring(ETY_REP_PAG_WRK.HORA_INICIO_SECS.Value, 7, 2) | ",000000000 AM";
+         End-If;
+      End-If;
+      
+      &hora_f_nbr = Value(Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 1, 2));
+      
+      If &hora_f_nbr >= 12 Then
+         rem tmp &hora_final = &hora_f_nbr - 12;
+         &hora_final = &hora_f_nbr;
+         &hora_final = &hora_final | ":" | Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 4, 2) | ":" | Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 7, 2) | ",000000000 PM";
+      Else
+         If &hora_final = 0 Then
+            &hora_final = "01:" | Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 4, 2) | ":" | Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 7, 2) | ",000000000 AM";
+         Else
+            &hora_final = &hora_f_nbr | ":" | Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 4, 2) | ":" | Substring(ETY_REP_PAG_WRK.HORA_FIN_SECS.Value, 7, 2) | ",000000000 AM";
+         End-If;
+      End-If;
+      
+      &dttm_mod_Ini_char = "20" | Substring(ETY_REP_PAG_WRK.FROM_DATE.Value, 3, 2) | "/" | Substring(ETY_REP_PAG_WRK.FROM_DATE.Value, 6, 2) | "/" | Substring(ETY_REP_PAG_WRK.FROM_DATE.Value, 9, 2) | "-" | &hora_inicio;
+      rem &dttm_mod_Fin_char = "20" | Substring(ETY_REP_PAG_WRK.TO_DATE.Value, 3, 2) | "/" | Substring(ETY_REP_PAG_WRK.FROM_DATE.Value, 6, 2) | "/" | Substring(ETY_REP_PAG_WRK.TO_DATE.Value, 9, 2) | " " | &hora_final;
+      &dttm_mod_Fin_char = "20" | Substring(ETY_REP_PAG_WRK.TO_DATE.Value, 3, 2) | "/" | Substring(ETY_REP_PAG_WRK.FROM_DATE.Value, 6, 2) | "/" | Substring(ETY_REP_PAG_WRK.TO_DATE.Value, 9, 2) | "-" | &hora_final;
+      
+      REM WinMessage("SELECT * FROM PS_ETY_REP_PAG_TBL " | &dttm_mod_Ini_char);
+      REM WinMessage("SELECT * FROM PS_ETY_REP_PAG_TBL " | &dttm_mod_Fin_char);
+      
+      REM 2020/04/14-01:00:00,000000000 AM
+REM 2020/04/14-23.59.59.000000000 PM;
+      
+      
+      &dttm_mod_Ini = &dttm_mod_Ini_char;
+      
+      &dttm_mod_Fin = &dttm_mod_Fin_char;
+      
+      &Where = &Where | " AND DTTM_MODIFIED >= %DateTimeIn('" | &dttm_mod_Ini | "') AND DTTM_MODIFIED <= %DateTimeIn('" | &dttm_mod_Fin | "')";
+      
+   End-If;
+   
+   
+   &Where = &Where | " AND NOTIFIED_FLAG = 'Y' ORDER BY DTTM_MODIFIED";
+   REM WinMessage("SELECT * FROM PS_ETY_REP_PAG_TBL " | &Where);
+   &rs_ETY_REP_PAG_TBL.Select(Record.ETY_REP_PAG_TBL, &Where);
+End-If;

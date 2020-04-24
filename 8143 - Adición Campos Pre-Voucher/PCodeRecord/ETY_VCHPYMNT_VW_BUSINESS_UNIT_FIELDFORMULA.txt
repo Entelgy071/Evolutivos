@@ -1,0 +1,46 @@
+/*- Level 0 Rowset -*/
+Component Rowset &rsLevel0;
+/*- Row of Level 0 row 1 -*/
+Component Row &rwLevel0Row1;
+/*- Record of Level 0 row 1 -*/
+Component Record &rdLevel0;
+/*- Many purposes info -*/
+Component string &pg_sSearchKey, &pg_sSortKey, &pg_sConvertKey;
+Component number &nTotalRowNum;
+/*- Display currency info -*/
+Component Record &rdUserCurr;
+
+Local Rowset &rsVchrPayDet;
+Local string &sWhere;
+Local Grid &gdVchrInq;
+Local number &nRows;
+
+Function SearchRows()
+   
+   &rsVchrPayDet = &rwLevel0Row1.GetRowset(Scroll.VCHR_PYMNT_VW);
+   
+   &sWhere = "WHERE BUSINESS_UNIT = '" | &rdLevel0.BUSINESS_UNIT.Value | "'";
+   &sWhere = &sWhere | " AND VOUCHER_ID = '" | &rdLevel0.VOUCHER_ID.Value | "'";
+   
+   &rsVchrPayDet.Flush();
+   &rsVchrPayDet.Select(Record.VCHR_PYMNT_VW, &sWhere);
+   &rsVchrPayDet.Select(Record.VCHR_APPLPAY_VW, &sWhere);
+   
+   If &rsVchrPayDet.ActiveRowCount = 1 And
+         &rsVchrPayDet(1).IsNew = True Then
+      &rsVchrPayDet.HideAllRows();
+   Else
+      &rsVchrPayDet.ShowAllRows();
+      &nRows = &rsVchrPayDet.ActiveRowCount;
+      For &ni = 1 To &nRows
+         If None(&rsVchrPayDet(&ni).VCHR_PYMNT_VW.PREPAID_APPLIED_BU.Value) Then
+            &rsVchrPayDet(&ni).DERIVED_AP.PYMNT_SLCT_PB.Label = &rsVchrPayDet(&ni).VCHR_PYMNT_VW.PYMNT_ID_REF.Value;
+         Else
+            &rsVchrPayDet(&ni).DERIVED_AP.PYMNT_SLCT_PB.Visible = False;
+         End-If;
+      End-For;
+      &gdVchrInq = GetGrid(Page.VCHR_PYMNT_INQ, "VCHR_PYMNT_VW");
+      &gdVchrInq.GetColumn("PYMNT_SLCT_PB").Label = &rsVchrPayDet(1).VCHR_PYMNT_VW.PYMNT_ID_REF.GetLongLabel("PAY_REF_ID");
+   End-If;
+End-Function;
+

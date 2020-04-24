@@ -1,0 +1,61 @@
+Function Enviar_Notificacion() Returns number
+   Local string &NL = "<br>"; /* The new line character in html */
+   
+   &strSql = "SELECT EMAILID FROM PSUSEREMAIL WHERE  PRIMARY_EMAIL = 'Y' AND OPRID = :1";
+   
+   SQLExec(&strSql, %OperatorId, &MAIL_FROM);
+   SQLExec(&strSql, ETY_REP_PAG_TBL.OPRID_FROM, &MAIL_TO);
+   /*inicio 001*/
+   rem    SQLExec(&strSql, ETY_REP_PAG_TBL.OPRID_OWNER, &MAIL_CC);
+   
+   &strSql2 = "SELECT ACCTLOCK FROM PSOPRDEFN WHERE OPRID = :1";
+   SQLExec(&strSql2, ETY_REP_PAG_TBL.OPRID_OWNER, &cierre);
+   If (&cierre <> 1) Then
+      
+      &strSql = "SELECT EMAILID FROM PSUSEREMAIL WHERE  PRIMARY_EMAIL = 'Y' AND OPRID = :1";
+      SQLExec(&strSql, ETY_REP_PAG_TBL.OPRID_OWNER, &MAIL_CC);
+   End-If;
+   /*fin 001*/
+   
+   &strSql = "SELECT OPRDEFNDESC FROM PSOPRDEFN WHERE OPRID = :1";
+   
+   SQLExec(&strSql, %OperatorId, &DevueltoPor);
+   SQLExec(&strSql, ETY_REP_PAG_TBL.OPRID_FROM, &DevueltoA);
+   SQLExec(&strSql, ETY_REP_PAG_TBL.OPRID_OWNER, &Coordinador);
+   
+   /* Setting the parameters for sendmail */
+   &MAIL_FLAGS = 0;
+   &MAIL_FROM = &MAIL_FROM;
+   &MAIL_TO = &MAIL_TO;
+   &MAIL_CC = &MAIL_CC;
+   &MAIL_BCC = &MAIL_FROM;
+   &MAIL_SUBJECT = "Inconsistencias";
+   &MAIL_FILES = "";
+   &MAIL_TITLES = "";
+   
+   /* Making the email body */
+   &GREET = "<font face ='Arial'>Cordial Saludo " | &f_name | " " | &l_name | "," | &NL | &NL;
+   &MAIL_TEXT1 = &GREET | "Inconsistencias Presentadas:" | &NL | &NL | &NL;
+   REM &MAIL_TEXT2 = "<table border='1'><tr bgcolor = '#AAAAAA' ><th>Name</th><th>State</th><th>Country</th></tr><tr><td>Rojer Alex</td><td>VA</td><td>USA</td></tr></table>" | &NL;
+   &MAIL_TEXT2 = "<table border='1'><tr bgcolor = '#AAAAAA' ><th>FECHA</th><th>UN</th><th>PREVOUCHER</th><th>F. CREACIÓN</th><th>CÓDIGO DE EVENTO</th><th>CONCEPTO</th><th>No. PAGOS</th><th>DOCUMENTO</th><th>No. RECEPCIÓN</th><th>DESCRIPCIÓN</th><th>DEVUELTO A</th><th>DEVUELTO POR</th><th>COORDINADOR</th></tr>";
+   &MAIL_TEXT2 = &MAIL_TEXT2 | "<tr><th>" | ETY_REP_PAG_TBL.ENTERED_DT | "</th><th>" | ETY_REP_PAG_TBL.BUSINESS_UNIT | "</th><th>" | ETY_REP_PAG_TBL.VOUCHER_ID | "</th><th>" | ETY_REP_PAG_TBL.EVENT_DTTM | "</th><th>" | ETY_REP_PAG_TBL.ETY_COD_EVENTO | "</th><th>" | ETY_REP_PAG_TBL.ETY_COD_EVENTO.LongTranslateValue;
+   &MAIL_TEXT2 = &MAIL_TEXT2 | "</th><th>" | ETY_REP_PAG_TBL.PYMNT_CNT | "</th><th>" | ETY_REP_PAG_TBL.DOCUMENT | "</th><th>" | ETY_REP_PAG_TBL.RECEIVER_ID | "</th><th>" | ETY_REP_PAG_TBL.DESCR254 | "</th><th>" | &DevueltoA | "</th><th>" | &DevueltoPor | "</th><th>" | &Coordinador | "</th></tr></table>" | &NL;
+   &TEXT1 = "";
+   &TEXT2 = "";
+   &MAIL_FOOTER = &TEXT1 | &TEXT2 | "</font>";
+   &MAIL_TEXT_BODY = &MAIL_GREET | &MAIL_TEXT1 | &MAIL_TEXT2 | &MAIL_FOOTER;
+   
+   /* Sending the email */
+   &RET_CODE = SendMail(&MAIL_FLAGS, &MAIL_TO, &MAIL_CC, &MAIL_BCC, &MAIL_SUBJECT, &MAIL_TEXT_BODY, &MAIL_FILES, &MAIL_TITLES, &MAIL_FROM, ";", "Content-type: text/html; charset=utf8");
+   
+   /* Evaluating the return value of sendmail and showing the appropriate message */
+   If (&RET_CODE = 0) Then
+      MessageBox(0, "Alert", 0, 0, "Email ha sido enviado.");
+   Else
+      MessageBox(0, "Alert", 0, 0, "Email no se ha sido enviado.");
+   End-If;
+   
+   Return &RET_CODE;
+   
+End-Function;
+

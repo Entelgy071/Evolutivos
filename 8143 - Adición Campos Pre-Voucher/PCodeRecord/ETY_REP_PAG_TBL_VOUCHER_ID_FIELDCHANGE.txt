@@ -1,0 +1,103 @@
+/*******************************************************************************************************************************************/
+/* PROYECTO			ACTIVIDAD			RESPONSABLE			FECHA		DESCRIPCIÓN											           	   */
+/* ETY_ERP_PO_7329		001				Mauricio González	18/02/2020	Trae el valor de la VENDOR.VAT_SW para activar el link de Registro */
+/* ETY_ERP_AP_8143		002				John Diaz       	24/04/2020	Se realizan ajustes al cargue del prompt                           */
+/*******************************************************************************************************************************************/
+SQLExec("Select ENTRY_STATUS from PS_VOUCHER WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &Est_Entrada);
+
+If &Est_Entrada = "R" Then
+   MessageBox(0, "", 22000, 22006, "Mensage no encontrado", ETY_REP_PAG_TBL.VOUCHER_ID, ETY_REP_PAG_TBL.BUSINESS_UNIT);
+Else
+   /*Inicio 002*/
+   If %Page = Page.ETY_ING_PAG_PG Then
+      SQLExec("SELECT 'X' FROM PS_ETY_VCHR_NO_PAY WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &EXIST);
+   End-If;
+   
+   If %Page = Page.ETY_INCONS_PAG_PG Then
+      SQLExec("SELECT 'X' FROM PS_ETY_REP_PAG_TBL WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &EXIST);
+   End-If;
+   
+   If None(&EXIST) Then
+      ETY_REP_PAG_TBL.VOUCHER_ID.Style = "PSERROR";
+      Error ("No hay valores coincidentes");
+   Else
+      ETY_REP_PAG_TBL.VOUCHER_ID.Style = "PSEDITBOX";
+   End-If;
+   /*Fin 002*/
+   
+   SQLExec("Select pymnt_id, bank_setid, BANK_CD, BANK_ACCT_KEY, PREPAID_APPLIED_BU, PREPAID_APPL_VCHR, PREPAID_APPL_PYMNT, PREPAID_STATUS  from PS_PYMNT_VCHR_XREF where business_unit= :1 and voucher_id = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &pymnt_id, &bank_setid, &bank_cd, &bank_acct_key, &prepaid_applied_bu, &prepaid_appl_vchr, &prepaid_appl_pymnt, &prepaid_status);
+   REM MessageBox(0, "",0,0,""|);
+   REM MessageBox(0, "", 0, 0, "&pymnt_id>" | &pymnt_id | "<");
+   REM MessageBox(0, "", 0, 0, "&prepaid_appl_vchr>" | &prepaid_appl_vchr | "<");
+   
+   rem MessageBox(0, "", 0, 0, "&pymnt_id-&prepaid_appl_vchr>" | &pymnt_id | "<<>>" | &prepaid_appl_vchr | "<");
+   /*
+      Si el pymnt_id no existe se debe buscar como un pago anticipado;
+   */
+   If ((&pymnt_id = " " Or
+         &pymnt_id = "") And
+         (&prepaid_appl_vchr <> "")) Then
+      /* Se busca como un pago anticipado con los datos de Prepaid */
+      SQLExec("Select pymnt_id, bank_setid, BANK_CD, BANK_ACCT_KEY from PS_PYMNT_VCHR_XREF where business_unit= :1 and voucher_id = :2  and pymnt_type = 'R'", &prepaid_applied_bu, &prepaid_appl_vchr, &pymnt_id_PPAY, &bank_setid_ppay, &bank_cd_ppay, &bank_acct_key_ppay);
+      SQLExec("Select pymnt_id_ref from PS_PAYMENT_TBL where PYMNT_ID = :1 and BANK_SETID = :2 and BANK_CD = :3 and BANK_ACCT_KEY = :4", &pymnt_id_PPAY, &bank_setid, &bank_cd_ppay, &bank_acct_key_ppay, &payment_id_ref_ppay);
+      If &payment_id_ref <> "" Or
+            &payment_id_ref <> " " Then
+         
+         rem MessageBox(0, "", 0, 0, "&payment_id_ref>" | &payment_id_ref | "<");
+         Error ("El voucher " | ETY_REP_PAG_TBL.VOUCHER_ID | " No se puede usar, ya ha sido pago con el Id de Referencia N°" | &payment_id_ref);
+      Else
+         Error (" Es atípico que el voucher prepaid " | &prepaid_appl_vchr | " no tenga Id de Referencia");
+      End-If;
+   Else
+      
+      rem SQL ya ejecutado en la sentencia anterior 
+      SQLExec("Select pymnt_id, bank_setid, BANK_CD, BANK_ACCT_KEY from PS_PYMNT_VCHR_XREF where business_unit= :1 and voucher_id = :2 and pymnt_type = 'R'	", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &pymnt_id, &bank_setid, &bank_cd, &bank_acct_key);
+      
+      /*** Se busca la referencia de pago                                                                                                         ***/
+      /***                                   Si la refencia encuentra una en blanco pasa porque se entiende que no ha sido pagada en su totalidad ***/
+      SQLExec("Select pymnt_id_ref from PS_PAYMENT_TBL where PYMNT_ID = :1 and BANK_SETID = :2 and BANK_CD = :3 and BANK_ACCT_KEY = :4 AND (pymnt_id_ref = ' ' OR pymnt_id_ref = '')", &pymnt_id, &bank_setid, &bank_cd, &bank_acct_key, &payment_id_ref_pago);
+      rem SQLExec("Select pymnt_id_ref from PS_PAYMENT_TBL where PYMNT_ID = :1 and BANK_SETID = :2 and BANK_CD = :3 and BANK_ACCT_KEY = :4 AND (pymnt_id_ref <> ' ' OR pymnt_id_ref <> '')", &pymnt_id, &bank_setid, &bank_cd, &bank_acct_key, &payment_id_ref);
+      rem MessageBox(0, "", 0, 0, "&payment_id_ref>" | &payment_id_ref | "<");
+      If &payment_id_ref_pago <> "" Then
+         Error ("El voucher " | ETY_REP_PAG_TBL.VOUCHER_ID | " No se puede usar, ya ha sido pago, Id de Referencia #" | &payment_id_ref_pago);
+      End-If;
+      
+      /* Valida la obigatoriedad del radicado para la unidad de negocios */
+      SQLExec("Select FF_VALIDAR_RADICAD from PS_FF_BUS_UNIT_AP WHERE business_unit= :1", ETY_REP_PAG_TBL.BUSINESS_UNIT, &Radica_Oblig);
+      /* 6- Trae el # del radicado */
+      SQLExec("Select ff_id_radicado from ps_ff_voucher where business_unit= :1 and voucher_id = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &Id_radicado);
+      
+      If &Radica_Oblig = "Y" And
+            None(&Id_radicado) Then
+         If %Page = Page.ETY_ING_PAG_PG Then
+            SetCursorPos(Page.ETY_ING_PAG_PG, ETY_REP_PAG_TBL.FF_ID_RADICADO, CurrentRowNumber());
+            Error ("El número del radicado es obligatorio y no existe en la base de datos");
+         End-If;
+      End-If;
+      ETY_REP_PAG_TBL.FF_ID_RADICADO = &Id_radicado;
+      
+      /** 3- datetime de creación del voucher **/
+      SQLExec("SELECT AUDLOG_DTTM,USERID FROM PS_AP_VCHR_AUD_TBL WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND MESSAGE_SET_NBR ='7000' AND MESSAGE_NBR IN ('863','827')", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &dttm_crea_vchr, &Id_user_entrega);
+      ETY_REP_PAG_TBL.EVENT_DTTM = &dttm_crea_vchr;
+      ETY_REP_PAG_TBL.OPRID_FROM = &Id_user_entrega;
+      
+      /* 5- Recepción */
+      SQLExec("Select distinct(RECEIVER_ID) from PS_AP_VCHRRECVMTH WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &Id_Recepcion);
+      ETY_REP_PAG_TBL.RECEIVER_ID = &Id_Recepcion;
+      
+      /* 7- # DE Factura */
+      SQLExec("Select distinct(INVOICE_ID) from PS_VOUCHER WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &Id_Invoice);
+      ETY_REP_PAG_TBL.INVOICE_ID_FROM = &Id_Invoice;
+      
+      
+      
+      SQLExec("Select OPRID_OWNER from ps_ETY_REP_PAG_TBL WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &Coordinador);
+      ETY_REP_PAG_TBL.OPRID_OWNER = &Coordinador;
+      
+      SQLExec("Select OPRID_ENTERED_BY from ps_ETY_REP_PAG_TBL WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", ETY_REP_PAG_TBL.BUSINESS_UNIT, ETY_REP_PAG_TBL.VOUCHER_ID, &ingresoUsuario);
+      ETY_REP_PAG_TBL.OPRID_ENTERED_BY = &ingresoUsuario;
+      
+   End-If;
+   
+End-If;
+/*AP401*/
