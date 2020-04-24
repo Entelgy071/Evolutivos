@@ -1,0 +1,58 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 001       ETY_ERP_AP_EVO_9689     John Diaz         28-Febr-2020        Valida campo por defecto.
+*************************************************************************************************************************************/
+/*Inicio 001*/
+Local Rowset &rsETY_COD_DOC_TBL;
+Local string &DefectoFT, &AllDefectoFT, &DefectoNC, &AllDefectoNC, &DefectoND, &AllDefectoND;
+Local boolean &ERROR;
+
+&rsETY_COD_DOC_TBL = GetLevel0().GetRow(1).GetRowset(Scroll.ETY_COD_DOC_TBL);
+For &i = 1 To &rsETY_COD_DOC_TBL.ActiveRowCount
+   &Cod = &rsETY_COD_DOC_TBL.GetRow(&i).ETY_COD_DOC_TBL.MATCHNAME.Value;
+   &TipoDoc = &rsETY_COD_DOC_TBL.GetRow(&i).ETY_COD_DOC_TBL.ETY_TIPO_DOC_FE.Value;
+   
+   Evaluate &TipoDoc
+   When "FT"
+      &AllDefectoFT = "Y";
+      If &rsETY_COD_DOC_TBL.GetRow(&i).ETY_COD_DOC_TBL.ETY_P_DEFECTO.Value = "Y" Then
+         &DefectoFT = "Y";
+      End-If;
+      Break;
+      
+   When "NC"
+      &AllDefectoNC = "Y";
+      If &rsETY_COD_DOC_TBL.GetRow(&i).ETY_COD_DOC_TBL.ETY_P_DEFECTO.Value = "Y" Then
+         &DefectoNC = "Y";
+      End-If;
+      Break;
+      
+   When "ND"
+      &AllDefectoND = "Y";
+      If &rsETY_COD_DOC_TBL.GetRow(&i).ETY_COD_DOC_TBL.ETY_P_DEFECTO.Value = "Y" Then
+         &DefectoND = "Y";
+      End-If;
+      Break;
+   End-Evaluate;
+   
+End-For;
+
+If All(&Cod) Then
+   If All(&AllDefectoFT) And
+         &DefectoFT <> "Y" Then
+      Error ("En la parametrización del código de tipo documento debe seleccionar un campo Por Defecto para la Factura.");
+   End-If;
+   
+   If All(&AllDefectoNC) And
+         &DefectoNC <> "Y" Then
+      Error ("En la parametrización del código de tipo documento debe seleccionar un campo Por Defecto para Nota Credito. ");
+   End-If;
+   
+   If All(&AllDefectoND) And
+         &DefectoND <> "Y" Then
+      Error ("En la parametrización del código de tipo documento debe seleccionar un campo Por Defecto para Nota Debito. ");
+   End-If;
+End-If;
+
+/*Fin 001*/

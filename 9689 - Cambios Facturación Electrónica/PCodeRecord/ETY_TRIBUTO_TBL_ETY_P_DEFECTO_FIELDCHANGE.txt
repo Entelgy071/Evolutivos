@@ -1,0 +1,21 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 001       ETY_ERP_AP_EVO_9689     John Diaz         05-Febr-2020        Valida campo por defecto.
+*************************************************************************************************************************************/
+/*Inicio 001*/
+Local Rowset &rsETY_TRIBUTO_TBL;
+Local string &P_DEFECTO;
+
+&rsETY_TRIBUTO_TBL = GetLevel0().GetRow(1).GetRowset(Scroll.ETY_TRIBUTO_TBL);
+
+If ETY_TRIBUTO_TBL.ETY_P_DEFECTO = "Y" Then
+   For &i = 1 To &rsETY_TRIBUTO_TBL.ActiveRowCount
+      &P_DEFECTO = &rsETY_TRIBUTO_TBL.GetRow(&i).ETY_TRIBUTO_TBL.ETY_P_DEFECTO.Value;
+      If &P_DEFECTO = "Y" And
+            &i <> CurrentRowNumber() Then
+         &rsETY_TRIBUTO_TBL.GetRow(&i).ETY_TRIBUTO_TBL.ETY_P_DEFECTO.Value = "N";
+      End-If;
+   End-For;
+End-If;
+/*Fin 001*/

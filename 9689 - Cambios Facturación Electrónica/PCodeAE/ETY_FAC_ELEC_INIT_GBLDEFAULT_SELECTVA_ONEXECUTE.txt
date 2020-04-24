@@ -1,0 +1,1102 @@
+/************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+------------------------------------------------------------------------------------------------------------------------------------
+ 001       ETY_ERP_AP_EVO_9689     John Diaz          24 Ene 2020        Se modifican los campos que genera el TXT para el envio de 
+                                                                         la informacion a SERES.
+***********************************************************************************************************************************/
+/*Inicio 001*/
+import ETY_FACTURACION_ELECTRONICA:*;
+
+Declare Function EstadosDocumentos PeopleCode ETY_DOC_DIAN_FE.BUSINESS_UNIT FieldFormula;
+
+/*Fin 001*/
+Function AddBytesToFile(&archive, &fileName)
+   /* Read source file into input stream */
+   Local JavaObject &in = CreateJavaObject("java.io.FileInputStream", &fileName);
+   /* Java Array that will read bytes from input file */
+   Local JavaObject &filebuffer = CreateJavaArray("byte[]", 1024);
+   Local number &byteCount = &in.read(&filebuffer);
+   /* Read bytes from input file and load it byte array  - Do until all bytes are read*/
+   While &byteCount > 0
+      /* Write Bytes of Data to corresponding Archive Output Stream */
+      &archive.write(&filebuffer, 0, &byteCount);
+      &byteCount = &in.read(&filebuffer);
+   End-While;
+   /* Close input stream */
+   &in.close();
+End-Function;
+
+Function CreateArchiveEntry(&Archive, &fileNametoAdd, &fileNametoAdd2, &typeofArchive, &desiredOption)
+   /* Create an Archive entry for every file you want to add to the archive */
+   Local JavaObject &ArchiveEntry;
+   If &desiredOption = 3 Then /* Handle Zip entries differently */
+      &ArchiveEntry = CreateJavaObject(&typeofArchive, &fileNametoAdd2);
+   Else /* Handle TAR and TAR.GZ */
+      &ArchiveEntry = CreateJavaObject(&typeofArchive, CreateJavaObject("java.io.File", &fileNametoAdd), &fileNametoAdd);
+   End-If;
+   /* Add Archive entry to OutputStream */
+   &Archive.putNextEntry(&ArchiveEntry);
+   /* Call Add Bytes to File method to add actual file to the Archive */
+   AddBytesToFile(&Archive, &fileNametoAdd);
+End-Function;
+
+
+Declare Function InFileLayout PeopleCode FUNCLIB_BI.BI_XML_DATA FieldFormula;
+Declare Function BuildRecordArray PeopleCode FUNCLIB_BI.BI_XML_DATA FieldFormula;
+
+Local Record &recEXTRCT = CreateRecord(Record.BI_EXTRCT);
+Local Record &recEXT_HDR_NOTE = CreateRecord(Record.BI_EXT_HDR_NOTE);
+Local Record &recEXT_SHIP_TO = CreateRecord(Record.BI_EXT_SHIP_TO);
+Local Record &recEXT_INST_SEC = CreateRecord(Record.BI_EXT_INST_SEC);
+Local Record &recEXT_INST_SUM = CreateRecord(Record.BI_EXT_INST_SUM);
+Local Record &recEXTRCT_LINE = CreateRecord(Record.BI_EXTRCT_LINE);
+Local Record &recEXTRCT_PAY = CreateRecord(Record.BI_EXTRCT_PAY);
+Local Record &recEXT_SUM_GPHR = CreateRecord(Record.BI_EXT_SUM_GPHR);
+Local Record &recEXT_SUM_NT = CreateRecord(Record.BI_EXT_SUM_NT);
+Local Record &recEXT_SUM_IVC = CreateRecord(Record.BI_EXT_SUM_IVC);
+Local Record &recEXT_SUM_LNNT = CreateRecord(Record.BI_EXT_SUM_LNNT);
+Local Record &recEXTRCT_PROJ = CreateRecord(Record.BI_EXTRCT_PROJ);
+Local Record &recEXTRCT_CONTR = CreateRecord(Record.BI_EXTRCT_CONTR);
+Local Record &recEXTRCT_UTL = CreateRecord(Record.BI_EXTRCT_UTL);
+Local Record &recEXTRCT_TAX = CreateRecord(Record.BI_EXTRCT_TAX);
+Local Record &recEXTRCT_TXDTL = CreateRecord(Record.BI_EXTRCT_TXDTL);
+Local Record &recEXTRCT_VAT = CreateRecord(Record.BI_EXTRCT_VAT);
+Local Record &recEXT_LIN_NOTE = CreateRecord(Record.BI_EXT_LIN_NOTE);
+Local Record &recEXT_EXSDTL = CreateRecord(Record.BI_EXT_EXSDTL);
+Local Record &recEXT_CONFIG_DTL = CreateRecord(Record.BI_CONFIG_D_VW);
+
+Local SQL &sqlEXTRCT, &sqlEXT_HDR_NOTE, &sqlEXTRCT_LINE, &sqlEXTRCT_PAY, &sqlEXT_LIN_NOTE, &sqlEXTRCT_TAX;
+Local SQL &sqlEXTRCT_TXDTL, &sqlEXTRCT_VAT, &sqlEXT_INST_SEC, &sqlEXT_INST_SUM, &sqlEXTRCT_PROJ;
+Local SQL &sqlEXTRCT_CONTR, &sqlEXTRCT_UTL, &sqlEXT_SHIP_TO, &sqlEXT_EXSDTL, &sqlEXT_CONFIG_DTL;
+Local SQL &sqlEXT_SUM_GPHR, &sqlEXT_SUM_NT, &sqlEXT_SUM_IVC, &sqlEXT_SUM_LNNT;
+/*Inicio 001*/
+Local SQL &sqlPSCODESET, &sqlDOC_DIAN_FE;
+Local string &EObligaciones, &Obsv, &TipDocLeg;
+Local array &ResEstado, &DescrEstaDoc;
+Local Record &recDOC_DIAN_FE, &recUpdDOC_DIAN_FE;
+Local integer &Count = 0;
+Local ETY_FACTURACION_ELECTRONICA:EstadoDocumento &obj = create ETY_FACTURACION_ELECTRONICA:EstadoDocumento();
+/*Fin 001*/
+
+Local integer &InvCount = 0;
+
+Local array of string &arrRecords;
+Local string &FileName;
+Local File &FILE;
+
+Local boolean &bConsol = False;
+Local boolean &bBurstMode = False;
+
+&arrRecords = BuildRecordArray("FF_BI_EXTRCT2");
+
+/* Initialize Variables for the Report */
+&ProcessInstance = BI_XMLP_AET.PROCESS_INSTANCE2;
+&ReportDefnID = "FF_FOR_FAC";
+rem &LanguageCd = BI_XMLP_AET.LANGUAGE_CD;
+&AcceptGiroInd = "Y";
+&SumIvcPrintOpt = "SUM";
+
+/* Level 0 records */
+&sqlEXTRCT = GetSQL(SQL.ETY_BI_EXTRCT, &recEXTRCT, &ProcessInstance, &ReportDefnID, &AcceptGiroInd, &SumIvcPrintOpt); /**/
+
+While &sqlEXTRCT.Fetch(&recEXTRCT)
+   /* Use Fetch & WriteRecord so that we don't need to keep the whole XML in memory. */
+   
+   &FileName = "BI_SERES" | "_" | &recEXTRCT.INVOICE.Value | "_" | String(BI_XMLP_AET.PROCESS_INSTANCE) | ".TXT";
+   &FILE = GetFile(&FileName, "W", "UTF8", %FilePath_Relative);
+   
+   &FILE.WriteLine("CodEncoding=" | "UTF-8");
+   
+   SQLExec(SQL.ETY_BI_NRO_RESOLUCION_SQL, &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.BILL_TYPE_ID.Value, &strNroResolucion, &strPart1Static);
+   
+   &FILE.WriteLine("Resolucion=" | &strNroResolucion);
+   /*Inicio 001*/
+   REM &FILE.WriteLine("TotImpReper=" | &recEXTRCT.TOT_VAT.Value);
+   REM &FILE.WriteLine("TotImpRete=" | "0.00");
+   REM &FILE.WriteLine("ImporteTotalPes=" | &recEXTRCT.INVOICE_AMOUNT.Value);
+   
+   /*Parametrización de la factura.*/
+   &TipDocLeg = "FT";
+   
+   /*Cod Responsabilidad Fiscal*/
+   SQLExec("SELECT MATCHNAME, MATCHVALUE FROM PS_ETY_RESFISC_TBL WHERE ETY_P_DEFECTO = 'Y'", &CodResFisc, &DescResFisc);
+   /*Cod Tributo*/
+   SQLExec("SELECT MATCHNAME, DESCR_AMT1, MATCHVALUE FROM PS_ETY_TRIBUTO_TBL WHERE ETY_P_DEFECTO = 'Y'", &CodTributos, &NomTributos, &DescTributos);
+   /*Cod Tipo operacion Doc*/
+   SQLExec("SELECT MATCHNAME, MATCHVALUE FROM PS_ETY_TIPO_OP_TBL WHERE ETY_TIPO_DOC_FE = :1 AND ETY_P_DEFECTO = 'Y'", &TipDocLeg, &CodOperacion, &DescOperacion);
+   /*Cod Producto*/
+   SQLExec("SELECT MATCHNAME, MATCHVALUE FROM PS_ETY_PR_PROD_TBL WHERE ETY_P_DEFECTO = 'Y'", &CodPROD, &DescPROD);
+   /*Codigo del tipo de documento*/
+   SQLExec("SELECT MATCHNAME FROM PS_ETY_COD_DOC_TBL WHERE ETY_TIPO_DOC_FE = :1 AND ETY_P_DEFECTO = 'Y'", &TipDocLeg, &CodDoc);
+   
+   &FILE.WriteLine("TipoOper=" | &CodOperacion);
+   /*Fin 001*/
+   
+   If &strPart1Static = " " Then
+      &strPart1Static = "";
+   End-If;
+   
+   REM &FILE.WriteLine("NumDoc=" | &strPart1Static | &recEXTRCT.INVOICE.Value);
+   &FILE.WriteLine("NumDoc=" | &recEXTRCT.INVOICE.Value);
+   &FILE.WriteLine("FechaEmision=" | &recEXTRCT.INVOICE_DT.Value);
+   /*Inicio 001*/
+   REM &FILE.WriteLine("CodDoc=" | "1");
+   &FILE.WriteLine("CodDoc=" | &CodDoc);
+   /*Fin 001*/
+   
+   /* Level 1 record */
+   If &recEXTRCT.SUM_IVC_PRINT_OPT.Value <> "DETL" And
+         &recEXTRCT.SUMMARIZE_IVC_FLG.Value = "Y" Then
+      &sqlEXT_SUM_GPHR = GetSQL(SQL.BI_EXT_SUM_GPHR, &recEXT_SUM_GPHR, &ProcessInstance, &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value);
+      While &sqlEXT_SUM_GPHR.Fetch(&recEXT_SUM_GPHR)
+         
+         If &recEXT_SUM_GPHR.GROUP_SEQ_NUM.Value = 1 Then
+            &strGROUP_HEADER_TEXT_1 = &recEXT_SUM_GPHR.GROUP_HEADER_TEXT.Value;
+            &strGROUP_HEADER_TEXT_1 = Substitute(&strGROUP_HEADER_TEXT_1, Char(13), "|");
+            &strGROUP_HEADER_TEXT_1 = Substitute(&strGROUP_HEADER_TEXT_1, Char(10), "");
+         End-If;
+         
+         If &recEXT_SUM_GPHR.GROUP_SEQ_NUM.Value = 2 Then
+            &strGROUP_HEADER_TEXT_0 = &recEXT_SUM_GPHR.GROUP_HEADER_TEXT.Value;
+            &strGROUP_HEADER_TEXT_0 = Substitute(&strGROUP_HEADER_TEXT_0, Char(13), "|");
+            &strGROUP_HEADER_TEXT_0 = Substitute(&strGROUP_HEADER_TEXT_0, Char(10), "");
+            
+            &FILE.WriteLine("NotasDoc=" | &strGROUP_HEADER_TEXT_0);
+         End-If;
+         
+         If &recEXT_SUM_GPHR.GROUP_SEQ_NUM.Value = 3 Then
+            &strGROUP_HEADER_TEXT_2 = &recEXT_SUM_GPHR.GROUP_HEADER_TEXT.Value;
+            &strGROUP_HEADER_TEXT_2 = Substitute(&strGROUP_HEADER_TEXT_2, Char(13), "|");
+            &strGROUP_HEADER_TEXT_2 = Substitute(&strGROUP_HEADER_TEXT_2, Char(10), "");
+         End-If;
+         
+         /* Level 2 record */
+         &sqlEXT_SUM_NT = GetSQL(SQL.BI_EXT_SUM_NT, &recEXT_SUM_NT, &ProcessInstance, &recEXT_SUM_GPHR.BUSINESS_UNIT.Value, &recEXT_SUM_GPHR.INVOICE.Value, &recEXT_SUM_GPHR.GROUP_SEQ_NUM.Value);
+         While &sqlEXT_SUM_NT.Fetch(&recEXT_SUM_NT)
+            
+         End-While;
+         &sqlEXT_SUM_NT.Close();
+         
+         /* Level 2 record */
+         &sqlEXT_SUM_IVC = GetSQL(SQL.BI_EXT_SUM_IVC, &recEXT_SUM_IVC, &ProcessInstance, &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value, &recEXT_SUM_GPHR.GROUP_SEQ_NUM.Value);
+         While &sqlEXT_SUM_IVC.Fetch(&recEXT_SUM_IVC)
+            
+            /* Level 3 record */
+            &sqlEXT_SUM_LNNT = GetSQL(SQL.BI_EXT_SUM_LNNT, &recEXT_SUM_LNNT, &ProcessInstance, &recEXT_SUM_IVC.BUSINESS_UNIT.Value, &recEXT_SUM_IVC.INVOICE.Value, &recEXT_SUM_IVC.GROUP_SEQ_NUM.Value);
+            While &sqlEXT_SUM_LNNT.Fetch(&recEXT_SUM_LNNT)
+               
+            End-While;
+            &sqlEXT_SUM_LNNT.Close();
+            
+         End-While;
+         &sqlEXT_SUM_IVC.Close();
+         
+      End-While;
+      &sqlEXT_SUM_GPHR.Close();
+   End-If;
+   
+   
+   &FILE.WriteLine("CodMoneda=" | &recEXTRCT.CURRENCY_CD.Value);
+   &FILE.WriteLine("PeriodoFactura=" | &recEXTRCT.FROM_DT.Value | "_" | &recEXTRCT.TO_DT.Value);
+   
+   Evaluate &recEXTRCT.PAYMENT_METHOD.Value
+   When "CSH"
+      &str_MedioPago = "10";
+   When "CHK"
+      &str_MedioPago = "20";
+   When "EFT"
+      &str_MedioPago = "41";
+   When "GE"
+      &str_MedioPago = "42";
+   End-Evaluate;
+   
+   /*Inicio 001*/
+   REM &FILE.WriteLine("MedioPag=" | &str_MedioPago);
+   /*Fin 001*/
+   &FILE.WriteLine("FechVenc=" | &recEXTRCT.DUE_DT.Value);
+   
+   /*Inicio 001*/
+   REM SQLExec(SQL.ETY_BI_DATOS_EMISOR_SQL, &recEXTRCT.BUSINESS_UNIT_GL.Value, &strE_NATIONAL_ID_TYPE, &strE_NATIONAL_ID, &strE_LC_DIG_VERIF, &strE_LC_NOMBRE_TERCERO, &strE_ADDRESS1, &strE_CITY, &strE_STATE, &strE_COUNTRY, &strE_COUNTRY_CODE, &strE_PHONE, &strE_LC_TIPO_CONTRIBUY);
+   
+   SQLExec(SQL.ETY_BI_DATOS_EMISOR_SQL, &recEXTRCT.BUSINESS_UNIT_GL.Value, &strE_NATIONAL_ID_TYPE, &strE_NATIONAL_ID, &strE_LC_DIG_VERIF, &strE_LC_NOMBRE_TERCERO, &strE_ADDRESS1, &strE_CITY, &strE_STATE, &strE_COUNTRY, &strE_COUNTRY_CODE, &strE_PHONE, &strE_LC_TIPO_CONTRIBUY, &strE_POSTAL, &strE_EMAILID);
+   
+   &strE_Departamento = Substring(&strE_POSTAL, 1, 2);
+   &PROGRAM_ID = "REG_FISC";
+   &CODESETGROUPNAME = "ETY_RESP_FISCALES";
+   
+   /*Parametros registro fiscal segun Nit emisor*/
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = :2", &PROGRAM_ID, &strE_NATIONAL_ID, &strE_RegFiscal);
+   
+   Evaluate &strE_RegFiscal
+   When "48"
+      &strE_IdTributo = "01";
+      &strE_NomTributo = "IVA";
+      Break;
+   When "49"
+      &strE_IdTributo = "ZZ";
+      &strE_NomTributo = "No causa";
+      Break;
+   End-Evaluate;
+   
+   /*Parametrización obligaciones tributarias del Emisor.*/
+   &sqlPSCODESET = CreateSQL("SELECT MATCHNAME FROM PSCODESET WHERE CODESETGROUPNAME = :1 AND CODESETNAME = :2", &CODESETGROUPNAME, &strE_NATIONAL_ID);
+   While &sqlPSCODESET.Fetch(&CodEObligaciones)
+      If None(&EObligaciones) Then
+         &EObligaciones = &CodEObligaciones;
+      Else
+         &EObligaciones = &EObligaciones | ";" | &CodEObligaciones;
+      End-If;
+   End-While;
+   /*Fin 001*/
+   
+   SQLExec("SELECT COUNTRY_2CHAR FROM PS_COUNTRY_TBL WHERE COUNTRY = :1", &strE_COUNTRY, &strE_COUNTRY2);
+   
+   If None(&strE_COUNTRY2) Then
+      &strE_COUNTRY2 = "CO";
+   End-If;
+   
+   Evaluate &strE_NATIONAL_ID_TYPE
+   When "CC"
+      &strE_TypeDoc = "13"
+   When "CE"
+      &strE_TypeDoc = "22"
+   When "NIT"
+      &strE_TypeDoc = "31"
+   When "NITE"
+      &strE_TypeDoc = "31"
+   When "PJE"
+      &strE_TypeDoc = "31"
+   When "PP"
+      &strE_TypeDoc = "41"
+   When "TI"
+      &strE_TypeDoc = "12"
+   When-Other
+      &strE_TypeDoc = "91"
+   End-Evaluate;
+   
+   If &strE_NATIONAL_ID_TYPE = "NIT" Then
+      &str_ETipoEmisor = "1";
+   Else
+      &str_ETipoEmisor = "2";
+   End-If;
+   
+   If &strE_LC_TIPO_CONTRIBUY = "02" Then
+      &str_ETipoEmisor = "3";
+   End-If;
+   
+   &FILE.WriteLine("ETipoEmisor=" | &str_ETipoEmisor);
+   /*Inicio 001*/
+   &FILE.WriteLine("ECodMuni=" | &strE_POSTAL);
+   &FILE.WriteLine("EClasificacionInd=");
+   &FILE.WriteLine("ECodPostal=");
+   /*Fin 001*/
+   &FILE.WriteLine("ETipoID=" | &strE_TypeDoc);
+   &FILE.WriteLine("ENumeroNIT=" | &strE_NATIONAL_ID);
+   /*Inicio 001*/
+   &FILE.WriteLine("EDigitoV=" | &strE_LC_DIG_VERIF);
+   /*Fin 001*/
+   &FILE.WriteLine("ENombreComercial=" | &strE_LC_NOMBRE_TERCERO);
+   /*Inicio 001*/
+   REM &FILE.WriteLine("EDepartamento=" | &strE_STATE);
+   &FILE.WriteLine("EDepartamento=" | &strE_Departamento);
+   /*Fin 001*/
+   &FILE.WriteLine("EDistrito=" | "");
+   &FILE.WriteLine("EMunicipio=" | &strE_CITY);
+   &FILE.WriteLine("EDireccion=" | &strE_ADDRESS1);
+   &FILE.WriteLine("ECodPais=" | &strE_COUNTRY2);
+   /*Inicio 001*/
+   REM &FILE.WriteLine("ERegimenFact=" | "2");
+   &FILE.WriteLine("ERegimenFact=" | &strE_RegFiscal);
+   &FILE.WriteLine("EObligaciones=" | &EObligaciones);
+   &FILE.WriteLine("ECodMuniFiscal=" | &strE_POSTAL);
+   &FILE.WriteLine("ECodPostalFiscal=");
+   &FILE.WriteLine("EDeparFiscal=" | &strE_Departamento);
+   &FILE.WriteLine("EDireccionFiscal=" | &strE_ADDRESS1);
+   &FILE.WriteLine("ECodPaisFiscal=" | &strE_COUNTRY2);
+   &FILE.WriteLine("EIdTributo=" | &strE_IdTributo);
+   &FILE.WriteLine("ENomTributo=" | &strE_NomTributo);
+   &FILE.WriteLine("EEmailDep=" | &strE_EMAILID);
+   /*Fin 001*/
+   &FILE.WriteLine("ERazonSocial=" | &strE_LC_NOMBRE_TERCERO);
+   
+   SQLExec("SELECT ETY_MANDATO_FLG FROM PS_ETY_BI_HDR WHERE BUSINESS_UNIT = :1 AND INVOICE = :2", &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value, &strEtyMandatoFlag);
+   
+   If &strEtyMandatoFlag = "Y" Then
+      SQLExec("SELECT LC_TERCERO_ID, ETIPOOBLIGACION, ETIPOREPRESENTACIO, ETIPOESTABLECIMIEN, LC_TERCERO_ID2, TIPOCONTRATO, IDCONTRATO, NUMMATRICULACC FROM PS_ETY_FC_MNDT_TBL WHERE BUSINESS_UNIT = :1", &recEXTRCT.BUSINESS_UNIT_GL.Value, &str_LC_TERCERO_ID, &str_ETIPOOBLIGACION, &str_ETIPOREPRESENTACIO, &str_ETIPOESTABLECIMIEN, &str_LC_TERCERO_ID2, &str_TIPOCONTRATO, &str_IDCONTRATO, &str_NUMMATRICULACC);
+      
+      SQLExec(SQL.ETY_BI_DATOS_MANDATO_SQL, &str_LC_TERCERO_ID, &str_NATIONAL_ID_TYPE, &str_NATIONAL_ID, &str_LC_DIG_VERIF, &str_LC_NOMBRE_TERCERO, &str_LC_TIPO_CONTRIBUY);
+      
+      If &str_NATIONAL_ID_TYPE = "NIT" Then
+         &str_ETipoMandato = "1";
+      Else
+         &str_ETipoMandato = "2";
+      End-If;
+      
+      If &str_LC_TIPO_CONTRIBUY = "02" Then
+         &str_ETipoMandato = "3";
+      End-If;
+      
+      &FILE.WriteLine("FM_NomMandatario=" | &str_LC_NOMBRE_TERCERO);
+      &FILE.WriteLine("FM_IDMandatario=" | &str_NATIONAL_ID);
+      &FILE.WriteLine("FM_ETipoObligacion=" | "R-" | Substring(&str_ETIPOOBLIGACION, 1, 2) | "-" | Substring(&str_ETIPOOBLIGACION, 3, 2));
+      &FILE.WriteLine("FM_ETipoPersona=" | &str_ETipoMandato);
+      &FILE.WriteLine("FM_ETipoRepresentacion=" | &str_ETIPOREPRESENTACIO);
+      &FILE.WriteLine("FM_ETipoEstablecimiento=" | &str_ETIPOESTABLECIMIEN);
+   End-If;
+   
+   SQLExec("SELECT BILL_TO_CUST_ID FROM PS_ETY_TER_FACT_VW WHERE PROCESS_INSTANCE = :1 AND BUSINESS_UNIT = :2 AND INVOICE = :3", &ProcessInstance, &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value, &strR_BILL_TO_CUST_ID);
+   
+   /*Inicio 001*/
+   REM SQLExec(SQL.ETY_BI_DATOS_RECEPTOR_SQL, &strR_BILL_TO_CUST_ID, &strR_NATIONAL_ID_TYPE, &strR_NATIONAL_ID, &strR_LC_DIG_VERIF, &strR_LC_NOMBRE_TERCERO, &strR_ADDRESS1, &strR_CITY, &strR_STATE, &strR_COUNTRY, &strR_COUNTRY_CODE, &strR_PHONE, &strR_EMAILID, &strR_LC_TIPO_CONTRIBUY);
+   
+   SQLExec(SQL.ETY_BI_DATOS_RECEPTOR_SQL, &strR_BILL_TO_CUST_ID, &strR_NATIONAL_ID_TYPE, &strR_NATIONAL_ID, &strR_LC_DIG_VERIF, &strR_LC_NOMBRE_TERCERO, &strR_ADDRESS1, &strR_CITY, &strR_STATE, &strR_COUNTRY, &strR_COUNTRY_CODE, &strR_PHONE, &strR_EMAILID, &strR_LC_TIPO_CONTRIBUY, &strR_POSTAL);
+   
+   &strR_Departamento = Substring(&strR_POSTAL, 1, 2);
+   /*Fin 001*/
+   
+   SQLExec("SELECT COUNTRY_2CHAR FROM PS_COUNTRY_TBL WHERE COUNTRY = :1", &strR_COUNTRY, &strR_COUNTRY2);
+   
+   /*Inicio 001*/
+   &SETID = "SHARE";
+   SQLExec("SELECT LC_TIPO_PERSONA FROM PS_LC_CUSTOMER WHERE SETID = :1 AND CUST_ID = :2", &SETID, &strR_BILL_TO_CUST_ID, &LC_TIPO_PERSONA);
+   
+   Evaluate &LC_TIPO_PERSONA
+   When "N"
+      &strR_TIPO_PERSONA = "49";
+   When "J"
+      &strR_TIPO_PERSONA = "48";
+   End-Evaluate;
+   /*Fin 001*/
+   
+   If None(&strR_COUNTRY2) Then
+      &strR_COUNTRY2 = "CO";
+   End-If;
+   
+   Evaluate &strR_NATIONAL_ID_TYPE
+   When "CC"
+      &strR_TypeDoc = "13"
+   When "CE"
+      &strR_TypeDoc = "22"
+   When "NIT"
+      &strR_TypeDoc = "31"
+   When "NITE"
+      &strR_TypeDoc = "31"
+   When "PJE"
+      &strR_TypeDoc = "31"
+   When "PP"
+      &strR_TypeDoc = "41"
+   When "TI"
+      &strR_TypeDoc = "12"
+   When-Other
+      &strR_TypeDoc = "91"
+   End-Evaluate;
+   
+   If &strR_NATIONAL_ID_TYPE = "NIT" Then
+      &str_RTipoEmisor = "1";
+   Else
+      &str_RTipoEmisor = "2";
+   End-If;
+   
+   /*Inicio 001*/
+   /*If &strR_LC_TIPO_CONTRIBUY = "02" Then
+      &str_RTipoEmisor = "3";
+   End-If;*/
+   /*Fin 001*/
+   
+   If &strR_LC_TIPO_CONTRIBUY = "03" Then
+      &str_RRegimenFact = "2";
+   Else
+      &str_RRegimenFact = "0";
+   End-If;
+   
+   &FILE.WriteLine("RTipoReceptor=" | &str_RTipoEmisor);
+   REM &FILE.WriteLine("RTipoReceptor=" | "1");
+   &FILE.WriteLine("RTipoID=" | &strR_TypeDoc);
+   &FILE.WriteLine("RNumeroNIT=" | &strR_NATIONAL_ID);
+   &FILE.WriteLine("RNombreComercial=" | &strR_LC_NOMBRE_TERCERO);
+   /*Inicio 001*/
+   REM &FILE.WriteLine("RDepartamento=" | &strR_STATE);
+   &FILE.WriteLine("RDepartamento=" | &strR_Departamento);
+   /*Fin 001*/
+   &FILE.WriteLine("RDistrito=" | "");
+   &FILE.WriteLine("RMunicipio=" | &strR_CITY);
+   &FILE.WriteLine("RDireccion=" | &strR_ADDRESS1);
+   &FILE.WriteLine("RCodPais=" | &strR_COUNTRY2);
+   /*Inicio 001*/
+   REM &FILE.WriteLine("RRegimenFact=" | &str_RRegimenFact);
+   &FILE.WriteLine("RRegimenFact=" | &strR_TIPO_PERSONA);
+   &FILE.WriteLine("RResponsabilidad=" | &CodResFisc);
+   /*Fin 001*/
+   &FILE.WriteLine("RRazonSocial=" | &strR_LC_NOMBRE_TERCERO);
+   /*Inicio 001*/
+   REM &FILE.WriteLine("RCodEmisor=" | "");
+   REM &FILE.WriteLine("RNombreFinal=" | "");
+   &FILE.WriteLine("RCodEmisor=" | "NA");
+   &FILE.WriteLine("RNombreFinal=" | "NA");
+   &FILE.WriteLine("RCodMuni=" | &strR_POSTAL);
+   &FILE.WriteLine("RCodPostal=" | "000000");
+   &FILE.WriteLine("RDigitoV=" | &strR_LC_DIG_VERIF);
+   &FILE.WriteLine("RCodPostalFiscal=" | "000000");
+   &FILE.WriteLine("RCodMuniFiscal=" | &strR_POSTAL);
+   &FILE.WriteLine("RDeparFiscal=" | &strR_Departamento);
+   &FILE.WriteLine("RDireccionFiscal=" | &strR_ADDRESS1);
+   &FILE.WriteLine("RCodPaisFiscal=" | &strR_COUNTRY2);
+   &FILE.WriteLine("RIdTributo=" | &CodTributos);
+   &FILE.WriteLine("RNomTributo=" | &NomTributos);
+   /*Fin 001*/
+   &FILE.WriteLine("REmail=" | &strR_EMAILID);
+   &FILE.WriteLine("RTelf=" | &strR_PHONE);
+   
+   If &strEtyMandatoFlag = "Y" Then
+      SQLExec("SELECT XLATLONGNAME FROM PS_FF_XLAT_EFFDT_V WHERE FIELDNAME = 'TIPOCONTRATO' AND FIELDVALUE = :1", &str_TIPOCONTRATO, &strValueTipoContrato);
+      
+      SQLExec(SQL.ETY_BI_DATOS_MANDATO_SQL, &str_LC_TERCERO_ID2, &str_NATIONAL_ID_TYPE, &str_NATIONAL_ID, &str_LC_DIG_VERIF, &str_LC_NOMBRE_TERCERO, &str_LC_TIPO_CONTRIBUY);
+      
+      &FILE.WriteLine("SFM_TipoContrato=" | &strValueTipoContrato);
+      &FILE.WriteLine("SFM_IDContrato=" | &str_IDCONTRATO);
+      &FILE.WriteLine("SFM_NitTercero=" | &str_NATIONAL_ID);
+      &FILE.WriteLine("SFM_NomTercero=" | &str_LC_NOMBRE_TERCERO);
+      &FILE.WriteLine("SFM_NumMatriculaCC=" | &str_NUMMATRICULACC);
+   End-If;
+   
+   Evaluate &recEXTRCT.PAYMENT_METHOD.Value
+   When "CSH"
+      &str_MedioPago = "10";
+   When "CHK"
+      &str_MedioPago = "20";
+   When "EFT"
+      &str_MedioPago = "41";
+   When "GE"
+      &str_MedioPago = "42";
+   End-Evaluate;
+   
+   /*Inicio 001*/
+   REM &FILE.WriteLine("MedioPago=" | &str_MedioPago);
+   /*Fin 001*/
+   
+   &str_DiasVencimiento = Substitute(&recEXTRCT.PYMNT_TERMS_CD.Value, "D", "");
+   
+   /*Inicio 001*/
+   REM &FILE.WriteLine("DiasVencimiento=" | &str_DiasVencimiento);
+   REM &FILE.WriteLine("ImporteVencimiento=" | &recEXTRCT.INVOICE_AMOUNT.Value);
+   SQLExec("SELECT ETY_FORM_PAGOS, ETY_MED_PAGOS FROM PS_ETY_BI_METPAGOS WHERE BUSINESS_UNIT = :1 AND INVOICE = :2", &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value, &IdPago, &MedioPag);
+   
+   SQLExec(SQL.ETY_DESCXLAT_SQL, "ETY_FORM_PAGOS", &IdPago, &FormaPag);
+   
+   &FILE.WriteLine("IDPago=" | &IdPago);
+   &FILE.WriteLine("FormaPag=" | &IdPago);
+   &FILE.WriteLine("MedioPag=" | &MedioPag);
+   &FILE.WriteLine("FechVencPag=" | &recEXTRCT.DUE_DT.Value);
+   &FILE.WriteLine("ValorPago=" | &recEXTRCT.INVOICE_AMOUNT.Value);
+   &FILE.WriteLine("PeriodoPago=" | &str_DiasVencimiento);
+   /*Fin 001*/
+   
+   <*
+   &FILE.WriteLine("GlobalDesCar=" | "false");
+   &FILE.WriteLine("GlobalCodDesCar=" | "NA");
+   &FILE.WriteLine("GlobalDescripDesCar=" | "NA");
+   &FILE.WriteLine("GlobalImporteDesCar=" | "0.00");
+   *>
+   
+   &sqlEXT_HDR_NOTE = GetSQL(SQL.BI_EXT_HDR_NOTE, &recEXT_HDR_NOTE, &ProcessInstance, &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value);
+   While &sqlEXT_HDR_NOTE.Fetch(&recEXT_HDR_NOTE)
+      &strTEXT254 = &recEXT_HDR_NOTE.TEXT254.Value;
+   End-While;
+   &sqlEXT_HDR_NOTE.Close();
+   
+   /* Level 1 record */
+   If All(&recEXTRCT.SHIP_TO_CUST_ID.Value) And
+         All(&recEXTRCT.SHIP_TO_ADDR_NUM.Value) Then
+      
+      &sqlEXT_SHIP_TO = GetSQL(SQL.BI_EXT_SHIP_TO, &recEXT_SHIP_TO, &ProcessInstance, &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value, &recEXTRCT.SEQ_NUM.Value);
+      While &sqlEXT_SHIP_TO.Fetch(&recEXT_SHIP_TO)
+         
+      End-While;
+      &sqlEXT_SHIP_TO.Close();
+      
+   End-If;
+   
+   /* Level 1 record */
+   If &recEXTRCT.BILLING_FREQUENCY.Value = "INS" And
+         All(&recEXTRCT.TEMPLATE_INVOICE.Value) Then
+      &sqlEXT_INST_SEC = GetSQL(SQL.BI_EXT_INST_SEC, &recEXT_INST_SEC, &ProcessInstance, &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value, &recEXTRCT.SEQ_NUM.Value);
+      While &sqlEXT_INST_SEC.Fetch(&recEXT_INST_SEC)
+         
+         /* Level 2 record */
+         &sqlEXT_INST_SUM = GetSQL(SQL.BI_EXT_INST_SUM, &recEXT_INST_SUM, &ProcessInstance, &recEXT_INST_SEC.BUSINESS_UNIT.Value, &recEXT_INST_SEC.INVOICE.Value, &recEXT_INST_SEC.SEQ_NUM.Value);
+         While &sqlEXT_INST_SUM.Fetch(&recEXT_INST_SUM)
+            
+         End-While;
+         &sqlEXT_INST_SUM.Close();
+      End-While;
+      &sqlEXT_INST_SEC.Close();
+   End-If;
+   
+   /* Level 1 record */
+   &sqlEXTRCT_PAY = GetSQL(SQL.BI_EXTRCT_PAY, &recEXTRCT_PAY, &ProcessInstance, &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value, &recEXTRCT.SEQ_NUM.Value);
+   While &sqlEXTRCT_PAY.Fetch(&recEXTRCT_PAY)
+      
+   End-While;
+   &sqlEXTRCT_PAY.Close();
+   
+   /* Level 1 record */
+   &countLine = 1;
+   
+   &sqlEXTRCT_LINE = GetSQL(SQL.BI_EXTRCT_LINE, &recEXTRCT_LINE, &ProcessInstance, &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value, &recEXTRCT.SEQ_NUM.Value);
+   While &sqlEXTRCT_LINE.Fetch(&recEXTRCT_LINE)
+      
+      /* Level 2 record */
+      If All(&recEXTRCT_LINE.PROJECT_ID.Value) And
+            &recEXTRCT_LINE.SYSTEM_SOURCE.Value = "PBI" Then
+         &sqlEXTRCT_PROJ = GetSQL(SQL.BI_EXTRCT_PROJ, &recEXTRCT_PROJ, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value, &recEXTRCT_LINE.SEQ_NUM.Value);
+         While &sqlEXTRCT_PROJ.Fetch(&recEXTRCT_PROJ)
+            
+         End-While;
+         &sqlEXTRCT_PROJ.Close();
+      End-If;
+      
+      /* Level 2 record */
+      If All(&recEXTRCT_LINE.CONTRACT_NUM.Value) And
+            &recEXTRCT_LINE.SYSTEM_SOURCE.Value <> "PBI" Then
+         &sqlEXTRCT_CONTR = GetSQL(SQL.BI_EXTRCT_CONTR, &recEXTRCT_CONTR, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value, &recEXTRCT_LINE.SEQ_NUM.Value);
+         While &sqlEXTRCT_CONTR.Fetch(&recEXTRCT_CONTR)
+            
+         End-While;
+         &sqlEXTRCT_CONTR.Close();
+      End-If;
+      
+      /* Level 2 record */
+      If All(&recEXTRCT_LINE.CONTRACT_NUM.Value) And
+            &recEXTRCT_LINE.CONTRACT_PPD_SEQ.Value > 0 Then
+         &sqlEXTRCT_UTL = GetSQL(SQL.BI_EXTRCT_UTL, &recEXTRCT_UTL, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value, &recEXTRCT_LINE.SEQ_NUM.Value);
+         While &sqlEXTRCT_UTL.Fetch(&recEXTRCT_UTL)
+            
+         End-While;
+         &sqlEXTRCT_UTL.Close();
+      End-If;
+      
+      /* Level 2 record */
+      If &recEXTRCT.BI_BU_TAX_IND.Value <> "2" Then
+         &sqlEXTRCT_TAX = CreateSQL("%SELECTALL(:1) WHERE PROCESS_INSTANCE = :2 AND BUSINESS_UNIT = :3 AND INVOICE = :4 AND LINE_SEQ_NUM = :5", &recEXTRCT_TAX, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value);
+         &sqlEXTRCT_TAX = GetSQL(SQL.BI_EXTRCT_TAX, &recEXTRCT_TAX, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value);
+         While &sqlEXTRCT_TAX.Fetch(&recEXTRCT_TAX)
+            
+            /* Level 3 record */
+            &sqlEXTRCT_TXDTL = GetSQL(SQL.BI_EXTRCT_TXDTL, &recEXTRCT_TXDTL, &ProcessInstance, &recEXTRCT_TAX.BUSINESS_UNIT.Value, &recEXTRCT_TAX.INVOICE.Value, &recEXTRCT_TAX.LINE_SEQ_NUM.Value);
+            While &sqlEXTRCT_TXDTL.Fetch(&recEXTRCT_TXDTL)
+               
+            End-While;
+            &sqlEXTRCT_TXDTL.Close();
+            
+         End-While;
+         &sqlEXTRCT_TAX.Close();
+      End-If;
+      
+      /* Level 2 record */
+      If All(&recEXTRCT.VAT_ENTITY.Value) Then
+         &sqlEXTRCT_VAT = GetSQL(SQL.BI_EXTRCT_VAT, &recEXTRCT_VAT, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value);
+         While &sqlEXTRCT_VAT.Fetch(&recEXTRCT_VAT)
+            
+            &FILE.WriteLine("EsRetenido=" | "false");
+            /*Inicio 001*/
+            &FILE.WriteLine("SumaImpuestos=" | &recEXTRCT.TOT_VAT.Value);
+            /*Fin 001*/
+            &FILE.WriteLine("BaseImpuesto=" | &recEXTRCT_VAT.VAT_BASIS_AMT.Value);
+            &FILE.WriteLine("TotalImpuesto=" | &recEXTRCT_VAT.VAT_AMT.Value);
+            &FILE.WriteLine("TarifaImpuesto=" | &recEXTRCT_VAT.TAX_CD_VAT_PCT.Value);
+            
+            SQLExec("SELECT E.ETY_CODIMPUESTO FROM PS_VAT_ENT_RGSTRN D, PS_ETY_TAX_HDR_TBL E WHERE D.VAT_ENTITY = :1 AND D.LOCATION_SETID = E.SETID AND E.TAX_CD = :2", &recEXTRCT_VAT.VAT_ENTITY.Value, &recEXTRCT_VAT.TAX_CD_VAT.Value, &str_ETY_CODIMPUESTO);
+            
+            REM &FILE.WriteLine("CodImpuesto=" | "01");
+            /*Inicio 001*/
+            REM &FILE.WriteLine("CodImpuesto=" | &str_ETY_CODIMPUESTO);
+            &FILE.WriteLine("CodImpuesto=" | &strE_IdTributo);
+            /*Fin 001*/
+            
+         End-While;
+         &sqlEXTRCT_VAT.Close();
+         
+      End-If;
+      
+      If &countLine = 1 Then
+         &FILE.WriteLine("TotalBrutoFact=" | &recEXTRCT.INVOICE_AMT_PRETAX.Value);
+         /*Inicio 001*/
+         If &recEXTRCT.TOT_VAT.Value = 0 Then
+            &BaseImpFact = &recEXTRCT.TOT_VAT.Value;
+         Else
+            &BaseImpFact = &recEXTRCT.INVOICE_AMT_PRETAX.Value;
+         End-If;
+         REM &FILE.WriteLine("TotalBaseImpFact=" | &recEXTRCT.INVOICE_AMT_PRETAX.Value);
+         &FILE.WriteLine("TotalBaseImpFact=" | &BaseImpFact);
+         &FILE.WriteLine("TotalConImp=" | &recEXTRCT.INVOICE_AMOUNT.Value);
+         /*Fin 001*/
+         &FILE.WriteLine("TotalDescuentos=" | "0.00");
+         &FILE.WriteLine("TotalCargos=" | "0.00");
+         &FILE.WriteLine("TotalFact=" | &recEXTRCT.INVOICE_AMOUNT.Value);
+      End-If;
+      
+      &FILE.WriteLine("NumLin=" | &recEXTRCT_LINE.LINE_SEQ_NUM.Value);
+      
+      /* Level 2 record */
+      If &recEXTRCT.CONFIG_DTL_FLAG.Value = "Y" Then
+         &sqlEXT_CONFIG_DTL = GetSQL(SQL.BI_EXTRCT_CONFIG_DTL, &recEXT_CONFIG_DTL, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value);
+         While &sqlEXT_CONFIG_DTL.Fetch(&recEXT_CONFIG_DTL)
+            
+         End-While;
+         &sqlEXT_CONFIG_DTL.Close();
+      End-If;
+      
+      /* Level 2 record */
+      &sqlEXT_LIN_NOTE = GetSQL(SQL.BI_EXT_LIN_NOTE, &recEXT_LIN_NOTE, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value);
+      While &sqlEXT_LIN_NOTE.Fetch(&recEXT_LIN_NOTE)
+         &strNotasLin = &strNotasLin | &recEXT_LIN_NOTE.TEXT254.Value;
+         rem &FILE.WriteLine("NotasLin=" | &recEXT_LIN_NOTE.TEXT254.Value);
+      End-While;
+      &sqlEXT_LIN_NOTE.Close();
+      
+      rem &strNotasLin = &strNotasLin | &strTEXT254;
+      &FILE.WriteLine("NotasLin=" | &strNotasLin);
+      
+      /* Level 2 record */
+      If &recEXTRCT.BI_BU_TAX_IND.Value = "2" Then
+         &sqlEXT_EXSDTL = GetSQL(SQL.BI_EXT_EXSDTL, &recEXT_EXSDTL, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value);
+         While &sqlEXT_EXSDTL.Fetch(&recEXT_EXSDTL)
+            
+         End-While;
+         &sqlEXT_EXSDTL.Close();
+      End-If;
+      
+      /*
+      If &recEXTRCT_LINE.UNIT_OF_MEASURE.Value Then
+         &str_UNIT_OF_MEASURE = "UND";
+      Else
+         &str_UNIT_OF_MEASURE = &recEXTRCT_LINE.UNIT_OF_MEASURE.Value;
+      End-If;
+      */
+      
+      &str_UNIT_OF_MEASURE = "C62";
+      
+      &FILE.WriteLine("UMedida=" | &str_UNIT_OF_MEASURE);
+      &FILE.WriteLine("NumUnidades=" | &recEXTRCT_LINE.QTY.Value);
+      &FILE.WriteLine("ValorTotalLin=" | &recEXTRCT_LINE.GROSS_EXTENDED_AMT.Value);
+      
+      <* 
+      &FILE.WriteLine("DesOCargo=" | "false");
+      &FILE.WriteLine("CodDesCar=" | "NA");
+      &FILE.WriteLine("DescripDesCar=" | "NA");
+      &FILE.WriteLine("ImporteDesCar=" | "0.00");
+      *>
+      
+      /* Level 2 record */
+      If All(&recEXTRCT.VAT_ENTITY.Value) Then
+         &sqlEXTRCT_VAT = GetSQL(SQL.BI_EXTRCT_VAT, &recEXTRCT_VAT, &ProcessInstance, &recEXTRCT_LINE.BUSINESS_UNIT.Value, &recEXTRCT_LINE.INVOICE.Value, &recEXTRCT_LINE.LINE_SEQ_NUM.Value);
+         While &sqlEXTRCT_VAT.Fetch(&recEXTRCT_VAT)
+            
+            /*Inicio 001*/
+            &FILE.WriteLine("EsRetenidoLin=" | "false");
+            /*Fin 001*/
+            &FILE.WriteLine("ImpuestoLin=" | &recEXTRCT_VAT.VAT_AMT.Value);
+            &FILE.WriteLine("BaseImponibleLin=" | &recEXTRCT_VAT.VAT_BASIS_AMT.Value);
+            &FILE.WriteLine("TarifaImpuestoLin=" | &recEXTRCT_VAT.TAX_CD_VAT_PCT.Value);
+            &FILE.WriteLine("CodImpLin=" | "01");
+            
+         End-While;
+         &sqlEXTRCT_VAT.Close();
+         
+      End-If;
+      
+      &FILE.WriteLine("Descripcion=" | &recEXTRCT_LINE.DESCR.Value);
+      &FILE.WriteLine("CodProducto=" | &recEXTRCT_LINE.IDENTIFIER.Value);
+      /*Inicio 001*/
+      &FILE.WriteLine("TipoCodProd=" | &CodPROD);
+      &FILE.WriteLine("CodEANProduct=" | &recEXTRCT_LINE.IDENTIFIER.Value);
+      /*Fin 001*/
+      &FILE.WriteLine("ValorUnidad=" | &recEXTRCT_LINE.UNIT_AMT.Value);
+      /*Inicio 001*/
+      &FILE.WriteLine("NomPropiedad=" | "NOTE_TEXT16");
+      &FILE.WriteLine("ValorPropiedad=" | &strNotasLin);
+      /*Fin 001*/
+      
+      &countLine = &countLine + 1;
+      
+   End-While;
+   
+   &sqlEXTRCT_LINE.Close();
+   
+   &FILE.WriteLine("IDConcepto=" | "001");
+   &FILE.WriteLine("NomConcepto=" | "GROUP_HEADER_TEXT_1");
+   &FILE.WriteLine("ValorConcepto=" | &strGROUP_HEADER_TEXT_1);
+   
+   &FILE.WriteLine("IDConcepto=" | "002");
+   &FILE.WriteLine("NomConcepto=" | "GROUP_HEADER_TEXT_2");
+   &FILE.WriteLine("ValorConcepto=" | &strGROUP_HEADER_TEXT_2);
+   
+   &FILE.WriteLine("IDConcepto=" | "003");
+   &FILE.WriteLine("NomConcepto=" | "REMIT_ADDR_LN1");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.REMIT_ADDR_LN1.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "004");
+   &FILE.WriteLine("NomConcepto=" | "REMIT_ADDR_LN2");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.REMIT_ADDR_LN2.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "005");
+   &FILE.WriteLine("NomConcepto=" | "REMIT_ADDR_LN3");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.REMIT_ADDR_LN3.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "006");
+   &FILE.WriteLine("NomConcepto=" | "REMIT_ADDR_LN4");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.REMIT_ADDR_LN4.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "007");
+   &FILE.WriteLine("NomConcepto=" | "REMIT_ADDR_LN5");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.REMIT_ADDR_LN5.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "008");
+   &FILE.WriteLine("NomConcepto=" | "DUE_DT");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.DUE_DT.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "009");
+   &FILE.WriteLine("NomConcepto=" | "FROM_DT");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.FROM_DT.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "010");
+   &FILE.WriteLine("NomConcepto=" | "TO_DT");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.TO_DT.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "011");
+   &FILE.WriteLine("NomConcepto=" | "AMOUNT");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.AMOUNT.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "012");
+   &FILE.WriteLine("NomConcepto=" | "USER_AMT1");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.USER_AMT1.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "013");
+   &FILE.WriteLine("NomConcepto=" | "USER_AMT2");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.USER_AMT2.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "014");
+   &FILE.WriteLine("NomConcepto=" | "TOT_EXD_AMT");
+   &FILE.WriteLine("ValorConcepto=" | &recEXTRCT.TOT_EXD_AMT.Value);
+   
+   &FILE.WriteLine("IDConcepto=" | "015");
+   &FILE.WriteLine("NomConcepto=" | "TEXT254");
+   &FILE.WriteLine("ValorConcepto=" | &strTEXT254);
+   
+   &FILE.Close();
+   
+   
+   rem Exec("gzip -c " | "/psconfig/psfiledir/fdm91/" | &FileName | " > " | "/psconfig/psfiledir/fdm91/" | &FileName | ".zip", %Exec_Asynchronous + %FilePath_Absolute);
+   
+   /**/
+   /*
+   Local JavaObject &textToCompress = CreateJavaObject("java.lang.String", "This is some text to compress... probably a bloated XML document or something ;)");
+   Local string &zipInternalFileName = &FileName;
+   
+   Local JavaObject &zip = CreateJavaObject("java.util.zip.ZipOutputStream", CreateJavaObject("java.io.FileOutputStream", "/psconfig/psfiledir/fdm91/" | &FileName | ".zip", True));
+   Local JavaObject &zipEntry = CreateJavaObject("java.util.zip.ZipEntry", &zipInternalFileName);
+   Local JavaObject &buf = &textToCompress.getBytes();
+   Local number &byteCount = &buf.length;
+   
+   &zip.putNextEntry(&zipEntry);
+   
+   &zip.write(&buf, 0, &byteCount);
+   
+   &zip.flush();
+   &zip.close();
+   */
+   
+   
+   /* PeopleCode - Create ZIP / TAR / TAR.GZ Archive - Common Example
+You can use this code to
+
+1- TAR Single or multiple files
+2 - TAR.GZ Single or Multiple Files
+3- ZIP Single or Multiple Files */
+   
+   Local array of string &FileArray = CreateArrayRept("", 0);
+   &FileArray.Push("/psconfig/psfiledir/fdm91/" | &FileName);
+   REM &FileArray.Push(&FileName);
+   
+   /* This value defines the final output */
+   Local number &desiredOption = 3;
+   Local string &finalFileName, &ArchiveEntry, &OutputStreamType;
+   Evaluate &desiredOption
+   When 1 /* Just a TAR file */
+   When 2 /* TAR.GZ */
+      &OutputStreamType = "org.xeustechnologies.jtar.TarOutputStream";
+      &ArchiveEntry = "org.xeustechnologies.jtar.TarEntry";
+      &finalFileName = "c:\myTarFile.tar";
+   When 3 /* ZIP file */
+      &OutputStreamType = "java.util.zip.ZipOutputStream";
+      &ArchiveEntry = "java.util.zip.ZipEntry";
+      &finalFileName = "/psconfig/psfiledir/fdm91/" | &FileName | ".zip";
+   When-Other
+      Error "Wrong Option";
+   End-Evaluate;
+   /* Create Archive Object */
+   Local JavaObject &myArchive = CreateJavaObject(&OutputStreamType, CreateJavaObject("java.io.FileOutputStream", &finalFileName, True));
+   For &i = 1 To &FileArray.Len
+      CreateArchiveEntry(&myArchive, &FileArray [&i], &FileName, &ArchiveEntry, &desiredOption);
+   End-For;
+   /* Close output Stream */
+   &myArchive.close();
+   /* We will now create a GZIP file only for Option 2*/
+   If &desiredOption = 2 Then
+      Local JavaObject &gzip = CreateJavaObject("java.util.zip.GZIPOutputStream", CreateJavaObject("java.io.FileOutputStream", "c:\myTarFile.tar.gz", True));
+      AddBytesToFile(&gzip, "c:\myTarFile.tar");
+      &gzip.close();
+   End-If;
+   
+   
+   /**/
+   
+   Local File &F1;
+   Local string &base64string;
+   
+   /* Load the Base64 string data into &base64string */
+   &base64string = "...";
+   
+   rem &F1 = GetFile(&FileName, "R", %FilePath_Relative);
+   &F1 = GetFile("/psconfig/psfiledir/fdm91/" | &FileName | ".zip", "R", %FilePath_Absolute);
+   
+   If &F1.IsOpen Then
+      &base64string = &F1.GetBase64StringFromBinary();
+      &F1.Close();
+   End-If;
+   
+   MessageBox(0, "", 0, 0, &base64string);
+   
+   &FileName2 = "BI_SERES" | "_" | &recEXTRCT.INVOICE.Value | ".TXT";
+   &FILE2 = GetFile(&FileName2, "W", "UTF8", %FilePath_Relative);
+   
+   &FILE2.WriteLine(&base64string);
+   
+   &FILE2.Close();
+   
+   <*
+   Local array of string &operpwsdsalt;
+   Local string &resultSalt;
+   &operpwsdsalt = SecureRandomGen();
+   
+   &datetime = %datetime ;
+    
+   If (&operpwsdsalt <> Null) Then
+      For &i = 1 To &operpwsdsalt.Len
+         &resultSalt = &operpwsdsalt [&i];
+         &pass = HashWithSalt(&resultSalt | &datetime | "n2A8-3h7", &resultSalt, "SHA1");
+      End-For;
+   End-If;
+   
+   
+   rem &pass = HashWithSalt(&operpwsdsalt | &datetime | "n2A8-3h7", &operpwsdsalt, "SHA1");
+   
+   rem MessageBox(0, "", 0, 0, &pass);
+   rem MessageBox(0, "", 0, 0, &datetime);
+   rem MessageBox(0, "", 0, 0, &resultSalt);
+   *>
+   
+   
+   Local Record &rcEtyParamseres;
+   
+   &rcEtyParamseres = CreateRecord(Record.ETY_PARAM_SERES);
+   
+   &rcEtyParamseres.BUSINESS_UNIT.Value = &recEXTRCT.BUSINESS_UNIT.Value;
+   
+   /*Inicio 001*/
+   SQLExec("SELECT ETY_ESTADO_DOC FROM PS_ETY_DOC_DIAN_FE WHERE BUSINESS_UNIT = :1 AND INVOICE = :2 AND ETY_TIPO_DOC_FE = :3", &recEXTRCT.BUSINESS_UNIT.Value, &recEXTRCT.INVOICE.Value, &TipDocLeg, &EstadoDIAN);
+   If &EstadoDIAN <> "ACEPTADA" Then
+      /*Fin 001*/
+      
+      If &rcEtyParamseres.SelectByKey() Then
+         
+         &username = &rcEtyParamseres.PTSF_SS_USER_NAME.Value;
+         &pass = &rcEtyParamseres.PTSF_SS_PASSWORD.Value;
+         &strNationalId = &rcEtyParamseres.NATIONAL_ID.Value;
+         &strAuthToken = &rcEtyParamseres.AUTH_TOKEN.Value;
+         rem &strNationalId = "860525148";
+         rem &username = "usr.ws860525148";
+         rem &pass = "n2A8-3h7";
+         
+         /**/
+         try
+            &StrRequest = "";
+            &StrRequest = &StrRequest | "<?xml version='1.0'?>";
+            &StrRequest = &StrRequest | "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'>";
+            &StrRequest = &StrRequest | "<s:Header>";
+            REM &StrRequest = &StrRequest | "<VsDebuggerCausalityData xmlns='http://schemas.microsoft.com/vstudio/diagnostics/servicemodelsink'>uIDPo5SqpbR8FRJBvWUzQkc9akIAAAAArf1TWagsfE2KMnd4fXAxJf25IYJuOhlLnOHSJjHrmk8ACQAA</VsDebuggerCausalityData>";
+            &StrRequest = &StrRequest | "<wsse:Security xmlns:wsse='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd' xmlns:wsu='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd'>";
+            &StrRequest = &StrRequest | "<wsse:UsernameToken Id='" | &strAuthToken | "'>";
+            &StrRequest = &StrRequest | "<wsse:Username>" | &username | "</wsse:Username>";
+            rem &StrRequest = &StrRequest | "<wsse:Password Type='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText'>n2A8-3h7</wsse:Password>";
+            &StrRequest = &StrRequest | "<wsse:Password Type='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText'>" | &pass | "</wsse:Password>";
+            rem &StrRequest = &StrRequest | "<wsu:Created>" | &datetime | "</wsu:Created>";
+            rem &StrRequest = &StrRequest | "<wsse:Nonce>" | &resultSalt | "</wsse:Nonce>";
+            &StrRequest = &StrRequest | "</wsse:UsernameToken>";
+            &StrRequest = &StrRequest | "</wsse:Security>";
+            &StrRequest = &StrRequest | "</s:Header>";
+            &StrRequest = &StrRequest | "<s:Body xmlns:xsd='http://www.w3.org/2001/XMLSchema' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>";
+            &StrRequest = &StrRequest | "<publishDocument xmlns='http://ws.seres.com/wsdl/20150301/LoadsDocuments/'>";
+            &StrRequest = &StrRequest | "<parameters xmlns=''>";
+            &StrRequest = &StrRequest | "<EFacturaService>CO</EFacturaService>";
+            &StrRequest = &StrRequest | "<TaxIdentification>";
+            &StrRequest = &StrRequest | "<TaxIdCountry>CO</TaxIdCountry>";
+            &StrRequest = &StrRequest | "<TaxIdType>" | &strE_TypeDoc | "</TaxIdType>";
+            &StrRequest = &StrRequest | "<TaxIdNumber>" | &strNationalId | "</TaxIdNumber>";
+            &StrRequest = &StrRequest | "</TaxIdentification>";
+            &StrRequest = &StrRequest | "<DocumentList>";
+            &StrRequest = &StrRequest | "<DocumentToLoad>";
+            &StrRequest = &StrRequest | "<Type>053</Type>";
+            &StrRequest = &StrRequest | "<FileData>" | &base64string | "</FileData>";
+            &StrRequest = &StrRequest | "<FileMimeType>application/xml</FileMimeType>";
+            <*
+         &StrRequest = &StrRequest | "<AttachInformation>";
+      	 &StrRequest = &StrRequest | "<DocType>053</DocType>";
+         &StrRequest = &StrRequest | "<DocIdentification>" | &recEXTRCT.INVOICE.Value | "</DocIdentification>";
+         &StrRequest = &StrRequest | "<DocDate>" | %Date | "</DocDate>";
+         &StrRequest = &StrRequest | "<TaxIdentification>";
+         &StrRequest = &StrRequest | "<TaxIdCountry>CO</TaxIdCountry>";
+         &StrRequest = &StrRequest | "<TaxIdType>" | &strR_TypeDoc | "</TaxIdType>";
+         &StrRequest = &StrRequest | "<TaxIdNumber>" | &strR_NATIONAL_ID | "</TaxIdNumber>";
+         &StrRequest = &StrRequest | "</TaxIdentification>";
+         &StrRequest = &StrRequest | "</AttachInformation>";
+         *>
+            &StrRequest = &StrRequest | "</DocumentToLoad>";
+            &StrRequest = &StrRequest | "</DocumentList>";
+            &StrRequest = &StrRequest | "</parameters>";
+            &StrRequest = &StrRequest | "</publishDocument>";
+            &StrRequest = &StrRequest | "</s:Body>";
+            &StrRequest = &StrRequest | "</s:Envelope>";
+            
+            &XMLDoc = CreateXmlDoc(&StrRequest);
+            
+            
+            /*Se declara mensaje Request, Response*/
+            
+            Local Message &msg_Request;
+            Local Message &msg_Response;
+            
+            /*Se crea request baseado en operación*/
+            
+            SQLExec("SELECT IB_OPERATIONNAME FROM PS_ETY_BI_SERES", &strIbOperationname);
+            
+            &MSGName = "OPERATION." | &strIbOperationname;
+            
+            &msg_Request = CreateMessage(@(&MSGName), %IntBroker_Request);
+            
+            &msg_Request.SetXmlDoc(&XMLDoc);
+            
+            /*Se llama al servicio*/
+            &msg_Response = %IntBroker.SyncRequest(&msg_Request);
+            
+            Local XmlDoc &xmlRta, &xXmlDoc2;
+            Local XmlNode &Cabecera, &Datos;
+            Local array of XmlNode &vBody, &vHeader, &vDato;
+            Local string &Rta, &BodyTag, &HeaderTag;
+            Local string &Rtaradicado, &RtanombreArchivo;
+            
+            &xmlRta = &msg_Response.GetXmlDoc();
+            
+            &Rta = &xmlRta.GenXmlString();
+            
+            &Tag = "ResultCode";
+            
+            &IDIncident = &xmlRta.DocumentElement.GetElementsByTagName(&Tag);
+            &strNodeValue = &IDIncident [1].NodeValue;
+            
+            MessageBox(0, "", 0, 0, "ResultCode: " | &strNodeValue);
+            
+            /*Inicio 001*/
+            /*Se inserta en la tabla de estados de la DIAN*/
+            &recDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
+            &recUpdDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
+            
+            &recDOC_DIAN_FE.BUSINESS_UNIT.Value = &recEXTRCT.BUSINESS_UNIT.Value;
+            &recDOC_DIAN_FE.INVOICE.Value = &recEXTRCT.INVOICE.Value;
+            
+            If &recDOC_DIAN_FE.SelectByKey() Then
+               &recUpdDOC_DIAN_FE.PROCESS_INSTANCE.Value = BI_XMLP_AET.PROCESS_INSTANCE;
+               &recUpdDOC_DIAN_FE.ACTIONTYPE.Value = &strE_TypeDoc;
+               &recUpdDOC_DIAN_FE.ETY_TIPO_DOC_FE.Value = &TipDocLeg;
+               &recUpdDOC_DIAN_FE.Update(&recDOC_DIAN_FE);
+            Else
+               &recDOC_DIAN_FE.BUSINESS_UNIT.Value = &recEXTRCT.BUSINESS_UNIT.Value;
+               &recDOC_DIAN_FE.INVOICE.Value = &recEXTRCT.INVOICE.Value;
+               &recDOC_DIAN_FE.PROCESS_INSTANCE.Value = BI_XMLP_AET.PROCESS_INSTANCE;
+               &recDOC_DIAN_FE.ACTIONTYPE.Value = &strE_TypeDoc;
+               &recDOC_DIAN_FE.ETY_TIPO_DOC_FE.Value = &TipDocLeg;
+               &recDOC_DIAN_FE.Insert();
+            End-If;
+            /*Fin 001*/
+            
+         catch Exception &e
+            REM MessageBox(0, "", 0, 0, "Error: " | &e.ToString());
+         end-try;
+         
+         /**/
+         
+      End-If;
+      /*Inicio 001*/
+   End-If;
+   /*Fin 001*/
+   
+   /* Update Invoice Counter */
+   &InvCount = &InvCount + 1;
+End-While;
+&sqlEXTRCT.Close();
+
+/*Inicio 001*/
+&recDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
+&recUpdDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
+
+&sqlDOC_DIAN_FE = GetSQL("%SelectAll(:1) WHERE PROCESS_INSTANCE = :2 AND ETY_TIPO_DOC_FE = :3", &recDOC_DIAN_FE, BI_XMLP_AET.PROCESS_INSTANCE.Value, &TipDocLeg);
+While &sqlDOC_DIAN_FE.Fetch(&recDOC_DIAN_FE)
+   If &Count = 0 Then
+      GetJavaClass("java.lang.Thread").sleep(150 * 1000);
+   End-If;
+   
+   /*Parametrización tipos de documento para el servicio consulta de estado*/
+   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TIPO_DOC' AND STRING_ID = 'FACTURA'", &DocType);
+   
+   /*Llama la integración consulta de estado*/
+   &ResEstado = &obj.ConEstadoDocumento(&recDOC_DIAN_FE.BUSINESS_UNIT.Value, &recDOC_DIAN_FE.ACTIONTYPE.Value, &recDOC_DIAN_FE.INVOICE.Value, &DocType);
+   
+   /*Estado documento retornado por la DIAN*/
+   &StrRCode = &ResEstado [2];
+   
+   /*Observaciones del estado del documento retornado por la DIAN*/
+   &Obsv = &ResEstado [3];
+   If Len(&Obsv) > 253 Then
+      &Obsv = Substring(&Obsv, 1, 253);
+   End-If;
+   
+   /*Descripcion del estado del documento*/
+   &DescrEstaDoc = EstadosDocumentos(&StrRCode);
+   &DecrEstado = &DescrEstaDoc [1];
+   &Estado = &DescrEstaDoc [2];
+   
+   &recUpdDOC_DIAN_FE.STATE_NAME.Value = &ResEstado [2];
+   &recUpdDOC_DIAN_FE.ETY_ESTADO_DOC.Value = &Estado;
+   &recUpdDOC_DIAN_FE.ETY_DESCR_ESTADO.Value = &DecrEstado;
+   &recUpdDOC_DIAN_FE.DESCR_LONG.Value = &Obsv;
+   &recUpdDOC_DIAN_FE.DOCUMENT.Value = &DocType;
+   &recUpdDOC_DIAN_FE.ETY_CUFE_FE.Value = &ResEstado [4];
+   &recUpdDOC_DIAN_FE.Update(&recDOC_DIAN_FE);
+   
+   MessageBox(0, "", 0, 0, "-----------SERVICIO CONSULTA ESTADO DOCUMENTO-------------");
+   MessageBox(0, "", 0, 0, "Unidad Negocio: " | &recDOC_DIAN_FE.BUSINESS_UNIT.Value);
+   MessageBox(0, "", 0, 0, "Documento: " | &recDOC_DIAN_FE.INVOICE.Value);
+   MessageBox(0, "", 0, 0, "ResultCode: " | &ResEstado [1]);
+   MessageBox(0, "", 0, 0, "ResultMessage: " | &ResEstado [2]);
+   MessageBox(0, "", 0, 0, "Estado: " | &Estado);
+   MessageBox(0, "", 0, 0, "Descr Estado: " | &DecrEstado);
+   MessageBox(0, "", 0, 0, "Observations: " | &ResEstado [3]);
+   
+   If &Estado <> "ACEPTADA" Then
+      BI_XMLP_AET.AE_APPSTATUS = 1;
+   End-If;
+   
+   &Count = &Count + 1;
+End-While;
+&sqlDOC_DIAN_FE.Close();
+/*Fin 001*/

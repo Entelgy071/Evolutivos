@@ -1,0 +1,55 @@
+/************************************************************************************************************************************
+Proyecto					Ref		Fecha	  	  Desa.	    Descripción
+-------------------------------------------------------------------------------------------------------------------------------------
+ETY_ERP_AP_EVO_9689     	001		13-02-2020	   JH   	Descripción de los estados de documento SERES.
+************************************************************************************************************************************/
+/*Inicio 001*/
+Function EstadosDocumentos(&CODIGO) Returns array
+   Local array &Resp;
+   &Resp = CreateArray();
+   Evaluate &CODIGO
+   When "ERROR"
+      &Resp [1] = "Error";
+      &Resp [2] = "ERROR";
+   When "NO_ENC"
+      &Resp [1] = "No encontrado en la plataforma";
+      &Resp [2] = "NO_ENCONTRADA";
+   When "PAUTDIAN"
+      &Resp [1] = "Pend. Autorización DIAN";
+      &Resp [2] = "PENDIENTE";
+   When "DEPODIAN"
+      &Resp [1] = "Autorizada DIAN";
+      &Resp [2] = "ACEPTADA";
+   When "RECUDIAN"
+      &Resp [1] = "Autorizada DIAN y abierto por el cliente";
+      &Resp [2] = "ACEPTADA";
+   When "NAUTDIAN"
+      &Resp [1] = "No Autorizada DIAN";
+      &Resp [2] = "RECHAZADA";
+   When "DEPODIG"
+      &Resp [1] = "Recibida por email";
+      &Resp [2] = "ACEPTADA";
+   When "RECUDIG"
+      &Resp [1] = "Recibida y abierta por email";
+      &Resp [2] = "ACEPTADA";
+   When "ACEP"
+      &Resp [1] = "Aceptada por el cliente (desde la plataforma)";
+      &Resp [2] = "ACEPTADA";
+   When "NACEP"
+      &Resp [1] = "No aceptada por el cliente (desde la plataforma)";
+      &Resp [2] = "ACEPTADA";
+   When "VALID"
+      &Resp [1] = "Aceptada por el cliente (desde email interactivo)";
+      &Resp [2] = "ACEPTADA";
+   When "NVALID"
+      &Resp [1] = "No aceptada por el cliente (desde email interactivo)";
+      &Resp [2] = "ACEPTADA";
+   When-Other
+      &Resp [1] = "NA";
+      &Resp [2] = "NA";
+   End-Evaluate;
+   
+   Return &Resp;
+End-Function;
+
+/*Fin 001*/

@@ -1,0 +1,127 @@
+/************************************************************************************************************************************
+Proyecto					Ref		Fecha	  	  Desa.	    Descripción
+-------------------------------------------------------------------------------------------------------------------------------------
+ETY_ERP_AP_EVO_9689     	001		12-02-2020	   JH   	Integracion consulta estados documento con SERES.
+************************************************************************************************************************************/
+/*Inicio 001*/
+class EstadoDocumento
+   method ConEstadoDocumento(&BU As string, &TaxIdType As string, &DocId As string, &DocType As string) Returns array
+end-class;
+
+method ConEstadoDocumento
+   /+ &BU as String, +/
+   /+ &TaxIdType as String, +/
+   /+ &DocId as String, +/
+   /+ &DocType as String +/
+   /+ Returns Array of Any +/
+   
+   Local string &username, &pass, &strNationalId, &strAuthToken, &StrRequest, &strIbOperationname;
+   Local Record &rcEtyParamseres;
+   Local XmlDoc &XMLDoc;
+   Local array &Resp;
+   &Resp = CreateArray();
+   
+   &rcEtyParamseres = CreateRecord(Record.ETY_PARAM_SERES);
+   
+   &rcEtyParamseres.BUSINESS_UNIT.Value = &BU;
+   
+   If &rcEtyParamseres.SelectByKey() Then
+      
+      &username = &rcEtyParamseres.PTSF_SS_USER_NAME.Value;
+      &pass = &rcEtyParamseres.PTSF_SS_PASSWORD.Value;
+      &strNationalId = &rcEtyParamseres.NATIONAL_ID.Value;
+      &strAuthToken = &rcEtyParamseres.AUTH_TOKEN.Value;
+      
+      try
+         &StrRequest = "";
+         &StrRequest = &StrRequest | "<?xml version='1.0'?>";
+         &StrRequest = &StrRequest | "<s:Envelope xmlns:s='http://www.w3.org/2003/05/soap-envelope'>";
+         &StrRequest = &StrRequest | "<s:Header>";
+         &StrRequest = &StrRequest | "<wsse:Security xmlns:wsse='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd' xmlns:wsu='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd'>";
+         &StrRequest = &StrRequest | "<wsse:UsernameToken Id='" | &strAuthToken | "'>";
+         &StrRequest = &StrRequest | "<wsse:Username>" | &username | "</wsse:Username>";
+         &StrRequest = &StrRequest | "<wsse:Password Type='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText'>" | &pass | "</wsse:Password>";
+         &StrRequest = &StrRequest | "</wsse:UsernameToken>";
+         &StrRequest = &StrRequest | "</wsse:Security>";
+         &StrRequest = &StrRequest | "</s:Header>";
+         &StrRequest = &StrRequest | "<s:Body xmlns:xsd='http://www.w3.org/2001/XMLSchema' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>";
+         &StrRequest = &StrRequest | "<getDocumentsState xmlns='http://ws.seres.com/wsdl/20150301/DocumentsState/'>";
+         &StrRequest = &StrRequest | "<parameters xmlns=''>";
+         &StrRequest = &StrRequest | "<EFacturaService>CO</EFacturaService>";
+         &StrRequest = &StrRequest | "<TaxIdentification>";
+         &StrRequest = &StrRequest | "<TaxIdCountry>CO</TaxIdCountry>";
+         &StrRequest = &StrRequest | "<TaxIdType>" | &TaxIdType | "</TaxIdType>";
+         &StrRequest = &StrRequest | "<TaxIdNumber>" | &strNationalId | "</TaxIdNumber>";
+         &StrRequest = &StrRequest | "</TaxIdentification>";
+         &StrRequest = &StrRequest | "<DocId>" | &DocId | "</DocId>";
+         &StrRequest = &StrRequest | "<DocType>" | &DocType | "</DocType>";
+         &StrRequest = &StrRequest | "</parameters>";
+         &StrRequest = &StrRequest | "</getDocumentsState>";
+         &StrRequest = &StrRequest | "</s:Body>";
+         &StrRequest = &StrRequest | "</s:Envelope>";
+         
+         &XMLDoc = CreateXmlDoc(&StrRequest);
+         
+         /*Se declara mensaje Request, Response*/
+         
+         Local Message &msg_Request;
+         Local Message &msg_Response;
+         
+         /*Se crea request baseado en operación*/
+         
+         &msg_Request = CreateMessage(Operation.ETY_DOCUMENTSSTATE, %IntBroker_Request);
+         
+         &msg_Request.SetXmlDoc(&XMLDoc);
+         
+         /*Se llama al servicio*/
+         &msg_Response = %IntBroker.SyncRequest(&msg_Request);
+         
+         Local XmlDoc &xmlRta;
+         Local array of XmlNode &RCode, &RMessage, &Obsv, &Cufe;
+         Local string &StrRCode, &StrRMessage, &StrObsv, &StrCufe;
+         
+         &xmlRta = &msg_Response.GetXmlDoc();
+         
+         &RCode = &xmlRta.GetElementsByTagName("ResultCode");
+         &RMessage = &xmlRta.GetElementsByTagName("ResultMessage");
+         &Obsv = &xmlRta.GetElementsByTagName("Observations");
+         &Cufe = &xmlRta.GetElementsByTagName("Cufe");
+         
+         If &RCode.Len > 0 Then
+            &StrRCode = &xmlRta.GetElementsByTagName("ResultCode")[1].NodeValue;
+            &Resp [1] = &StrRCode;
+         End-If;
+         
+         If &RMessage.Len > 0 Then
+            &StrRMessage = &xmlRta.GetElementsByTagName("ResultMessage")[1].NodeValue;
+            &Resp [2] = &StrRMessage;
+         End-If;
+         
+         If &Obsv.Len > 0 Then
+            &StrObsv = &xmlRta.GetElementsByTagName("Observations")[1].NodeValue;
+            &Resp [3] = &StrObsv;
+         Else
+            &Resp [3] = " ";
+         End-If;
+         
+         If &Cufe.Len > 0 Then
+            &StrCufe = &xmlRta.GetElementsByTagName("Cufe")[1].NodeValue;
+            &Resp [4] = &StrCufe;
+         Else
+            &Resp [4] = " ";
+         End-If;
+         
+      catch Exception &e
+         &Resp [1] = "1";
+         &Resp [2] = "ERROR";
+         &Resp [3] = &e.ToString();
+         &Resp [4] = " ";
+      end-try;
+      
+   End-If;
+   
+   Return &Resp;
+   
+end-method;
+
+/*Inicio 001*/

@@ -1,0 +1,18 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 001       ETY_ERP_AP_EVO_9689     John Diaz          24 Ene 2020        Se inicializa el campo ETY_BI_METPAGOS.ETY_FORM_PAGOS.
+*************************************************************************************************************************************/
+/*Inicio 001*/
+Function Metodo_Pago()
+   &CodPago = BI_HDR.PYMNT_TERMS_CD.Value;
+   If All(&CodPago) Then
+      If &CodPago = "00D" Then
+         ETY_BI_METPAGOS.ETY_FORM_PAGOS.Value = "1";
+      Else
+         ETY_BI_METPAGOS.ETY_FORM_PAGOS.Value = "2";
+      End-If;
+   End-If;
+End-Function;
+
+/*Fin 001*/

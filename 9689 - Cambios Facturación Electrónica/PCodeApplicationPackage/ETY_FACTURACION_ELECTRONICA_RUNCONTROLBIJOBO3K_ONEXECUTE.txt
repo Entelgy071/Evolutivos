@@ -1,0 +1,131 @@
+/************************************************************************************************************************************
+Proyecto					Ref		Fecha	  	  Desa.	    Descripción
+-------------------------------------------------------------------------------------------------------------------------------------
+ETY_ERP_AP_EVO_9689     	001		21-02-2020	   JH   	Crea el run control mediante un component interface para el envio del 
+                                                            Job BIJOB03K.
+************************************************************************************************************************************/
+/*Inicio 001*/
+class RunControlBIJOB03K
+   method CreateRUN_BI_PRNTIVC(&RUN_CNTL As string, &POST_ACTION As string, &INVOICE_DT_OPT As string, &INVOICE_RANGE_OPT As string, &BUSINESS_UNIT As string, &START_INVOICE As string, &END_INVOICE As string) Returns string;
+   method errorHandler(&oSession As ApiObject);
+end-class;
+
+method CreateRUN_BI_PRNTIVC
+   /+ &RUN_CNTL as String, +/
+   /+ &POST_ACTION as String, +/
+   /+ &INVOICE_DT_OPT as String, +/
+   /+ &INVOICE_RANGE_OPT as String, +/
+   /+ &BUSINESS_UNIT as String, +/
+   /+ &START_INVOICE as String, +/
+   /+ &END_INVOICE as String +/
+   /+ Returns String +/
+   
+   /* ===>
+This is a dynamically generated PeopleCode template to be used only as a helper
+to the application developer.
+You need to replace all references to '[*]' OR default values with  references to
+PeopleCode variables and/or a Rec.Fields. */
+   
+   Local File &fileLog;
+   Local ApiObject &oSession, &oEtySnglActionCi;
+   Local ApiObject &oRunBiPrntivcCollection, &oRunBiPrntivc;
+   Local string &resp;
+   
+   try
+      
+      rem ***** Get current PeopleSoft Session *****;
+      &oSession = %Session;
+      
+      rem ***** Set the PeopleSoft Session Error Message Mode *****;
+      rem ***** 0 - None *****;
+      rem ***** 1 - PSMessage Collection only (default) *****;
+      rem ***** 2 - Message Box only *****;
+      rem ***** 3 - Both collection and message box *****;
+      &oSession.PSMessagesMode = 1;
+      
+      rem ***** Get the Component Interface *****;
+      &oEtySnglActionCi = &oSession.GetCompIntfc(CompIntfc.ETY_SNGL_ACTION_CI);
+      If &oEtySnglActionCi = Null Then
+         %This.errorHandler(&oSession);
+         throw CreateException(0, 0, "GetCompIntfc failed");
+      End-If;
+      
+      rem ***** Set the Component Interface Mode *****;
+      &oEtySnglActionCi.InteractiveMode = False;
+      &oEtySnglActionCi.GetHistoryItems = True;
+      &oEtySnglActionCi.EditHistoryItems = False;
+      
+      rem ***** Set Component Interface Get/Create Keys *****;
+      &oEtySnglActionCi.RUN_CNTL_ID = &RUN_CNTL;
+      
+      rem ***** Execute Get *****;
+      rem If Not &oEtySnglActionCi.Get() Then
+         rem ***** No rows exist for the specified keys.*****;
+      rem %This.errorHandler(&oSession);
+      rem throw CreateException(0, 0, "Get failed");
+      rem End-If;
+      
+      rem ***** Execute Create ******;
+      If Not &oEtySnglActionCi.Create() Then;
+         rem ***** Unable to Create Component Interface for the Add keys provided. *****;
+         %This.errorHandler(&oSession);
+         throw CreateException(0, 0, "Create failed");
+      End-If;
+      
+      rem ***** Set/Get RUN_BI_PRNTIVC Collection Field Properties -- Parent: PS_ROOT Collection *****;
+      &oRunBiPrntivcCollection = &oEtySnglActionCi.RUN_BI_PRNTIVC;
+      Local integer &i127;
+      For &i127 = 1 To &oRunBiPrntivcCollection.Count;
+         &oRunBiPrntivc = &oRunBiPrntivcCollection.Item(&i127);
+         &oRunBiPrntivc.POST_ACTION = &POST_ACTION;
+         &oRunBiPrntivc.INVOICE_DT_OPT = &INVOICE_DT_OPT;
+         &oRunBiPrntivc.INVOICE_RANGE_OPT = &INVOICE_RANGE_OPT;
+         &oRunBiPrntivc.BUSINESS_UNIT = &BUSINESS_UNIT;
+         &oRunBiPrntivc.START_INVOICE = &START_INVOICE;
+         &oRunBiPrntivc.END_INVOICE = &START_INVOICE;
+      End-For;
+      
+      rem ***** End: Get/Set Component Interface Properties *****;
+      
+      rem ***** Execute Save *****;
+      If Not &oEtySnglActionCi.Save() Then;
+         %This.errorHandler(&oSession);
+         throw CreateException(0, 0, "Save failed");
+      End-If;
+      
+      rem ***** Execute Cancel *****;
+      rem If Not &oEtySnglActionCi.Cancel() Then;
+      rem 	errorHandler();
+      rem 	throw CreateException(0, 0, "Cancel failed");
+      rem End-If;
+      
+      &resp = &RUN_CNTL;
+      
+   catch Exception &ex
+      rem Handle the exception;
+      rem &fileLog.WriteLine(&ex.ToString());
+      &resp = &ex.ToString();
+   end-try;
+   
+   Return &resp;
+   
+end-method;
+
+method errorHandler
+   /+ &oSession as ApiObject +/
+   Local ApiObject &oPSMessageCollection, &oPSMessage;
+   Local number &i;
+   Local string &sErrMsgSetNum, &sErrMsgNum, &sErrMsgText, &sErrType;
+   
+   &oPSMessageCollection = &oSession.PSMessages;
+   For &i = 1 To &oPSMessageCollection.Count
+      &oPSMessage = &oPSMessageCollection.Item(&i);
+      &sErrMsgSetNum = &oPSMessage.MessageSetNumber;
+      &sErrMsgNum = &oPSMessage.MessageNumber;
+      &sErrMsgText = &oPSMessage.Text;
+   End-For;
+   rem ***** Delete the Messages from the collection *****;
+   &oPSMessageCollection.DeleteAll();
+end-method;
+
+/*Inicio 001*/

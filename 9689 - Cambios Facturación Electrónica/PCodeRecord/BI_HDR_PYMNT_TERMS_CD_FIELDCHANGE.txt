@@ -1,0 +1,15 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 001       ETY_ERP_AP_EVO_9689     John Diaz          23 Ene 2020        Se inicializa el campo ETY_BI_METPAGOS.ETY_FORM_PAGOS.
+*************************************************************************************************************************************/
+Declare Function SET_PAY_TERM_DFLT PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+/*Inicio 001*/
+Declare Function Metodo_Pago PeopleCode ETY_BI_METPAGOS.BUSINESS_UNIT FieldFormula;
+
+Metodo_Pago();
+/*Fin 001*/
+
+If None(BI_HDR.PYMNT_TERMS_CD) Then
+   SET_PAY_TERM_DFLT();
+End-If;

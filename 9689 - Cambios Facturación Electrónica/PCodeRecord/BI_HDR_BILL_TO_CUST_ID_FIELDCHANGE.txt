@@ -1,0 +1,862 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 001       ETY_ERP_AP_EVO_9689     John Diaz          23 Ene 2020        Se inicializa el campo ETY_BI_METPAGOS.ETY_FORM_PAGOS.
+*************************************************************************************************************************************/
+import SCM_BI_INVOICE:DisplayHeader:*;
+import SCM_BI_INVOICE:InvoiceController;
+
+Component SCM_BI_INVOICE:InvoiceController &C;
+
+/* 9/97 MWC Added Interunit logic                                         
+   9/97 KDW Added Currency Rate Type default logic 
+  12/97 JRH Added VAT Defaults 
+  02/98 MWC Modified InterUnit logic to check for valid pair 
+   6/98 MAC Added logic to default in bill_to_copies if non-EDI 
+  07/98 LIC Modified contact default to also get from PS_BI_CUST_A_C_VW
+   7/99 VMV Introduced zero percentage handling. Replaced all references to BI_LINE.TOT_LINE_DST_PCT with DERIVED_WORK_BI.TOT_LINE_DST_PCT_W. R-VDEVIL-3B4GC.
+  10/99 KAZ - R-JAK-RZ6WZ- If the customer ID changed, we need to wipe out the credit card info attached to this invoice for the previous customer. 
+  10/99 LIC Modified defaulting logic such that we default the contact first before address, then default as much as possible from the contact (like address, media, copies, etc).
+  11/99 JRH Added credit card defaulting.  Rel. 8.0.  Comment out old code to clear credit card data.  The new function will take care of this.
+  06/00 MWC Added logic to support InterUnit Control Inquiry hyperlink
+  06/00 TTV  Changed logic to allow changes to bill currency in more situations.
+06/29/00 MWC Added logic to disable Insert/Delete button for rev dist when
+             maintaining interunit bill, either entering initial bill to cust
+             id or changing it.
+07/13/00 LIC Default Sales Person from the Support Team Code.
+08/22/00 LIC #4524201 Modify Bill To Media default to take out the 2nd layer of defaulting, i.e., if contact is blank, then default Bill To Media to Print instead of looking for any contact that is defined as EDI in order to default to EDI.  Now, the only way a bill will default to EDI is if the contact for the bill is setup to receive invoices by EDI.
+09/18/00 DB  #4605300 TP_PROFILE_ID field removed from page and references removed from peoplecode as it is not required any more.
+01/17/00 LIC R-GRICHA-R2896 Fix defaulting algorithm to default the sales person with the min priority instead of defaulting the team member with priority "1". 
+01/22/01 MWC Changed 'BI_ENTRY' reference to accommodate Express Bill Entry
+03/05/01 DB  Added if..end-if condition for ungraying of BI_CURRENCY_CD - 8 SP2 defr. processing.
+09/05/01 DB  Eliminate usage of BI_IU_CONTROL table, Added new function call to load default general options into Header work record and all Acct. dist. info from the Common IU setup tables into the actual dist. tables. Also, added new function call to determine nature of IU Bill.
+10/23/01 DB  Changes to setting CF_ACTION_FLG for different kinds of IU Bills.
+10/25/01 TTV Build inherited chartfield array when BUSINESS_UNIT_TO is identified.
+11/20/01 DB  Test Incident # 9875500.
+12/30/01 KS  Cleaned up BI_ACTION_PROJ project -- Dynamic PeopleCode for Chartfields.
+01/09/02 DB  Modified code in function load_iu_defaults() to look for IU_METHOD = 'P' in case of Pairs method.
+02/14/02 DB  Removed hardcoded value for IU_TRAN_CD, instead retrieve from IU_TRAN_MAP_TBL.
+02/22/02 DB  commented out the code that was not allowing multile rev. lines within one line.
+02/26/02 DB  Changed Pairs, Direct and Indirect view names to use SP% views.
+05/16/02 DB  Test Incident: 12019200. &TO_BU should be from BI_HDR.BUSINESS_UNIT_TO.
+11/06/02 DB  Code to remove Acct. dist. rows when Bill change from IU to non-IU.
+11/19/02 LIC Added code for India Tax processing.
+12/03/02 KS  Changes made to call new vat defaulting function.
+01/10/03 VMV Changed value of From BU to use BUSINESS_UNIT_GL rather than just BUSINESS_UNIT before call to function load_iu_defaults for ICE 556138001 Resolution 113558
+04/09/03 LIC Pulled SQLExec on IU_TRAN_MAP_TBL outside of bill line loop.  Removed restriction of changing customer for consolidated bills and attached bills.
+04/09/03 LIC 69681000 Don't require all lines be loaded into the buffer unless change in currency or customer is interunit.  Needed to re-order some logic to accomplish this.
+02/10/04 LIC 153128 Make the credit card defaulting logic into a function so the same code can be called when the contact is changed.
+07/06/04 DB  ICE 689539000. change MsgGet to MsgGetText
+08/01/05 LIC ICE 1332765000 Changed BI_HDR_CRCARD from level 0 to level 1 so need to reference the fields as level 1 (to avoid empty BI_HDR_CRCARD row). 
+08/19/05 CRR 1318790000 Balancing for non interunit customers use Business_unit for function to set bill type
+11/09/05 LIC 1351199000 Only show the last four digits of the credit card.
+03/28/06 KRS - Release 9.0 Financial Sanctions Screening
+09/11/07 LIC - Release 9.1 Switch to call class DisplayHeader when populating BI_ADDR_WRK fields.  Also, add logic
+               to invoke InvoiceController app class.
+03/12/10 CRR 1943851001 Redefault in all VAT when customer changes
+*/
+
+Declare Function set_pay_term_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_remit_to_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_cycle_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_hdr_physical_nature PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_hdr_vat_svc_perfrm_flg PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_hdr_country_state_vat_perfrm PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function SetVATRowDefaults PeopleCode FUNCLIB_VAT.DEFAULT_FUNCTIONS FieldFormula;
+Declare Function VATStateBlankOut PeopleCode FUNCLIB_BI.VAT_FUNCTIONS_BI FieldFormula;
+Declare Function TrackVATRowChanges PeopleCode FUNCLIB_VAT.DEFAULT_FUNCTIONS FieldFormula;
+Declare Function ProcessVATChildren PeopleCode FUNCLIB_VAT.DEFAULT_FUNCTIONS FieldFormula;
+Declare Function GetContext PeopleCode FUNCLIB_VAT.DEFAULT_FUNCTIONS FieldFormula;
+Declare Function set_inq_phone_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_spclist_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_form_id_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_ar_dist_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_subcust_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_cur_rt_type_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function set_currency_dflt PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+Declare Function GetQuoteMethod PeopleCode EXCH_RT_WRK.RATE_DIRECT FieldChange;
+Declare Function GetMaxVariance PeopleCode EXCH_RT_WRK.RATE_DIRECT FieldChange;
+Declare Function GetExchangeRate PeopleCode EXCH_RT_WRK.RATE_MULT FieldChange;
+Declare Function change_bill_currency PeopleCode FUNCLIB_BI.BI_CURRENCY_CD FieldFormula;
+Declare Function Get_Contact_Defaults PeopleCode FUNCLIB_BI.CNTCT_SEQ_NUM FieldFormula;
+Declare Function cr_card_defaulting PeopleCode FUNCLIB_CR_CARD.CR_CARD_PROC FieldFormula;
+Declare Function decryptcc PeopleCode FUNCLIB_CR_CARD.CR_CARD_PROC FieldFormula;
+Declare Function GetExsDefaultsHdr PeopleCode FUNCLIB_BI.EXS_FUNCTIONS_BI FieldFormula;
+
+Declare Function load_iu_defaults PeopleCode FUNCLIB_BI.IU_CF_FUNCTIONS FieldFormula;
+Declare Function dflt_rev_fr_hdrwrk_rec PeopleCode FUNCLIB_BI.IU_CF_FUNCTIONS FieldFormula;
+Declare Function dflt_rec_fr_hdrwrk_rec PeopleCode FUNCLIB_BI.IU_CF_FUNCTIONS FieldFormula;
+Declare Function dflt_exp_fr_hdrwrk_rec PeopleCode FUNCLIB_BI.IU_CF_FUNCTIONS FieldFormula;
+Declare Function dflt_pay_fr_hdrwrk_rec PeopleCode FUNCLIB_BI.IU_CF_FUNCTIONS FieldFormula;
+Declare Function FIND_IU_BILL_TYPE PeopleCode FUNCLIB_BI.IU_CF_FUNCTIONS FieldFormula;
+
+Declare Function GET_CFS PeopleCode FUNCLIB_CF_FS.CF_FUNCTIONS FieldFormula;
+Declare Function get_cf_iu_inh PeopleCode FUNCLIB_BI.IU_CF_FUNCTIONS FieldFormula;
+Declare Function get_cf_action_flg PeopleCode FUNCLIB_BI.IU_CF_FUNCTIONS FieldFormula;
+Declare Function set_bill_hdr_fss_override PeopleCode FUNCLIB_BI.INVOICE FieldFormula;
+
+rem 1351199000;
+Declare Function maskAcctNumber2 PeopleCode FUNCLIB_CR_CARD.CR_CARD_PROC FieldFormula;
+
+/*Inicio 001*/
+Declare Function Metodo_Pago PeopleCode ETY_BI_METPAGOS.BUSINESS_UNIT FieldFormula;
+/*Fin 001*/
+
+Component array of string &CF_ARRAY, &CF_IU_INH_ARRAY, &CF_IU_INHO_ARRAY;
+
+Local Rowset &L0_ROWSET, &L1_ROWSET, &L2_ROWSET, &rsBI_LINE, &HDRVAT_SCROLL, &rsBI_LVAT_WRK;
+Local Row &L0_ROW, &L1_ROW, &L2_ROW;
+Local SCM_BI_INVOICE:DisplayHeader &HdrDisplay;
+
+/* 153128 Put this logic into a function. */
+Function DefaultCreditCard(&opt, &ovrde_pay_meth)
+   If Substring(%PanelGroup, 1, 8) = "BI_ENTRY" Then
+      Local Rowset &HDRCrCardRS;
+      Local Record &BIHdrCrCardRec, &FuncLibCrCardRec;
+      
+      &HDRCrCardRS = GetRowset(Scroll.BI_HDR_CRCARD);
+      &BIHdrCrCardRec = &HDRCrCardRS(1).BI_HDR_CRCARD;
+      &FuncLibCrCardRec = &HDRCrCardRS(1).FUNCLIB_CR_CARD;
+      
+      &BIHdrCrCardRec.CR_CARD_A_DTTM.Value = " ";
+      &BIHdrCrCardRec.CR_CARD_AUTH_CD.Value = " ";
+      &BIHdrCrCardRec.CR_CARD_AUTH_STAT.Value = "U";
+      cr_card_defaulting(&opt, BI_HDR.BUSINESS_UNIT, BI_HDR.BILL_TO_CUST_ID, &payment_method, &cr_card_type, &cr_card_nbr, &cr_card_digits, &cr_card_expmo, &cr_card_expyr, &cr_card_fname, &cr_card_lname, &addr1, &addr2, &addr3, &addr4, &city, &num1, &num2, &house_type, &county, &STATE, &postal, &COUNTRY, &geo_code, &in_city_limit, &emailid, &phone);
+      If &ovrde_pay_meth = "Y" Then
+         BI_HDR.PAYMENT_METHOD = &payment_method;
+      End-If;
+      If BI_HDR.PAYMENT_METHOD = "CC" Then
+         BI_HDR.CR_CARD_FLG = "Y";
+      Else
+         BI_HDR.CR_CARD_FLG = "N";
+      End-If;
+      &BIHdrCrCardRec.CR_CARD_TYPE.Value = &cr_card_type;
+      &BIHdrCrCardRec.CR_CARD_DIGITS.Value = &cr_card_digits;
+      &BIHdrCrCardRec.CR_CARD_NBR.Value = &cr_card_nbr;
+      If &BIHdrCrCardRec.CR_CARD_DIGITS.Value <> "UUUU" Then
+         decryptcc(&BIHdrCrCardRec.CR_CARD_NBR.Value, &FuncLibCrCardRec.CR_CARD_NBR_E.Value);
+      Else
+         &FuncLibCrCardRec.CR_CARD_NBR_E.Value = &BIHdrCrCardRec.CR_CARD_NBR.Value;
+      End-If;
+      rem begin 1351199000;
+      If All(&BIHdrCrCardRec.CR_CARD_DIGITS.Value) Then
+         maskAcctNumber2(&BIHdrCrCardRec.CR_CARD_DIGITS.Value, &FuncLibCrCardRec.CR_CARD_NBR_E2.Value);
+      Else
+         &FuncLibCrCardRec.CR_CARD_NBR_E2.Value = " ";
+      End-If;
+      rem end 1351199000;
+      &BIHdrCrCardRec.CR_CARD_FNAME.Value = &cr_card_fname;
+      &BIHdrCrCardRec.CR_CARD_LNAME.Value = &cr_card_lname;
+      &BIHdrCrCardRec.CR_CARD_EXPMO.Value = &cr_card_expmo;
+      &BIHdrCrCardRec.CR_CARD_EXPYR.Value = &cr_card_expyr;
+      &BIHdrCrCardRec.ADDRESS1.Value = &addr1;
+      &BIHdrCrCardRec.ADDRESS2.Value = &addr2;
+      &BIHdrCrCardRec.ADDRESS3.Value = &addr3;
+      &BIHdrCrCardRec.ADDRESS4.Value = &addr4;
+      &BIHdrCrCardRec.CITY.Value = &city;
+      &BIHdrCrCardRec.NUM1.Value = &num1;
+      &BIHdrCrCardRec.NUM2.Value = &num2;
+      &BIHdrCrCardRec.HOUSE_TYPE.Value = &house_type;
+      &BIHdrCrCardRec.COUNTY.Value = &county;
+      &BIHdrCrCardRec.STATE.Value = &STATE;
+      &BIHdrCrCardRec.POSTAL.Value = &postal;
+      &BIHdrCrCardRec.COUNTRY.Value = &COUNTRY;
+      &BIHdrCrCardRec.GEO_CODE.Value = &geo_code;
+      &BIHdrCrCardRec.IN_CITY_LIMIT.Value = &in_city_limit;
+      &BIHdrCrCardRec.PHONE.Value = &phone;
+      &BIHdrCrCardRec.EMAILID.Value = &emailid;
+   End-If;
+End-Function;
+
+/*-----------------------beginning of mainline--------------------*/
+&PRIOR_BILL_TO_CUST = PriorValue(BI_HDR.BILL_TO_CUST_ID, CurrentRowNumber());
+&PRIOR_ADDRESS_SEQ_NUM = PriorValue(BI_HDR.ADDRESS_SEQ_NUM, CurrentRowNumber());
+&PRIOR_COUNTRY_SHIP_TO = PriorValue(BI_HDR.COUNTRY_SHIP_TO, CurrentRowNumber());
+&PRIOR_STATE_SHIP_TO = PriorValue(BI_HDR.STATE_SHIP_TO, CurrentRowNumber());
+&PRIOR_BILL_CONTACT = PriorValue(BI_HDR.CNTCT_SEQ_NUM, CurrentRowNumber());
+&PRIOR_BUS_UNIT_TO = BI_HDR.BUSINESS_UNIT_TO;
+&CHANGE_CURRENCY = "Y";
+
+/*--------- The logic below covers the scenarios where the customer cannot be changed ---------*/
+/* Change is not allowed when the bill is attached to an excise invoice */
+If BI_HDR.BI_BU_TAX_IND = "2" Then
+   If BI_HDR.INVOICE = BI_HDR.ORIGINAL_INVOICE Or
+         BI_HDR.INVOICE_TYPE = "ACR" Then
+      SQLExec("Select COUNT(*) FROM PS_BI_LINE WHERE BUSINESS_UNIT = :1 AND INVOICE = :2 AND EXD_INVOICE_NO <> ' '", BI_HDR.BUSINESS_UNIT, BI_HDR.INVOICE, &count_exd_no);
+      If &count_exd_no > 0 Then
+         WinMessage(MsgGet(12500, 466, "Customer ID cannot be changed because an excise invoice is attached to this bill."), 16);
+         BI_HDR.BILL_TO_CUST_ID = &PRIOR_BILL_TO_CUST;
+         Exit;
+      End-If;
+   Else
+      SQLExec("Select COUNT(*) FROM PS_BI_LINE WHERE BUSINESS_UNIT = :1 AND INVOICE = :2 AND EXD_INVOICE_NO <> ' ' and ADJ_LINE_TYPE = 'ACR'", BI_HDR.BUSINESS_UNIT, BI_HDR.INVOICE, &count_exd_no);
+      If &count_exd_no > 0 Then
+         WinMessage(MsgGet(12500, 466, "Customer ID cannot be changed because an excise invoice is attached to this bill."), 16);
+         BI_HDR.BILL_TO_CUST_ID = &PRIOR_BILL_TO_CUST;
+         Exit;
+      End-If;
+   End-If;
+   If CUST_OPTION.INTERUNIT_FLG = "Y" Then
+      WinMessage(MsgGet(12500, 469, "An InterUnit customer cannot be selected when the bill is subject to India taxes."), 16);
+      BI_HDR.BILL_TO_CUST_ID = &PRIOR_BILL_TO_CUST;
+      Exit;
+   End-If;
+End-If;
+
+/* TTV 6/16/00 - Currency validation and change 
+   LIC 4/09/03 - Moved this up because we need to know if the currency has changed for the buffer check 
+*/
+If All(&PRIOR_BILL_TO_CUST) Then
+   If All(CUSTOMER.CURRENCY_CD) Then
+      If CUSTOMER.CURRENCY_CD <> BI_HDR.BI_CURRENCY_CD Then
+         If WinMessage(MsgGet(12500, 225, "The default currency of this customer differs from the bill currency.  Do you want to change it? Press Yes to change, no to not change."), %MsgStyle_YesNo) = %MsgResult_No Then
+            /* User pressed No. */
+            &CHANGE_CURRENCY = "N";
+         Else
+            /* Apply customer default currency. User pressed Yes. */
+            &CHANGE_CURRENCY = "Y";
+         End-If;
+      Else
+         /* New customer currency matched bill currency.  No need to change currency. */
+         &CHANGE_CURRENCY = "N";
+      End-If;
+   Else
+      /* There is no customer currency.  */
+      If WinMessage(MsgGet(12500, 276, "Do you want to use the current bill currency?  Press Yes to retain currency, press No to change."), %MsgStyle_YesNo) = %MsgResult_No Then
+         /* The currency will be changed to the business unit default. User pressed No. */
+         &CHANGE_CURRENCY = "Y";
+      Else
+         /* The bill currency will remain the same. User pressed Yes.*/
+         &CHANGE_CURRENCY = "N";
+      End-If;
+   End-If;
+End-If;
+/* TTV 6/16/00 End of currency change validation */
+
+/* Changing customer is not allowed when the bill has more lines in database than in scroll and 
+   - the bill currency has changed or
+   - the bill is interunit or
+   - the bill is changing from an interunit bill to a non interunit bill
+   Suggest that all lines be in the buffer for VAT bills - for the out-of-sync warning.
+*/
+&NeedAllLinesInBuffer = "N";
+&RecommendAllLinesInBuffer = "N";
+If Left(%PanelGroup, 7) <> "BI_CONS" Then
+   If All(&PRIOR_BUS_UNIT_TO) Or
+         CUST_OPTION.INTERUNIT_FLG = "Y" Or
+         &CHANGE_CURRENCY = "Y" Or
+         /* need all VAT in buffer to redefault on cust change */
+         All(BI_HDR.VAT_ENTITY) Then
+      &NeedAllLinesInBuffer = "Y";
+   End-If;
+End-If;
+
+/* Check to see if all bill lines have been loaded into the buffer.  In certain scenarios, we cannot continue to change customer until all lines are loaded.  Some scenarios just need a warning to the user. */
+If Left(%PanelGroup, 7) <> "BI_CONS" And
+      (&NeedAllLinesInBuffer = "Y" Or
+         &RecommendAllLinesInBuffer = "Y") Then
+   &LINE_COUNT_SCROLL = ActiveRowCount(BI_LINE.LINE_SEQ_NUM);
+   SQLExec("select count(*) from ps_bi_line where business_unit = :1 and invoice = :2", BI_HDR.BUSINESS_UNIT, BI_HDR.INVOICE, &LINE_COUNT_DB);
+   If &LINE_COUNT_SCROLL > 1 And
+         &LINE_COUNT_DB > 1 Then
+      If (&LINE_COUNT_DB > &LINE_COUNT_SCROLL) And
+            (&NeedAllLinesInBuffer = "Y") Then
+         WinMessage(MsgGet(12500, 246, "Customer ID may not be changed while there are more bill lines in database than in a chunking group."), 16);
+         BI_HDR.BILL_TO_CUST_ID = &PRIOR_BILL_TO_CUST;
+         Exit;
+      End-If;
+      If (&LINE_COUNT_DB > &LINE_COUNT_SCROLL) And
+            (&RecommendAllLinesInBuffer = "Y") Then
+         If WinMessage(MsgGet(12500, 512, "This is a VAT bill, better to load all lines in buffer so you will be notified of any out-of-sync line data. Press OK to change, CANCEL to cancel."), 33) = 2 Then
+            BI_HDR.BILL_TO_CUST_ID = &PRIOR_BILL_TO_CUST;
+            Exit;
+         End-If;
+      End-If;
+   End-If;
+End-If;
+
+/*--------- The logic below covers the scenarios that require a warning before changing the customer ---------*/
+/*
+Issue a warning, even though a change is allowed.
+*/
+If All(&PRIOR_BILL_TO_CUST) Then
+   If WinMessage(MsgGet(12500, 169, "Changing this field may change auto defaults based on Bill-to Cust. Do you still want to change? Press OK to change, CANCEL to cancel."), 33) = 2 Then
+      BI_HDR.BILL_TO_CUST_ID = PriorValue(BI_HDR.BILL_TO_CUST_ID, CurrentRowNumber());
+      Exit;
+   End-If;
+   If All(BI_HDR.VAT_ENTITY) Then
+      If WinMessage(MsgGet(12500, 739, "Changing this field will redefault VAT values based on Bill-to Cust. Do you still want to change? Press OK to change, CANCEL to cancel."), 33) = 2 Then
+         BI_HDR.BILL_TO_CUST_ID = PriorValue(BI_HDR.BILL_TO_CUST_ID, CurrentRowNumber());
+         Exit;
+      End-If;
+   End-If;
+   
+   /* KAZ - R-JAK-RZ6WZ- Since we are changing the customer ID, we need to wipe out the credit card info attached to this invoice too. 
+      JRH - Only issue warning to give users a chance to back out.  We default new credit card values at the end of the code now.
+      LIC - We already issued a warning about auto defaults above, we don't need a special warning for credit card information.
+   If BI_HDR.PAYMENT_METHOD = "CC" Then
+      If WinMessage(MsgGet(12500, 279, "Changing this field may result in Credit Card Information lost. Do you still want to change? Press OK to change, CANCEL to cancel."), 33) = 2 Then
+         BI_HDR.BILL_TO_CUST_ID = PriorValue(BI_HDR.BILL_TO_CUST_ID, CurrentRowNumber());
+         Exit;
+      End-If;
+   End-If; */
+   /* Excise/sales tax warnings */
+   If BI_HDR.BI_BU_TAX_IND = "2" Then
+      /* Check for "real" lines */
+      &real_lines = 0;
+      &rsBI_LINE = GetRowset(Record.BI_LINE);
+      For &ln = 1 To &rsBI_LINE.ActiveRowCount
+         If &rsBI_LINE(&ln).IsChanged Or
+               All(&rsBI_LINE(&ln).BI_LINE.ADD_DTTM.Value) Then
+            &real_lines = &real_lines + 1;
+         End-If;
+      End-For;
+      /* Warning for rebill with excise invoice number.  Excise invoice number will be blanked out. */
+      If All(BI_HDR.EXD_INVOICE_NO) Then
+         If BI_HDR.INVOICE <> BI_HDR.ORIGINAL_INVOICE Then
+            If WinMessage(MsgGet(12500, 442, "Modifying this entry can change tax applicability and clear excise invoice number.  Do you still want to change?  Press OK to change, CANCEL to cancel."), 33) = 2 Then
+               BI_HDR.BILL_TO_CUST_ID = PriorValue(BI_HDR.BILL_TO_CUST_ID, CurrentRowNumber());
+               &rebill_ok = "N";
+               Exit;
+            Else
+               BI_HDR.EXD_INVOICE_NO = " ";
+               &rebill_ok = "Y";
+            End-If;
+         End-If;
+      Else
+         If BI_HDR.INVOICE <> BI_HDR.ORIGINAL_INVOICE Then
+            SQLExec("Select COUNT(*) FROM PS_BI_LINE WHERE BUSINESS_UNIT = :1 AND INVOICE = :2 AND EXD_INVOICE_NO <> ' ' AND ADJ_LINE_TYPE <> 'ACR'", BI_HDR.BUSINESS_UNIT, BI_HDR.INVOICE, &count_exd_no);
+            If &count_exd_no > 0 Then
+               If WinMessage(MsgGet(12500, 442, "Modifying this entry can change tax applicability and clear excise invoice number.  Do you still want to change?  Press OK to change, CANCEL to cancel."), 33) = 2 Then
+                  BI_HDR.BILL_TO_CUST_ID = PriorValue(BI_HDR.BILL_TO_CUST_ID, CurrentRowNumber());
+                  &rebill_ok = "N";
+                  Exit;
+               Else
+                  &rebill_ok = "Y";
+               End-If;
+            End-If;
+         Else
+            SQLExec("Select COUNT(*) FROM PS_BI_LINE WHERE BUSINESS_UNIT = :1 AND INVOICE = :2 AND EXD_INVOICE_NO <> ' ' and INVOICE <> ORIGINAL_INVOICE AND ADJ_LINE_TYPE <> 'ACR' ", BI_HDR.BUSINESS_UNIT, BI_HDR.INVOICE, &count_exd_no);
+            If &count_exd_no > 0 Then
+               If WinMessage(MsgGet(12500, 442, "Modifying this entry can change tax applicability and clear excise invoice number.  Do you still want to change?  Press OK to change, CANCEL to cancel."), 33) = 2 Then
+                  BI_HDR.BILL_TO_CUST_ID = PriorValue(BI_HDR.BILL_TO_CUST_ID, CurrentRowNumber());
+                  &rebill_ok = "N";
+                  Exit;
+               Else
+                  &rebill_ok = "Y";
+               End-If;
+            End-If;
+         End-If;
+      End-If;
+      /* Warning that excise and sales tax rate codes can change */
+      If &rebill_ok <> "N" And
+            &rebill_ok <> "Y" Then
+         /* &rsBI_LINE = GetRowset(Record.BI_LINE);
+         If &rsBI_LINE.ActiveRowCount > 0 Then */
+         If &real_lines > 0 Then
+            If WinMessage(MsgGet(12500, 443, "Excise and/or sales tax rate code may be overwritten."), 33) = 2 Then
+               BI_HDR.BILL_TO_CUST_ID = PriorValue(BI_HDR.BILL_TO_CUST_ID, CurrentRowNumber());
+               &rebill_ok = "N";
+               Exit;
+            End-If;
+         End-If;
+      End-If;
+   End-If;
+   /* TTV 6/16/00 - Processing for possible different currency is now done after interunit processing. */
+End-If;
+
+/*--------- Handle Interunit Default Logic ---------*/
+/* lic 4/03 Needed to move the Interunit logic above other hierarchical defaulting because we give the user a opportunity to cancel */
+&IU_TRANCD = " ";
+If Substring(%PanelGroup, 1, 8) = "BI_ENTRY" Then
+   If CUST_OPTION.INTERUNIT_FLG = "Y" Then
+      UnHide(BI_PB_WRK.BI_IU_TOGL_PB);
+      UnHide(BI_PB_WRK.BI_IU_CTRL_PB);
+      /* Unhide Interunit flag */
+      UnHide(CUST_OPTION.INTERUNIT_FLG);
+      
+      /* Get Bill to GL Business Unit */
+      &HAS_BILL_TO_GL = "N";
+      If All(CUST_OPTION.BUSINESS_UNIT_GL) Then
+         /* Check if the Bill TO GL Unit is in InterUnit Control for Bill From GL BU */
+         &IU_VALID_PAIR = "N";
+         /* Determine the IU_METHOD. If is is 'N' (Pairs), then check for valid pair in SP_BIIUP_NONVW; if it is 'D' (Direct) check in SP_BIIUD_NONVW; if it is 'I' (Indirect) check in SP_BIIUI_NONVW.*/
+         &IUMETHOD = " ";
+         SQLExec("select IU_METHOD from PS_INSTALLATION_FS", &IUMETHOD);
+         Evaluate &IUMETHOD
+         When = "P" /*indicates that it is 'Pairs'*/
+            /*SQLExec("select 'Y' from PS_BI_IU_CONTROL A where A.BUS_UNIT_IU_FROM = :1 AND BUS_UNIT_IU_TO = :2 AND A.EFFDT=(SELECT MAX(EFFDT) FROM PS_BI_IU_CONTROL WHERE BUS_UNIT_IU_FROM=A.BUS_UNIT_IU_FROM AND BUS_UNIT_IU_TO=A.BUS_UNIT_IU_TO AND EFFDT <= %CURRENTDATEIN) AND A.EFF_STATUS='A'", BI_HDR.BUSINESS_UNIT_GL, CUST_OPTION.BUSINESS_UNIT_GL, &IU_VALID_PAIR);*/
+            SQLExec("select 'Y' from PS_SP_BIIUP_NONVW A WHERE A.BUSINESS_UNIT_GL = :1 AND A.BUSINESS_UNIT_TO = :2", BI_HDR.BUSINESS_UNIT_GL, CUST_OPTION.BUSINESS_UNIT_GL, &IU_VALID_PAIR);
+            Break;
+         When = "D"
+            SQLExec("select 'Y' from PS_SP_BIIUD_NONVW A WHERE A.BUSINESS_UNIT_GL = :1 AND A.BUSINESS_UNIT_TO = :2", BI_HDR.BUSINESS_UNIT_GL, CUST_OPTION.BUSINESS_UNIT_GL, &IU_VALID_PAIR);
+            Break;
+         When-Other
+            SQLExec("select 'Y' from PS_SP_BIIUI_NONVW A WHERE A.BUSINESS_UNIT_GL = :1 AND A.BUSINESS_UNIT_TO = :2", BI_HDR.BUSINESS_UNIT_GL, CUST_OPTION.BUSINESS_UNIT_GL, &IU_VALID_PAIR);
+            Break;
+         End-Evaluate;
+         
+         If &IU_VALID_PAIR = "Y" Then
+            BI_HDR.BUSINESS_UNIT_TO = CUST_OPTION.BUSINESS_UNIT_GL;
+            /* Build Inherited chartfield array */
+            If All(BI_HDR.BUSINESS_UNIT_TO) Then
+               If &CF_ARRAY = Null Then
+                  If GET_CFS(Record.BI_LINE_IU_PAY, "Y", "") Then
+                  End-If;
+               End-If;
+               If &CF_IU_INH_ARRAY <> Null Then
+                  &CF_IU_INHO_ARRAY = &CF_IU_INH_ARRAY.Clone();
+               End-If;
+               get_cf_iu_inh(BI_HDR.BUSINESS_UNIT_TO);
+            End-If;
+            &HAS_BILL_TO_GL = "Y";
+         Else
+            /* Invalid pair */
+            SetDefault(BI_HDR.BUSINESS_UNIT_TO);
+            &HAS_BILL_TO_GL = "N";
+         End-If;
+      Else
+         /* No default business unit to from Customer */
+         SetDefault(BI_HDR.BUSINESS_UNIT_TO);
+         &HAS_BILL_TO_GL = "N";
+      End-If;
+      /* Bring up Interunit Billing Bill To Business Unit secondary panel*/
+      While &HAS_BILL_TO_GL = "N"
+         /****** Code here to set a different prompt View as the prompt view for BUSINESS_UNIT_TO field based on IU method. No need to consider transaction as it is only a prompt view*/
+         DoModal(Panel.BI_IU_TO_SEC, MsgGetText(12503, 14, "Bill To GL Business Unit"), - 1, - 1);
+         If None(BI_HDR.BUSINESS_UNIT_TO) Then
+            &ACTION_SEL = WinMessage(MsgGet(12500, 231, "Bill to Business Unit is required for Interunit Bills. Do you really want to enter an Interunit Bill?"), 36);
+            If &ACTION_SEL = 7 Then
+               /* Provide a way out of sec panel, & clear cust id */
+               Hide(BI_PB_WRK.BI_IU_TOGL_PB);
+               &HAS_BILL_TO_GL = "Y";
+            End-If;
+         Else
+            &HAS_BILL_TO_GL = "Y";
+         End-If;
+      End-While;
+      If &HAS_BILL_TO_GL = "Y" And
+            None(BI_HDR.BUSINESS_UNIT_TO) Then
+         Hide(BI_PB_WRK.BI_IU_TOGL_PB);
+         Hide(BI_PB_WRK.BI_IU_CTRL_PB);
+         Hide(CUST_OPTION.INTERUNIT_FLG);
+         BI_HDR.BILL_TO_CUST_ID = &PRIOR_BILL_TO_CUST;
+         Exit;
+      End-If;
+      
+      /*DB 09/10/01 call new function to determine nature of the Bill*/
+      &FROM_BU = BI_HDR.BUSINESS_UNIT_GL;
+      &TO_BU = BI_HDR.BUSINESS_UNIT_TO;
+      /* 09/10/01. DB. Added new function call to determine nature of Bill*/
+      &IU_BILL_TYPE = FIND_IU_BILL_TYPE(&FROM_BU, &TO_BU, &LEDGER);
+      &IU_TRANSACTION = " ";
+      
+      Evaluate &IU_BILL_TYPE
+      When = "INTRAUNIT_INTERCF"
+         &IU_TRANSACTION = "INTRAUNIT";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break
+      When = "REGULAR"
+         &IU_TRANSACTION = "REGULAR";
+         BI_HDR.CF_ACTION_FLG = "N";
+         Break;
+      When = "INTRAUNIT"
+         &IU_TRANSACTION = "INTRAUNIT";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      When = "INTRAENTITY_INTERCF"
+      When = "INTRAENTITY"
+         &IU_TRANSACTION = "INTRAENTITY";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      When = "INTERENTITY_INTERCF"
+      When = "INTERENTITY"
+         &IU_TRANSACTION = "INTERENTITY";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      When = "INTERUNIT_INTERCF"
+      When = "INTERUNIT"
+         &IU_TRANSACTION = "INTERUNIT";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      When = "REGULAR_CFINH_ON"
+      When = "INTERCF"
+         &IU_TRANSACTION = "REGULAR";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      End-Evaluate;
+      /* 09/10/01. DB. Added new function call to determine nature of Bill*/
+      
+      /*09/05/01. DB.  Commenting this function call. Added new function to load to Header work records
+      IU_SET_HDR_WRKREC_BI(&BUSINESS_UNIT, &LEDGER);*/
+      /* 01/03 VMV - Changed to BUSINESS_UNIT_GL for ICE 556138000 */
+      &FROM_BU = BI_HDR.BUSINESS_UNIT_GL;
+      &TO_BU = BI_HDR.BUSINESS_UNIT_TO;
+      /*retrieve IU_TRAN_CD from IU_TRAN_MAP_TBL for Sys Tran CD 'BIIVC'*/
+      SQLExec("select iu_tran_cd from ps_iu_tran_map_tbl where iu_sys_tran_cd = 'BIIVC'", &IU_TRANCD);
+      
+      load_iu_defaults(&FROM_BU, &TO_BU, &IU_TRANCD, &IU_TRANSACTION);
+      
+      SQLExec("select base_currency from ps_bus_Unit_tbl_gl where business_Unit = :1", BI_HDR.BUSINESS_UNIT_TO, DERIVED_WORK_BI.BASE_CURRENCY_TO);
+      /* Override defaulted AR Offset & Invoice Form ID, using Interunit Control table */
+      set_ar_dist_dflt();
+      set_form_id_dflt();
+   Else
+      Hide(BI_PB_WRK.BI_IU_TOGL_PB);
+      Hide(BI_PB_WRK.BI_IU_CTRL_PB);
+      SetDefault(BI_HDR.BUSINESS_UNIT_TO);
+      /*11/20/01. DB*/
+      /* 08/18/05 ice 1318790000 Not iu customer so use bu and let function get GL unit */
+      &FROM_BU = BI_HDR.BUSINESS_UNIT;
+      &TO_BU = BI_HDR.BUSINESS_UNIT_TO;
+      &IU_BILL_TYPE = FIND_IU_BILL_TYPE(&FROM_BU, &TO_BU, &LEDGER);
+      &IU_TRANSACTION = " ";
+      
+      Evaluate &IU_BILL_TYPE
+      When = "INTRAUNIT_INTERCF"
+         &IU_TRANSACTION = "INTRAUNIT";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break
+      When = "REGULAR"
+         &IU_TRANSACTION = "REGULAR";
+         BI_HDR.CF_ACTION_FLG = "N";
+         Break;
+      When = "INTRAUNIT"
+         &IU_TRANSACTION = "INTRAUNIT";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      When = "INTRAENTITY_INTERCF"
+      When = "INTRAENTITY"
+         &IU_TRANSACTION = "INTRAENTITY";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      When = "INTERENTITY_INTERCF"
+      When = "INTERENTITY"
+         &IU_TRANSACTION = "INTERENTITY";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      When = "INTERUNIT_INTERCF"
+      When = "INTERUNIT"
+         &IU_TRANSACTION = "INTERUNIT";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      When = "REGULAR_CFINH_ON"
+      When = "INTERCF"
+         &IU_TRANSACTION = "REGULAR";
+         BI_HDR.CF_ACTION_FLG = "Y";
+         Break;
+      End-Evaluate;
+      /* Reset AR Offset & Invoice Form ID */
+      set_ar_dist_dflt();
+      set_form_id_dflt();
+      Hide(CUST_OPTION.INTERUNIT_FLG);
+   End-If;
+End-If;
+/* Set Distribution line defaults  
+- when it is an interunit bill   OR  
+- when it is changing from an interunit bill to a non interunit bill */
+If Left(%PanelGroup, 7) <> "BI_CONS" Then
+   If All(&PRIOR_BUS_UNIT_TO) Or
+         All(BI_HDR.BUSINESS_UNIT_TO) Then
+      &L0_ROWSET = GetRowset();
+      &L0_ROW = &L0_ROWSET(1);
+      &LINE_COUNT = ActiveRowCount(Record.BI_LINE);
+      If None(&IU_TRANCD) Then
+         /*retrieve IU_TRAN_CD from IU_TRAN_MAP_TBL for Sys Tran CD 'BIIVC'*/
+         SQLExec("select iu_tran_cd from ps_iu_tran_map_tbl where iu_sys_tran_cd = 'BIIVC'", &IU_TRANCD);
+      End-If;
+      For &I = 1 To &LINE_COUNT
+         &L1_ROWSET = &L0_ROW.GetRowset(Scroll.BI_LINE);
+         &L1_ROW = &L1_ROWSET(&I);
+         &ROW_COUNT_IUI = ActiveRowCount(Record.BI_LINE, &I, Record.BI_LINE_DST);
+         &J = &ROW_COUNT_IUI;
+         While &J > 0
+            If &J = 1 Then
+               UpdateValue(DERIVED_WORK_BI.TOT_LINE_DST_PCT_W, &I, 100);
+               &UPD_GROSS_EXT_AMT = FetchValue(BI_LINE.GROSS_EXTENDED_AMT, &I);
+               UpdateValue(BI_LINE.TOT_LINE_DST_AMT, &I, &UPD_GROSS_EXT_AMT);
+               /*09/07/01. DB. added new function call for REV dist. defaults from IU tables*/
+               &FROM_BU = BI_HDR.BUSINESS_UNIT_GL;
+               &TO_BU = BI_HDR.BUSINESS_UNIT_TO;
+               dflt_rev_fr_hdrwrk_rec(&I, 1, &FROM_BU, &TO_BU, &IU_TRANCD, &IU_TRANSACTION);
+               /*09/07/01. DB. added new function call for REV dist. defaults from IU tables*/
+               &L2_ROWSET = &L1_ROW.GetRowset(Scroll.BI_LINE_DST);
+               /*&L2_ROWSET.InsertEnabled = False;
+               &L2_ROWSET.DeleteEnabled = False;*/
+            Else
+               DeleteRow(BI_LINE.LINE_SEQ_NUM, &I, BI_LINE_DST.LINE_DST_SEQ_NUM, &J);
+            End-If;
+            &J = &J - 1;
+         End-While;
+         /* The following types of distribution line allows one distribution line only, no need to delete extra distribution lines */
+         &ROW_COUNT_IUR = ActiveRowCount(Record.BI_LINE, &I, Record.BI_LINE_DST_AR);
+         If &ROW_COUNT_IUR = 1 Then
+            dflt_rec_fr_hdrwrk_rec(&I, &FROM_BU, &TO_BU, &IU_TRANCD, &IU_TRANSACTION);
+         End-If;
+         &ROW_COUNT_IUE = ActiveRowCount(Record.BI_LINE, &I, Record.BI_LINE_IU_EXP);
+         If &ROW_COUNT_IUE = 1 Then
+            dflt_exp_fr_hdrwrk_rec(&I, &FROM_BU, &TO_BU, &IU_TRANCD, &IU_TRANSACTION);
+         End-If;
+         &ROW_COUNT_IUP = ActiveRowCount(Record.BI_LINE, &I, Record.BI_LINE_IU_PAY);
+         If &ROW_COUNT_IUP = 1 Then
+            dflt_pay_fr_hdrwrk_rec(&I, &FROM_BU, &TO_BU, &IU_TRANCD, &IU_TRANSACTION);
+         End-If;
+      End-For;
+      /*09/26/01. DB. When Cust Id changed from IU to non-IU, blank rows are in the line dst. rec. It 			needs to be deleted*/
+      If None(&TO_BU) Then
+         &LINE_COUNT = ActiveRowCount(Record.BI_LINE);
+         For &I = 1 To &LINE_COUNT
+            &REV_ROW_COUNT = ActiveRowCount(Record.BI_LINE, &I, Record.BI_LINE_DST);
+            &J = &REV_ROW_COUNT;
+            /*While &J > 0
+               DeleteRow(BI_LINE.LINE_SEQ_NUM, &I, BI_LINE_DST.LINE_DST_SEQ_NUM, &J);
+               &J = &J - 1;
+            End-While;
+            DeleteRow(BI_LINE.LINE_SEQ_NUM, &I, BI_LINE_DST_AR.LINE_DST_SEQ_NUM, 1);*/
+            While &J > 0
+               DeleteRow(BI_LINE.LINE_SEQ_NUM, &I, BI_LINE_IU_EXP.LINE_DST_SEQ_NUM, &J);
+               DeleteRow(BI_LINE.LINE_SEQ_NUM, &I, BI_LINE_IU_PAY.LINE_DST_SEQ_NUM, &J);
+               &J = &J - 1;
+            End-While;
+         End-For;
+      End-If;
+      /*09/26/01. DB. When Cust Id changed from IU to non-IU, blank rows are in the line dst. rec. It 			needs to be deleted*/
+      If BI_HDR.GEN_AP_VCHR_FLG = "Y" And
+            All(&TO_BU) Then
+         &LINE_COUNT = ActiveRowCount(Record.BI_LINE);
+         For &I = 1 To &LINE_COUNT
+            &REV_ROW_COUNT = ActiveRowCount(Record.BI_LINE, &I, Record.BI_LINE_DST);
+            &J = &REV_ROW_COUNT;
+            While &J > 0
+               DeleteRow(BI_LINE.LINE_SEQ_NUM, &I, BI_LINE_IU_PAY.LINE_DST_SEQ_NUM, &J);
+               &J = &J - 1;
+            End-While;
+         End-For;
+      End-If;
+      
+   End-If;
+   set_cur_rt_type_dflt();
+End-If;
+
+/*--------- Moved Some of the Hierarchical Defaults Above VAT Logic ---------*/
+/* Default customer contact */
+BI_HDR.CNTCT_SEQ_NUM = CUSTOMER.CNTCT_SEQ_NUM;
+
+/* Default address, media, copies, etc from the contact. */
+If All(BI_HDR.CNTCT_SEQ_NUM) Then
+   Get_Contact_Defaults();
+Else
+   BI_HDR.ADDRESS_SEQ_NUM = CUSTOMER.ADDRESS_SEQ_NUM;
+   /*   Check DOCUMENT COMM_METHOD on Contacts for customer.  If any INVC document is marked as 'EDI' or 'EDI & Print', then default BILL_TO_MEDIA to EDI. */
+   /* SQLExec("select count(*) from ps_cust_cntct_doc a  where cust_id = :1 and document_cd = 'INVC' and comm_method in ('I', 'R') and setid = (select setid from ps_set_cntrl_rec where setcntrlvalue = :2 and recname = 'CUST_CNTCT_DOC') and effdt = (select max(effdt) from ps_cust_cntct_doc where setid = a.setid and cust_id = a.cust_id and cntct_seq_num = a.cntct_seq_num and effdt <= %currentdatein)", BILL_TO_CUST_ID, BUSINESS_UNIT, &EDI_IVC_CNT);
+   If &EDI_IVC_CNT >= 1 Then
+      BILL_TO_MEDIA = "E";
+   Else
+      BILL_TO_MEDIA = "P";
+   End-If;
+*/
+   BI_HDR.BILL_TO_MEDIA = "P";
+End-If;
+If BI_HDR.BILL_TO_MEDIA = "E" Then
+   BI_HDR.BILL_TO_COPIES = 1;
+   Gray(BI_HDR.BILL_TO_COPIES);
+Else
+   UnGray(BI_HDR.BILL_TO_COPIES);
+End-If;
+/* BILL_TO_COPIES = CNTCT_DOC_BI_VW.NBR_COPIES; */
+If BI_HDR.BILL_TO_COPIES = 0 Then
+   BI_HDR.BILL_TO_COPIES = 1;
+End-If;
+
+/*--------- Handle VAT Default Logic ---------*/
+/* lic - 4/03 Needed to move the VAT logic above other hierarchical defaulting because we give the user a opportunity to cancel */
+If Substring(%PanelGroup, 1, 8) = "BI_ENTRY" And
+      All(BI_HDR.VAT_ENTITY) Then
+   
+   &ADDR_SETID = GetSetId("BUSINESS_UNIT", BI_HDR.BUSINESS_UNIT, "CUST_ADDRESS", " ");
+   UpdateValue(BI_HVAT_WRK.CUSTOMER_SETID, 1, &ADDR_SETID);
+   
+   SQLExec("select v.country, v.state, v.cust_id, v.address_seq_num from ps_cust_addr_bi_vw v where v.setid = :1 and v.cust_id = :2 and v.address_seq_num = :3", &ADDR_SETID, BI_HDR.BILL_TO_CUST_ID, BI_HDR.ADDRESS_SEQ_NUM, &VCOUNTRY, &VSTATE, &CUST_ID, &ADDR_NUM);
+   
+   &HDRVAT_SCROLL = GetRowset(Record.BI_HDR_VAT);
+   &VAT_HDR_IND = &HDRVAT_SCROLL(1).BI_HDR_VAT.VAT_HDR_IND.Value;
+   
+   &rsBI_LINE = GetRowset(Record.BI_LINE);
+   
+   &real_bill_lines = 0;
+   For &ln = 1 To &rsBI_LINE.ActiveRowCount
+      If All(&rsBI_LINE(&ln).BI_LINE.COUNTRY_SHIP_FROM.Value) Then
+         &real_bill_lines = &real_bill_lines + 1;
+      End-If;
+   End-For;
+   
+   If None(BI_HDR.SHIP_TO_CUST_ID) Or
+         None(BI_HDR.COUNTRY_SHIP_TO) Then
+      /* always update the country ship to when customer changes unless using ship_to cust */
+      
+      SQLExec("select 'Y' from ps_customer a, ps_cust_addr_seq b, ps_cust_address c where a.setid = b.setid and b.setid = c.setid and a.setid = :1 and a.cust_id = b.cust_id and b.cust_id = c.cust_id and a.cust_id = :2 and a.cust_status = 'A'  and b.address_seq_num = c.address_seq_num and c.address_seq_num = :3 and a.ship_to_flg = 'Y' and b.ship_to_addr = 'Y' and c.effdt = (select max(d.effdt) from ps_cust_address d where d.setid = c.setid and d.cust_id = c.cust_id and d.address_seq_num = c.address_seq_num and d.effdt <= %CurrentDateIn) and c.eff_status = 'A'", &ADDR_SETID, BI_HDR.BILL_TO_CUST_ID, BI_HDR.ADDRESS_SEQ_NUM, &ship_to_flg);
+      If &ship_to_flg = "Y" Then
+         /*BI_HDR.SHIP_TO_CUST_ID = &CUST_ID;
+         BI_HDR.SHIP_TO_ADDR_NUM = &ADDR_NUM;*/
+         BI_HDR.COUNTRY_SHIP_TO = &VCOUNTRY;
+         BI_HDR.STATE_SHIP_TO = &VSTATE;
+      Else
+         SQLExec("select c.country, c.state from ps_customer a, ps_cust_addr_seq b, ps_cust_address c where a.setid = b.setid and b.setid = c.setid and a.setid = :1 and a.cust_id = b.cust_id and b.cust_id = c.cust_id and a.cust_id = :2 and a.cust_status = 'A' and b.address_seq_num = a.address_seq_ship and b.address_seq_num = c.address_seq_num and a.ship_to_flg = 'Y' and b.ship_to_addr = 'Y' and c.effdt = (select max(d.effdt) from ps_cust_address d where d.setid = c.setid and d.cust_id = c.cust_id and d.address_seq_num = c.address_seq_num and d.effdt <= %CurrentDateIn) and c.eff_status = 'A'", &ADDR_SETID, BI_HDR.BILL_TO_CUST_ID, BI_HDR.COUNTRY_SHIP_TO, BI_HDR.STATE_SHIP_TO);
+      End-If;
+      
+   End-If;
+   
+   
+   /* Since the change of customer will redefault VAT- do not set warning */
+   
+   /* Track VAT Driver Change 
+   If GetLevel0()(1).GetRowset(Scroll.BI_HDR_VAT)(1).BI_HDR_VAT.VAT_HDR_IND.Value = "Y" Then
+      TrackVATRowChanges("BIFHeader", GetLevel0()(1).GetRowset(Scroll.BI_HDR_VAT)(1), CreateArray(Field.BILL_TO_CUST_ID.Name));
+      GetLevel0()(1).GetRowset(Scroll.BI_HDR_VAT)(1).BI_HVAT_WRK.VAT_HDR_ALERT_IND.Value = "Y";
+   End-If; */
+   
+   set_hdr_physical_nature();
+   set_hdr_vat_svc_perfrm_flg();
+   set_hdr_country_state_vat_perfrm();
+   
+   UpdateValue(BI_HDR_VAT.COUNTRY_LOC_BUYER, 1, &VCOUNTRY);
+   UpdateValue(BI_HDR_VAT.STATE_LOC_BUYER, 1, &VSTATE);
+   
+   /** Update buyer's location country Line level and ship_to if not line ship to values **/
+   If All(&PRIOR_BILL_TO_CUST) And
+         BI_HDR.BILL_TO_CUST_ID <> &PRIOR_BILL_TO_CUST And
+         &real_bill_lines > 0 Then
+      For &ln = 1 To &rsBI_LINE.ActiveRowCount
+         &rsBI_LINE(&ln).BI_LINE.COUNTRY_LOC_BUYER.Value = &VCOUNTRY;
+         &rsBI_LINE(&ln).BI_LINE.STATE_LOC_BUYER.Value = &VSTATE;
+         /* only change if there is not line ship_to information - note this will force lines out of sync with header to review ship_to */
+         If None(&rsBI_LINE(&ln).BI_LINE.SHIP_TO_CUST_ID.Value) And
+               None(&rsBI_LINE(&ln).BI_LINE.SHIP_TO_ADDR_NUM.Value) Then
+            &rsBI_LINE(&ln).BI_LINE.COUNTRY_SHIP_TO.Value = &VCOUNTRY;
+            &rsBI_LINE(&ln).BI_LINE.STATE_SHIP_TO.Value = &VSTATE;
+         End-If;
+         &vat_svc_perfrm_flg = &rsBI_LINE(&ln).BI_LVAT_WRK.VAT_SVC_PERFRM_FLG.Value;
+         /* only update if country ship to ro country loc buyer is source */
+         Evaluate &vat_svc_perfrm_flg
+         When = "1" /* Service is performed in Ship To Location */
+            &rsBI_LINE(&ln).BI_LINE.COUNTRY_VAT_PERFRM.Value = &rsBI_LINE(&ln).BI_LINE.COUNTRY_SHIP_TO.Value;
+            &rsBI_LINE(&ln).BI_LINE.STATE_VAT_PERFRM.Value = &rsBI_LINE(&ln).BI_LINE.STATE_SHIP_TO.Value;
+            Break;
+         When = "3" /* Service is performed in Buyer's Location */
+            &rsBI_LINE(&ln).BI_LINE.COUNTRY_VAT_PERFRM.Value = &rsBI_LINE(&ln).BI_LINE.COUNTRY_LOC_BUYER.Value;
+            &rsBI_LINE(&ln).BI_LINE.STATE_VAT_PERFRM.Value = &rsBI_LINE(&ln).BI_LINE.STATE_LOC_BUYER.Value;
+            Break;
+            
+         When-Other
+            Break;
+         End-Evaluate;
+         
+      End-For;
+   End-If;
+   
+   /* Blank out the the STATE fields when VAT country definition is not defined to be tracked by province/state */
+   VATStateBlankOut("H");
+   
+   If All(&PRIOR_BILL_TO_CUST) Then
+      &HDRVAT_SCROLL(1).BI_HDR_VAT.VAT_HDR_IND.Value = "A";
+      BI_HDR.COUNTRY_VAT_BILLTO = "";
+      BI_HDR.VAT_TREATMENT_GRP = "";
+      
+      If &HDRVAT_SCROLL(1).BI_HDR_VAT.VAT_HDR_IND.Value <> "Y" Then
+         SetVATRowDefaults("BIPHeader", GetLevel0()(1).GetRowset(Scroll.BI_HDR_VAT)(1));
+         If &real_bill_lines > 0 Then
+            &oContext = GetContext("BIFLine");
+            ProcessVATChildren(&oContext, GetLevel0()(1).GetRowset(Scroll.BI_HDR_VAT)(1), "U");
+         End-If;
+         
+         /*Set VAT_HDR_IND to "P" */
+         UpdateValue(BI_HDR_VAT.VAT_HDR_IND, 1, "P");
+      End-If;
+      
+   End-If;
+End-If;
+
+/*--------- Handle Hierarchical Default Logic ---------*/
+set_pay_term_dflt();
+set_remit_to_dflt();
+set_form_id_dflt();
+If BI_HDR.TEMPLATE_IVC_FLG <> "R" Or
+      BI_HDR.TEMPLATE_IVC_FLG <> "I" Then
+   /*If TEMPLATE_IVC_FLG <> "Y" Then*/
+   set_cycle_dflt();
+End-If;
+set_inq_phone_dflt();
+set_spclist_dflt();
+/* Clear values that are automatically defaulted based on Customer */
+SetDefault(BI_HDR.CR_ANALYST);
+SetDefault(BI_HDR.COLLECTOR);
+
+/* Default Sales Person from Sales Team */
+SetDefault(BI_HDR.SALES_PERSON);
+SQLExec("select SUPPORT_TEAM_CD from PS_CUST_TEAM where setid = (select setid from ps_set_cntrl_rec where setcntrlvalue = :1 and recname = 'CUST_TEAM') and cust_id = :2 and DEFAULT_FLAG = 'Y'", BI_HDR.BUSINESS_UNIT, BI_HDR.BILL_TO_CUST_ID, &SUPPORT_TEAM_CD);
+SQLExec(SQL.BI_DFT_SALES_PERSON, &SUPPORT_TEAM_CD, BI_HDR.BUSINESS_UNIT, BI_HDR.SALES_PERSON);
+
+/* Populate Bill To Address Work fields */
+&HdrDisplay = create SCM_BI_INVOICE:DisplayHeader();
+&HdrDisplay.DisplayBillToAddr();
+
+BI_HDR.NAME1 = CUST_CNCT_EF_VW.NAME1;
+
+/* Get subcust defaults */
+If Substring(%PanelGroup, 1, 8) = "BI_ENTRY" Then
+   set_subcust_dflt();
+End-If;
+
+/* Currency change */
+If &CHANGE_CURRENCY = "Y" Then
+   set_currency_dflt();
+End-If;
+/*03/01 - DB - open up BI_CURRENCY_CD field if Component is <> 'BI_CONS_HDR'*/
+If %Component <> Component.BI_CONS_HDR Then
+   UnGray(BI_HDR.BI_CURRENCY_CD);
+End-If;
+
+/* Credit Card Defaulting */
+/* Populate Credit Card Information Based on Invoice and Business Unit.  Set &opt to 0 so that the code only retrieves values if the new customer's payment method is "CC".*/
+DefaultCreditCard("0", "Y");
+
+/* Excise/Sales Tax Defaults */
+If Substring(%Component, 1, 8) = "BI_ENTRY" And
+      BI_HDR.BI_BU_TAX_IND = "2" And
+      All(&PRIOR_BILL_TO_CUST) And
+      &real_lines > 0 And
+      &rebill_ok <> "N" Then
+   GetExsDefaultsHdr("B", &ADDR_SETID);
+End-If;
+
+/* 8.9. Acceptgiro. Issue warning message when Bill is Acceptgiro and Customer does not have Bank Account setup.*/
+If Substring(%Component, 1, 8) = "BI_ENTRY" Or
+      %Component = Component.BI_CONS_HDR Then
+   If BI_HDR.ACCEPTGIRO_IND = "Y" Then
+      /*find out if Bank Account number MICR_ID exists for this Customer*/
+      SQLExec("select micr_id from ps_remit_micr_vw where cust_id = :1", BI_HDR.BILL_TO_CUST_ID, &CUST_BNK_ACT);
+      If None(&CUST_BNK_ACT) Then
+         Warning MsgGet(12500, 528, "Customer ID does not have a Bank Account Number setup.")
+      End-If;
+   End-If;
+End-If;
+
+/* When user changes bill to customer, reset bill's financial sanctions status related fields */
+If Substring(%Component, 1, 8) = "BI_ENTRY" Or
+      %Component = "BI_CONS_HDR" Then
+   If All(BI_HDR.BILL_TO_CUST_ID) Then
+      If BI_PB_WRK.BU_FSS_FLG = "Y" Then
+         If None(BI_HDR.BUSINESS_UNIT_TO) Then
+            set_bill_hdr_fss_override();
+         End-If;
+      End-If;
+   End-If;
+End-If;
+
+If Substring(%Component, 1, 8) = "BI_ENTRY" Then
+   &C.BillToCustFieldChg();
+End-If;
+
+/*Inicio 001*/
+Metodo_Pago();
+/*Fin 001*/

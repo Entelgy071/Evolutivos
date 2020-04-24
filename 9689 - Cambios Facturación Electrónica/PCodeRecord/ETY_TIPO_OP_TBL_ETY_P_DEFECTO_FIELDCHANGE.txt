@@ -1,0 +1,40 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 001       ETY_ERP_AP_EVO_9689     John Diaz         05-Febr-2020        Valida campo por defecto.
+*************************************************************************************************************************************/
+/*Inicio 001*/
+Local Rowset &rsETY_TIPO_OP_TBL;
+Local string &P_DEFECTO;
+
+Function PorDefecto(&TiDoc)
+   For &i = 1 To &rsETY_TIPO_OP_TBL.ActiveRowCount
+      &P_DEFECTO = &rsETY_TIPO_OP_TBL.GetRow(&i).ETY_TIPO_OP_TBL.ETY_P_DEFECTO.Value;
+      &TipoDoc = &rsETY_TIPO_OP_TBL.GetRow(&i).ETY_TIPO_OP_TBL.ETY_TIPO_DOC_FE.Value;
+      
+      If &P_DEFECTO = "Y" And
+            &TipoDoc = &TiDoc And
+            &i <> CurrentRowNumber() Then
+         &rsETY_TIPO_OP_TBL.GetRow(&i).ETY_TIPO_OP_TBL.ETY_P_DEFECTO.Value = "N";
+      End-If;
+      
+   End-For;
+End-Function;
+
+&rsETY_TIPO_OP_TBL = GetLevel0().GetRow(1).GetRowset(Scroll.ETY_TIPO_OP_TBL);
+
+If ETY_TIPO_OP_TBL.ETY_P_DEFECTO = "Y" Then
+   Evaluate ETY_TIPO_OP_TBL.ETY_TIPO_DOC_FE
+   When "FT"
+      PorDefecto("FT");
+      Break;
+   When "NC"
+      PorDefecto("NC");
+      Break;
+   When "ND"
+      PorDefecto("ND");
+      Break;
+   End-Evaluate;
+End-If;
+
+/*Fin 001*/

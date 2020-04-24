@@ -1,0 +1,36 @@
+/************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+------------------------------------------------------------------------------------------------------------------------------------
+ 001       ETY_ERP_AP_EVO_9689     John Diaz          14 Feb 2020        Se llama la integracion de consulta de estado de documento 
+                                                                         con SERES.
+***********************************************************************************************************************************/
+/*Inicio 001*/
+import ETY_FACTURACION_ELECTRONICA:*;
+
+Declare Function EstadosDocumentos PeopleCode ETY_DOC_DIAN_FE.BUSINESS_UNIT FieldFormula;
+
+Local array &ResEstado, &DescrEstaDoc;
+Local ETY_FACTURACION_ELECTRONICA:EstadoDocumento &obj = create ETY_FACTURACION_ELECTRONICA:EstadoDocumento();
+Local string &BU, &Invoice, &Estado, &NumDoc;
+
+&BU = ETY_RENV_FE_AET.BUSINESS_UNIT.Value;
+&Invoice = ETY_RENV_FE_AET.INVOICE.Value;
+
+/*Llama la integración consulta de estado*/
+&ResEstado = &obj.ConEstadoDocumento(&BU, ETY_RENV_FE_AET.ACTIONTYPE.Value, &Invoice, ETY_RENV_FE_AET.DOCUMENT.Value);
+
+/*Estado documento retornado por la DIAN*/
+&Estado = &ResEstado [2];
+ETY_RENV_FE_AET.STATE_NAME.Value = &Estado;
+
+/*Observaciones de la respuesta*/
+ETY_RENV_FE_AET.DESCR_LONG.Value = &ResEstado [3];
+
+/*Cufe DIAN*/
+ETY_RENV_FE_AET.ETY_CUFE_FE.Value = &ResEstado [4];
+
+/*Descripcion del estado del documento*/
+&DescrEstaDoc = EstadosDocumentos(&Estado);
+ETY_RENV_FE_AET.ETY_DESCR_ESTADO.Value = &DescrEstaDoc [1];
+ETY_RENV_FE_AET.ETY_ESTADO_DOC.Value = &DescrEstaDoc [2];
+/*Fin 001*/

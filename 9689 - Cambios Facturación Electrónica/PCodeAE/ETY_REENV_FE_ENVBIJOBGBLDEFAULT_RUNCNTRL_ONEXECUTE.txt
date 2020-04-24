@@ -1,0 +1,29 @@
+/************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+------------------------------------------------------------------------------------------------------------------------------------
+ 001       ETY_ERP_AP_EVO_9689     John Diaz          14 Feb 2020        Se lanza el JOB BIJOB03K para finalizar la factura.
+***********************************************************************************************************************************/
+/*Inicio 001*/
+import ETY_FACTURACION_ELECTRONICA:*;
+
+Local ProcessRequest &rqst;
+Local string &RUN_CNTL, &resp;
+Local ETY_FACTURACION_ELECTRONICA:RunControlBIJOB03K &obj = create ETY_FACTURACION_ELECTRONICA:RunControlBIJOB03K();
+
+&RUN_CNTL = ETY_RENV_FE_AET.BUSINESS_UNIT.Value | ETY_RENV_FE_AET.INVOICE.Value | "_" | ETY_RENV_FE_AET.PROCESS_INSTANCE.Value;
+&POST_ACTION = "L";
+&INVOICE_DT_OPT = "P";
+&INVOICE_RANGE_OPT = "INV";
+&BUSINESS_UNIT = ETY_RENV_FE_AET.BUSINESS_UNIT.Value;
+&START_INVOICE = ETY_RENV_FE_AET.INVOICE.Value;
+&END_INVOICE = ETY_RENV_FE_AET.INVOICE.Value;
+
+&resp = &obj.CreateRUN_BI_PRNTIVC(&RUN_CNTL, &POST_ACTION, &INVOICE_DT_OPT, &INVOICE_RANGE_OPT, &BUSINESS_UNIT, &START_INVOICE, &END_INVOICE);
+
+MessageBox(0, "", 0, 0, "RESPUESTA COMPONENT INTERFACE: " | &resp);
+
+&rqst = CreateProcessRequest();
+&rqst.RunControlID = &RUN_CNTL;
+&rqst.JobName = "BIJOB03K";
+&rqst.Schedule();
+/*Fin 001*/
