@@ -1,0 +1,109 @@
+import PS_PT:Integration:IRequestHandler;
+
+class ConsultaEntradContables implements PS_PT:Integration:IRequestHandler
+   method ConsultaECB();
+   method OnRequest(&_MSG As Message) Returns Message;
+end-class;
+
+/* constructor */
+method ConsultaECB
+end-method;
+
+method OnRequest
+   /+ &_MSG as Message +/
+   /+ Returns Message +/
+   /+ Extends/implements PS_PT:Integration:IRequestHandler.OnRequest +/
+   /* Variable Declaration */
+   
+   Local Message &request, &response;
+   Local Rowset &rsMesReq, &rsMesRes;
+   Local string &UNGL, &BUGL, &BUSINESS_UNIT, &FF_BI_NOMB_NEGOCIO, &JOURNAL_ID, &LEDGER, &ACCOUNT, &ALTACCT, &DESCR, &DEPTID, &PRODUCT, &FUND_CODE, &CHARTFIELD1, &CHARTFIELD2, &CHARTFIELD3, &NATIONAL_ID, &ACCOUNT_1, &LC_NOMBRE_TERCERO, &PROJECT_ID, &JRNL_LN_REF, &LINE_DESCR, &JRNL_HDR_STATUS, &BUDGET_HDR_STATUS, &SOURCE, &DOC_SEQ_NBR, &OPRID, &DESCR254, &DESCR254_MIXED, &PYMNT_ID_REF, &CUENTA1, &CUENTA2, &CONTAB;
+   Local date &JOURNAL_DATE;
+   Local datetime &JRNL_CREATE_DTTM;
+   Local number &h, &UNPOST_SEQ, &JOURNAL_LINE, &FISCAL_YEAR, &ACCOUNTING_PERIOD, &OPERATING_UNIT, &MONETARY_AMOUNT, &PROCESS_INSTANCE;
+   Local SQL &sql1;
+   Local date &FECHA1, &FECHA2;
+   
+   &request = &_MSG;
+   &rsMesReq = &request.GetRowset();
+   
+   &UNGL = &rsMesReq(1).ETY_ENTCNT_RQST.BUSINESS_UNIT_GL.Value;
+   &FECHA1 = &rsMesReq(1).ETY_ENTCNT_RQST.ETY_FECHA_ACT.Value;
+   &FECHA2 = &rsMesReq(1).ETY_ENTCNT_RQST.ETY_FECMOV.Value;
+   &CUENTA1 = &rsMesReq(1).ETY_ENTCNT_RQST.ACCOUNT.Value;
+   &CONTAB = &rsMesReq(1).ETY_ENTCNT_RQST.LEDGER.Value;
+   
+   /* Preparando respuesta */
+   &response = CreateMessage(Operation.ETY_ENTRCONTA_OS, %IntBroker_Response);
+   &rsMesRes = &response.GetRowset();
+   
+   
+   /*Valida si la unidad de negocio existe*/
+   SQLExec("Select BUSINESS_UNIT FROM PS_BUS_UNIT_GL_VW WHERE BUSINESS_UNIT = :1", &UNGL, &BUGL);
+   
+   If None(&FECHA1) Then
+      &FECHA1 = %Date;
+   End-If;
+   
+   If None(&FECHA2) Then
+      &FECHA2 = %Date;
+   End-If;
+   
+   /*If All(&CUENTA1) Then
+      &CUENTA1 = "'" | &CUENTA1 | "%'";
+   End-If;*/
+   
+   If All(&UNGL) Then
+      /*DATOS SOLICITUD*/
+      &h = 1;
+      &sql1 = GetSQL(SQL.ETY_ENTCONTBAN2_SQL, &UNGL, &FECHA1, &FECHA2, &CONTAB, &CUENTA1);
+      
+      While &sql1.Fetch(&BUSINESS_UNIT, &FF_BI_NOMB_NEGOCIO, &JOURNAL_ID, &JOURNAL_DATE, &UNPOST_SEQ, &JOURNAL_LINE, &LEDGER, &FISCAL_YEAR, &ACCOUNTING_PERIOD, &ACCOUNT, &ALTACCT, &DESCR, &DEPTID, &OPERATING_UNIT, &PRODUCT, &FUND_CODE, &CHARTFIELD1, &CHARTFIELD2, &CHARTFIELD3, &NATIONAL_ID, &LC_NOMBRE_TERCERO, &PROJECT_ID, &MONETARY_AMOUNT, &JRNL_LN_REF, &LINE_DESCR, &DESCR254_MIXED, &DESCR254, &PROCESS_INSTANCE, &JRNL_HDR_STATUS, &BUDGET_HDR_STATUS, &SOURCE, &DOC_SEQ_NBR, &OPRID, &JRNL_CREATE_DTTM, &PYMNT_ID_REF)
+         &rsMesRes(&h).ETY_ENTCNT_RESP.BUSINESS_UNIT_GL.Value = &BUSINESS_UNIT;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.JOURNAL_ID.Value = &JOURNAL_ID;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.FF_BI_NOMB_NEGOCIO.Value = &FF_BI_NOMB_NEGOCIO;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.JOURNAL_DATE.Value = &JOURNAL_DATE;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.UNPOST_SEQ.Value = &UNPOST_SEQ;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.JOURNAL_LINE.Value = &JOURNAL_LINE;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.LEDGER.Value = &LEDGER;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.FISCAL_YEAR.Value = &FISCAL_YEAR;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.ACCOUNTING_PERIOD.Value = &ACCOUNTING_PERIOD;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.ACCOUNT.Value = &ACCOUNT;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.ALTACCT.Value = &ALTACCT;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.DESCR.Value = &DESCR;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.DEPTID.Value = &DEPTID;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.OPERATING_UNIT.Value = &OPERATING_UNIT;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.PRODUCT.Value = &PRODUCT;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.FUND_CODE.Value = &FUND_CODE;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.CHARTFIELD1.Value = &CHARTFIELD1;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.CHARTFIELD2.Value = &CHARTFIELD2;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.CHARTFIELD3.Value = &CHARTFIELD3;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.NATIONAL_ID.Value = &NATIONAL_ID;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.LC_NOMBRE_TERCERO.Value = &LC_NOMBRE_TERCERO;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.PROJECT_ID.Value = &PROJECT_ID;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.MONETARY_AMOUNT.Value = &MONETARY_AMOUNT;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.JRNL_LN_REF.Value = &JRNL_LN_REF;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.LINE_DESCR.Value = &LINE_DESCR;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.DESCR254_MIXED.Value = &DESCR254_MIXED;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.DESCR254.Value = &DESCR254;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.PROCESS_INSTANCE.Value = &PROCESS_INSTANCE;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.JRNL_HDR_STATUS.Value = &JRNL_HDR_STATUS;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.BUDGET_HDR_STATUS.Value = &BUDGET_HDR_STATUS;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.SOURCE.Value = &SOURCE;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.DOC_SEQ_NBR.Value = &DOC_SEQ_NBR;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.OPRID.Value = &OPRID;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.JRNL_CREATE_DTTM.Value = &JRNL_CREATE_DTTM;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.PYMNT_ID_REF.Value = &PYMNT_ID_REF;
+         &rsMesRes(&h).ETY_ENTCNT_RESP.REF_VALUE.Value = " ";
+         &rsMesRes(&h).ETY_ENTCNT_RESP.REF_VALUE_TO.Value = " ";
+         
+         &rsMesRes.InsertRow(&h);
+         
+         &h = &h + 1;
+      End-While;
+   End-If;
+   
+   Return &response;
+   
+end-method;
+
