@@ -1,0 +1,368 @@
+/**********************************************************************************************************
+PROYECTO     				SEQ FECHA    	DESA 		DESCRIPCION
+-----------------------------------------------------------------------------------------------------------
+ETY_ERP_AP_FLP_OPTI_AP008	001	01-10-2018  YSA			Visualiza archivo plano de rechazos
+/**********************************************************************************************************
+ETY_ERP_IMS_4318         	002	03-01-2020  SRH			Carga archivo de rechazos desde ims 
+**********************************************************************************************************/
+/* Inicio #001 */
+/*Inicio #002*/
+import ETY_AP_ENCRYP_ARCHI:ETY_CALL_DENCRYP_PGP;
+
+Declare Function add_attachment PeopleCode FILE_ATTACH_WRK.ATTACHADD FieldChange;
+Declare Function cancelarpago PeopleCode ETY_PYMNT_RV_WK.CANCEL_PB FieldFormula;
+Component string &filename;
+
+
+Local Record &recContext;
+Local string &Error;
+Local ETY_AP_ENCRYP_ARCHI:ETY_CALL_DENCRYP_PGP &obj_encrypt;
+
+&recContext = GetRecord(Record.ETY_CARREC_WRK);
+&obj_dencrypt = create ETY_AP_ENCRYP_ARCHI:ETY_CALL_DENCRYP_PGP();
+
+SQLExec("SELECT 'Y' FROM PS_ETY_LOAD_RE_C_T WHERE instr(FILE_LOCATION,:1,-1,1)>0", ETY_PYMNT_FI_VW.FILENAME.Value, &existe);
+
+If None(&existe) Then
+   
+   &RECNAME = "Record." | Record.ETY_LOAD_REC_TB;
+   REM  001 add_attachment("record://PSFILE_ATTDET", "", "", 0, False, &RECNAME, &ATTACHSYSFILENAME, &ATTACHUSERFILE, 2, &Return_Code);
+   /*Inicio 002*/
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_SINPROCESAR2'", &StrPathPsArchTrnIms);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_SINPROCESAR'", &StrPathPsArchIMS);
+   
+   &DataFileName = ETY_PYMNT_FI_VW.FILENAME.Value | ".csv";
+   &StrFileNameProcesar = &StrPathPsArchTrnIms | ETY_PYMNT_FI_VW.FILENAME.Value | ".csv.pgp";
+   
+   /*Mueve los archivos*/
+   rem &obj_dencrypt.fi_ProcesoArchivo2(&recContext, &StrFileNameProcesar);
+   
+   &StrFilenamePgpIms = &StrPathPsArchTrnIms | ETY_PYMNT_FI_VW.FILENAME.Value | ".csv.pgp";
+   &StrFilenameCsvIms = &StrPathPsArchTrnIms | ETY_PYMNT_FI_VW.FILENAME.Value | ".csv";
+   
+   
+   &ATTACHSYSFILENAME = ETY_PYMNT_FI_VW.FILENAME.Value | ".csv";
+   /*Desencripta el archivo **/
+   &obj_dencrypt.fi_DencryptArchivo(&recContext, &StrFilenameCsvIms, &StrFilenamePgpIms);
+   
+   
+   &Datafilename2 = &StrPathPsArchIMS | ETY_PYMNT_FI_VW.FILENAME.Value | ".csv";
+   rem &Datafilename2 = &StrPathPsArchTrnIms | ETY_PYMNT_FI_VW.FILENAME.Value | ".csv";
+   
+   &bReturn = FileExists(&Datafilename2, %FilePath_Absolute);
+   
+   If &bReturn Then
+      
+      
+      &FILE = GetFile(&Datafilename2, "r", "a", %FilePath_Absolute);
+      rem 001 If (&Return_Code = %Attachment_Success) Then;
+      
+      SQLExec("select ETY_DELIMITER from ps_ETY_FIL_REC_TBL", &ety_delimiter_linea);
+      
+      If None(&ety_delimiter_linea) Then
+         &ety_delimiter_linea = ";";
+      End-If;
+      <*  Inicio 002 - se comentarea el codigo de la actividad 001   
+	      Local string &DataFileName;
+	      Local File &FILE;
+	      &DataFileName = &ATTACHSYSFILENAME;
+      	  &RtnCode = GetAttachment(URL.GL_FILE_IMPORT, &DataFileName, &DataFileName, "PS_FILEDIR");
+          If &RtnCode = 0 Then
+	         &FILE = GetFile(&DataFileName, "r", "a", %FilePath_Relative);
+	      End-If;      
+	      &filename = &ATTACHSYSFILENAME;
+      Fin 002 *>
+      
+      &filename = &DataFileName;
+      &file_row_number = 0;
+      REM      &REC = CreateRecord(Record.ETY_LOAD_REC_TB);
+      REM      &REC1 = CreateRecord(Record.ETY_LOAD_RE_C_T);
+      
+      &REC = CreateRecord(Record.ETY_LOAD_REC_T1);
+      &REC1 = CreateRecord(Record.ETY_LOAD_RE_C_1);
+      &p = 6;
+      &REC2 = CreateRecord(Record.ETY_PYMNT_FI_VW);
+      &REC2.PROCESS_INSTANCE.Value = ETY_PYMNT_FI_VW.PROCESS_INSTANCE.Value;
+      &REC2.PAY_CYCLE.Value = ETY_PYMNT_FI_VW.PAY_CYCLE.Value;
+      &REC2.PAY_CYCLE_SEQ_NUM.Value = ETY_PYMNT_FI_VW.PAY_CYCLE_SEQ_NUM.Value;
+      &REC2.FILENAME.Value = ETY_PYMNT_FI_VW.FILENAME.Value;
+      
+      SQLExec(SQL.ETY_LAYOUT_DES_SQL, ETY_PYMNT_FI_VW.PROCESS_INSTANCE.Value, ETY_PYMNT_FI_VW.FILENAME.Value, &strLayoutDes);
+      
+      While &FILE.ReadLine(&DATA)
+         
+         If &file_row_number > 0 Then
+            
+            &AR_DATA = Split(&DATA, &ety_delimiter_linea);
+            /* Process contents of the file in this loop */
+            /* Array elements of &HR_DATA can be accessed as &HR_DATA[1],&HR_DATA[2], etc. */
+            
+            &fila = 8;
+            
+            If &AR_DATA.len = 4 And
+                  All(&AR_DATA [8]) Then
+               &fila = 4;
+            End-If;
+            
+            
+            If &AR_DATA.len > &fila Then
+               /*  If &AR_DATA.len = 18 Then*/
+               If All(&AR_DATA [1]) And
+                     IsNumber(&AR_DATA [1]) Then
+                  &REC.PROCESS_INSTANCE.VALUE = ETY_PYMNT_FI_VW.PROCESS_INSTANCE.Value;
+                  &REC.PAY_CYCLE.VALUE = ETY_PYMNT_FI_VW.PAY_CYCLE.Value;
+                  &REC.PAY_CYCLE_SEQ_NUM.VALUE = ETY_PYMNT_FI_VW.PAY_CYCLE_SEQ_NUM.Value;
+                  &REC.FILENAME.VALUE = ETY_PYMNT_FI_VW.FILENAME.Value;
+                  REM &REC.BANK_ACCOUNT_NUM.value = &AR_DATA [7];
+                  &REC.NATIONAL_ID.value = Value(&AR_DATA [2]);
+                  REM 002 &REC.FILE_LOCATION.value = &ATTACHSYSFILENAME;
+                  &REC.FILE_LOCATION.value = &DataFileName;
+                  REM  &REC.SEQ_NBR.value = &AR_DATA [5];
+                  
+                  &fecha = Substring(&AR_DATA [10], 7, 2) | "/" | Substring(&AR_DATA [10], 5, 2) | "/" | Substring(&AR_DATA [10], 1, 4);
+                  
+                  SQLExec("SELECT TRANSLATE(:1,'$.', ' ') FROM DUAL", &AR_DATA [8], &num);
+                  SQLExec("SELECT trim(TRANSLATE(:1,',', '.')) FROM DUAL", &num, &num1);
+                  
+                  &year = Substring(&AR_DATA [9], 1, 4);
+                  &mes = Substring(&AR_DATA [9], 5, 2);
+                  &dia = Substring(&AR_DATA [9], 7, 2);
+                  
+                  If &year > 0 Then
+                     /*Inicio 002*/
+                     SQLExec("SELECT DISTINCT FI_COD_STD_PAGO FROM PS_FI_COD_STD_PAGO WHERE DESCR20 = :1", &AR_DATA [13], &STATUS_FIELD);
+                     &REC.STATUS_FIELD.value = &STATUS_FIELD;
+                     /*Fin 002*/
+                     REM 001 &REC.STATUS_FIELD.value = Substring(Upper(&AR_DATA [13]), 1, 3);
+                  End-If;
+                  
+                  &REC.DESCR50.value = Upper(&AR_DATA [13]);
+                  &REC.PYMNT_ID_REF.value = Upper(&AR_DATA [14]);
+                  &REC.ETY_PLDE_NOM_BENEF.value = &AR_DATA [12];
+                  
+                  If None(&dia) Then
+                     &year = Substring(&AR_DATA [10], 1, 4);
+                     &mes = Substring(&AR_DATA [10], 5, 2);
+                     &dia = Substring(&AR_DATA [10], 7, 2);
+                     
+                     &REC.DESCR50.value = Upper(&AR_DATA [14]);
+                     &REC.PYMNT_ID_REF.value = Upper(&AR_DATA [15]);
+                     &REC.ETY_PLDE_NOM_BENEF.value = &AR_DATA [13];
+                     SQLExec("SELECT :1 || '.' || :2 FROM DUAL", &num1, &AR_DATA [9], &num1);
+                     &REC.STATUS_FIELD.value = Substring(Upper(&AR_DATA [14]), 1, 3);
+                     
+                  End-If;
+                  
+                  &REC.MONETARY_AMOUNT.value = &num1;
+                  
+                  &fechadate = %Datetime;
+                  &REC.PYMNT_DT.value = Date3(&year, &mes, &dia);
+                  REM &REC.CE_REVAL_DATETIME.value = &fechadate;
+                  &REC.CREATEOPRID.Value = %OperatorId;
+                  &REC.ADD_DTTM.Value = %Datetime;
+                  &REC.LAST_MAINT_OPRID.Value = %OperatorId;
+                  &REC.LAST_UPDATE_DTTM.Value = %Datetime;
+                  
+                  rem                  WinMessage(&REC.BANK_ACCOUNT_NUM.value | "*" | &REC.ETY_PLDE_NOM_BENEF.value | "*" | &REC.NATIONAL_ID.value | "*" | &REC.FILE_LOCATION.value | "*" | &REC.PYMNT_DT.value | "*" | &REC.MONETARY_AMOUNT.value | "*" | &REC.STATUS_FIELD.value | "*" | &REC.DESCR50.value | "*" | &REC.CE_REVAL_DATETIME.value, 48);
+                  
+                  If Not &REC.insert() Then
+                     &REC.update();
+                  End-If;
+                  
+                  REM                 &sumalineasmonto = &sumalineasmonto + &num1;
+                  REM                 &sumalineasnits = &sumalineasnits + &REC.NATIONAL_ID.value;
+                  CommitWork();
+               End-If;
+               /*  Else
+                  &ErrorEstructura = "Y";
+               End-If;*/
+            End-If;
+            
+         End-If;
+         &file_row_number = &file_row_number + 1;
+      End-While;
+   Else
+      MessageBox(0, "", 0, 0, "Se ha producido un error con el archivo. El archivo no existe o no coincide con el nombre, por favor verifique.");
+      &ErrorEstructura = "Y";
+      REM  End-If;
+      
+      /*      
+      If ((&num1 - &sumalineasnits) <> 0 Or
+            (&num3 - &sumalineasmonto) <> 0) Then
+         Error ("Los montos del detalle y del total del archivo cargado no son iguales");
+      End-If;
+*/
+      REM Else
+      Error ("Archivo no existe.");
+      rem End-If;
+      
+   End-If;
+End-If;
+
+&ErrorEstructura = "N";
+
+
+If &ErrorEstructura = "Y" Then
+   
+   rem Mueve los archivos a la carpeta de ims de RECHAZADOS
+   REM &Datafilename3 = &StrFilenamePgpIms;
+   REM &obj_dencrypt.fi_ProcesoArchivo2(&recContext, &StrFileNameProcesar);
+   &Estado = "Rechazado";
+   MessageBox(0, "", 0, 0, "El archivo ha sido rechazado. " | &Estado);
+Else
+   rem &SQL_STR = "SELECT DESCR50,STATUS_FIELD,A.NATIONAL_ID,SEQ_NBR FROM PS_ETY_PYMNT_F_TVW A, PS_ETY_LOAD_REC_TB B WHERE PAY_CYCLE=:1 AND PAY_CYCLE_SEQ_NUM=:2 AND FILENAME =:3 AND MONETARY_AMOUNT=PAID_AMT AND instr(FILE_LOCATION,FILENAME,-1,1)>0 and instr(A.NATIONAL_ID ,B.NATIONAL_ID,-1,1)>0";
+   &SQL_STR = "SELECT DISTINCT B.DESCR50,B.STATUS_FIELD,A.NATIONAL_ID,B.SEQ_NBR FROM PS_ETY_PYMNT_F_TVW A, PS_ETY_LOAD_REC_T1 B WHERE  A.PAY_CYCLE = B.PAY_CYCLE AND A.PAY_CYCLE_SEQ_NUM=B.PAY_CYCLE_SEQ_NUM AND A.FILENAME=B.FILENAME AND A.PROCESS_INSTANCE = B.PROCESS_INSTANCE AND A.PROCESS_INSTANCE=:4 AND B.FILE_LOCATION=:5 AND A.PAY_CYCLE=:1 AND A.PAY_CYCLE_SEQ_NUM=:2 AND A.FILENAME =:3 AND  trim(a.national_id) = substr(trim(b.national_id), 1, length(trim(a.national_id))) AND A.PAID_AMT = B.MONETARY_AMOUNT	";
+   
+   &SQL = CreateSQL(&SQL_STR, ETY_PYMNT_FI_VW.PAY_CYCLE.Value, ETY_PYMNT_FI_VW.PAY_CYCLE_SEQ_NUM.Value, ETY_PYMNT_FI_VW.FILENAME.Value, ETY_PYMNT_FI_VW.PROCESS_INSTANCE.Value, &ATTACHSYSFILENAME);
+   
+   /*MessageBox(0, "", 0, 0, " ETY_PYMNT_FI_VW.PAY_CYCLE.Value" | ETY_PYMNT_FI_VW.PAY_CYCLE.Value);
+   MessageBox(0, "", 0, 0, "ETY_PYMNT_FI_VW.PAY_CYCLE_SEQ_NUM.Value " | ETY_PYMNT_FI_VW.PAY_CYCLE_SEQ_NUM.Value);
+   MessageBox(0, "", 0, 0, "ETY_PYMNT_FI_VW.FILENAME.Value " | ETY_PYMNT_FI_VW.FILENAME.Value);
+   MessageBox(0, "", 0, 0, "ETY_PYMNT_FI_VW.PROCESS_INSTANCE.Value " | ETY_PYMNT_FI_VW.PROCESS_INSTANCE.Value);
+   MessageBox(0, "", 0, 0, "&ATTACHSYSFILENAME " | &ATTACHSYSFILENAME);*/
+   
+   &rs = GetLevel0()(1).GetRowset(Scroll.ETY_PYMNT_F_TVW);
+   
+   &num = 1;
+   
+   
+   &suma_nits = 0;
+   &suma_montos = 0;
+   
+   /*Inicio 002*/
+   rem Llena las tablas para enviar parametros al proceso de contabilización;
+   &PROCESS_INSTANCE = GetNextProcessInstance();
+   &RUNCNTL = "CONTBL_PAGOS";
+   &REQUESTID = "CNT-" | %Date | "-" | Int(Rand() * 1000000);
+   
+   &Rec_PST_PYMT_RUN_AP = CreateRecord(Record.PST_PYMT_RUN_AP);
+   &Rec_PST_PYMT_RUN_BK = CreateRecord(Record.PST_PYMT_RUN_BK);
+   
+   
+   &Rec_PST_PYMT_RUN_AP.OPRID.value = %OperatorId;
+   &Rec_PST_PYMT_RUN_AP.RUN_CNTL_ID.value = &RUNCNTL;
+   &Rec_PST_PYMT_RUN_AP.REQUEST_ID.value = &REQUESTID;
+   &Rec_PST_PYMT_RUN_AP.PROCESS_INSTANCE.value = &PROCESS_INSTANCE;
+   &Rec_PST_PYMT_RUN_AP.PROCESS_STATUS.value = "N";
+   &Rec_PST_PYMT_RUN_AP.POST_PYMNT_OPTION.value = "A";
+   &Rec_PST_PYMT_RUN_AP.DESCR.value = "CONTABILIZACIÓN DE PAGOS";
+   &Rec_PST_PYMT_RUN_AP.PROCESS_ORIGIN.value = "P";
+   &Rec_PST_PYMT_RUN_AP.PROCESS_FREQUENCY.value = "O";
+   &Rec_PST_PYMT_RUN_AP.GFEE_RUN_EEG.value = "N";
+   &Rec_PST_PYMT_RUN_AP.AUTOPLT_RUNCNTL_SW.value = "N";
+   
+   
+   /*Fin 002*/
+   
+   
+   While &SQL.FETCH(&Error, &MOTIVO, &DOCUMENTO, &SEQ_NBR)
+      
+      
+      SQLExec("SELECT FF_CODIGO FROM PS_FF_CODESTADOPGO WHERE DESCR20 = :1 AND FF_ESTADO_PAGO<>'E'", &MOTIVO, &CODIGO);
+      If None(&CODIGO) Then
+         SQLExec("SELECT FF_CODIGO FROM PS_FF_CODESTADOPGO WHERE FF_CODIGO = :1 AND FF_ESTADO_PAGO<>'E'", &MOTIVO, &CODIGO);
+      End-If;
+      
+      rem WinMessage(&CODIGO | " " | &MOTIVO, 48);
+      If All(&CODIGO) Then
+         For &i = 1 To &rs.activerowcount
+            
+            /*     If &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_F_TVW).GetField(Field.NATIONAL_ID).Value = &DOCUMENTO And
+	            &SEQ_NBR = &i Then*/
+            
+            If &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_F_TVW).GetField(Field.NATIONAL_ID).Value = &DOCUMENTO Then
+               /*            If &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_F_TVW).GetField(Field.RECON_STATUS).Value <> "REC" Then*/
+               &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_RV_WK).GetField(Field.FF_MOTIVO_RETNCION).Value = &CODIGO;
+               &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_RV_WK).GetField(Field.SELECT).Value = "Y";
+               &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_RV_WK).GetField(Field.FF_MOTIVO_RETNCION).displayonly = True;
+               &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_RV_WK).GetField(Field.SELECT).displayonly = True;
+               
+               &suma_nits = &suma_nits + &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_F_TVW).GetField(Field.NATIONAL_ID).Value;
+               &suma_montos = &suma_montos + &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_F_TVW).GetField(Field.PAID_AMT).Value;
+               
+               /*            End-If;*/
+               &num = &num + 1;
+            End-If;
+            
+            /*Inicio 002 revisar si se debe tomar los datos de la vista ETY_PYMNT_F_TVW*/
+            
+            /*&Rec_PST_PYMT_RUN_BK.OPRID.value = &PROCESS_INSTANCE;
+            &Rec_PST_PYMT_RUN_BK.RUN_CNTL_ID.value = &RUNCNTL;
+            &Rec_PST_PYMT_RUN_BK.REQUEST_ID.value = &REQUESTID;
+            &Rec_PST_PYMT_RUN_BK.PROCESS_INSTANCE.value = &PROCESS_INSTANCE;
+            &Rec_PST_PYMT_RUN_BK.SETID.value = &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_F_TVW).GetField(Field.SETID).Value;
+            &Rec_PST_PYMT_RUN_BK.BANK_CD.value = &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_F_TVW).GetField(Field.BANK_CD).Value;
+            &Rec_PST_PYMT_RUN_BK.BANK_ACCT_KEY.value = &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_F_TVW).GetField(Field.BANK_ACCT_KEY).Value;
+            &Rec_PST_PYMT_RUN_BK.PYMNT_METHOD.value = " ";
+            &Rec_PST_PYMT_RUN_BK.PYMNT_ID_REF.value = &rs.GETROW(&i).GetRecord(Record.ETY_PYMNT_F_TVW).GetField(Field.PYMNT_ID_REF).Value;
+            
+            /*fin 002*/
+         End-For;
+      End-If;
+   End-While;
+   
+   rem ETY_PYMNT_RV_WK.MONETARY_AMOUNT.Value = &suma_nits;
+   ETY_PYMNT_RV_WK.MONETARY_AMOUNT_01 = &suma_montos;
+   ETY_PYMNT_RV_WK.MONETARY_AMOUNT_01.DecimalPosition = 2;
+   
+   
+   DoSave();
+   
+   
+   /*Inicio 002*/
+   rem Se llama la función para ejecutar la cancelación del pago;
+   cancelarpago();
+   
+   /*Genera request para el proceso AP_PSPYMNT
+   Local ProcessRequest &MYRQST;
+   
+   &MYAppName = "AP_PSTPYMNT";
+   &MYRQST = CreateProcessRequest("Application Engine", &MYAppName);
+   &MYRQST.RunControlID = &RUNCNTL;
+   &MYRQST.RunLocation = "PSUNX";
+   &MYRQST.Schedule();*/
+   
+   /*Mueve los archivos a la carpeta de IMS de Procesados */
+   rem &obj_dencrypt.fi_ProcesoArchivo3(&recContext, &StrFilenamePgpIms);
+   &Estado = "Procesado";
+   
+End-If;
+
+/*Fin 002*/
+
+/* Fin #001 */
+
+
+/* Inserta el registro en la tabla*/
+MessageBox(0, "", 0, 0, "&Estado " | &Estado);
+If All(&Estado) Then
+   SQLExec("SELECT MAX(VERSION) FROM PS_ETY_RGARRCH_TBL WHERE PROCESS_INSTANCE =:1 AND PAY_CYCLE_SEQ_NUM =:2 AND BANK_CD =:3 AND PAY_CYCLE =:4 and FILENAME=:5", ETY_PYMNT_FI_VW.PROCESS_INSTANCE.Value, ETY_PYMNT_FI_VW.PAY_CYCLE_SEQ_NUM.Value, ETY_PYMNT_FI_VW.BANK_CD.Value, ETY_PYMNT_FI_VW.PAY_CYCLE.Value, ETY_PYMNT_FI_VW.FILENAME.Value, &Version);
+   If &Version > 0 Then
+      &Version = &Version + 1;
+   Else
+      &Version = 1;
+   End-If;
+   
+   &REC_ETY_RGARRCH_TBL = CreateRecord(Record.ETY_RGARRCH_TBL);
+   &REC_ETY_RGARRCH_TBL.PROCESS_INSTANCE.Value = ETY_PYMNT_FI_VW.PROCESS_INSTANCE.Value;
+   &REC_ETY_RGARRCH_TBL.PAY_CYCLE_SEQ_NUM.Value = ETY_PYMNT_FI_VW.PAY_CYCLE_SEQ_NUM.Value;
+   &REC_ETY_RGARRCH_TBL.BANK_CD.Value = ETY_PYMNT_FI_VW.BANK_CD.Value;
+   &REC_ETY_RGARRCH_TBL.PAY_CYCLE.Value = ETY_PYMNT_FI_VW.PAY_CYCLE.Value;
+   &REC_ETY_RGARRCH_TBL.FILENAME.Value = ETY_PYMNT_FI_VW.FILENAME.Value;
+   &REC_ETY_RGARRCH_TBL.VERSION.Value = &Version;
+   &REC_ETY_RGARRCH_TBL.ETY_ETD_RHZ.Value = &Estado;
+   &REC_ETY_RGARRCH_TBL.DATE_ADDED.Value = %Date;
+   &REC_ETY_RGARRCH_TBL.Insert();
+   
+   
+   
+End-If;
+
+
+
+/*Elimina el archivo csv desencriptado *
+&FILE = GetFile(&Datafilename2, "r", "a", %FilePath_Absolute);
+If &bReturn1 Then
+   &FILE = GetFile(&Datafilename2, "r", "a", %FilePath_Absolute);
+   &FILE.DELETE();
+End-If;*/

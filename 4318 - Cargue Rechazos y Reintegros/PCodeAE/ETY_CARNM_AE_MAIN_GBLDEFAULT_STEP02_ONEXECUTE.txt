@@ -1,0 +1,8 @@
+&stPagina = ETY_RUN_XLS_AET.FI_FLAG_EMBARGOS.Value;
+If &stPagina = 0 Then
+   ETY_RUN_XLS_AET.AE_APPLID.Value = "ETY_CARNM_AE";
+   ETY_RUN_XLS_AET.AE_SECTION.Value = "ValXls";
+Else
+   ETY_RUN_XLS_AET.AE_APPLID.Value = "ETY_CARNM_AE";
+   ETY_RUN_XLS_AET.AE_SECTION.Value = "PrcEmb";
+End-If;

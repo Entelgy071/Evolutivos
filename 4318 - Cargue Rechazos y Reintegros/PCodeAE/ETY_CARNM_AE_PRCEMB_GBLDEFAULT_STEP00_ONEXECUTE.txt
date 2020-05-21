@@ -1,0 +1,157 @@
+import PS_PT:Integration:IRequestHandler;
+import FF_FINANZAS_FUNCLIB:BROKER:Xml:*;
+import FF_FINANZAS_FUNCLIB:BROKER:ArchivoLog:*;
+import FF_FINANZAS_FUNCLIB:BROKER:GeneradorAsientos:*;
+import FF_FINANZAS_FUNCLIB:CARGA_MASIVA:CargaArchivos:*;
+import EOEN_MVC:EOEN_MODEL:EOENInterface:*;
+
+Function EditRecord(&REC As Record) Returns boolean;
+   Local integer &E;
+   &REC.ExecuteEdits(%Edit_Required + %Edit_DateRange + %Edit_YesNo + %Edit_OneZero);
+   If &REC.IsEditError Then
+      For &E = 1 To &REC.FieldCount
+         &MYFIELD = &REC.GetField(&E);
+         If &MYFIELD.EditError Then
+            &MSGNUM = &MYFIELD.MessageNumber;
+            &MSGSET = &MYFIELD.MessageSetNumber;
+            ETY_RUN_XLS_AET.ERROR_DTL = "****" | MsgGet(&MSGSET, &MSGNUM, "");
+         End-If;
+      End-For;
+      Return False;
+   Else
+      Return True;
+   End-If;
+End-Function;
+
+Function ImportSegment(&RS2 As Rowset, &RSParent As Rowset)
+   Local Rowset &RS1, &RSP;
+   Local string &RecordName;
+   Local Record &REC2, &RECP;
+   Local SQL &SQL1;
+   Local integer &I, &L;
+   &SQL1 = CreateSQL("%Insert(:1)");
+   &RecordName = "RECORD." | &RS2.DBRecordName;
+   &REC2 = CreateRecord(@("Record.ETY_CRGNMTMP"));
+   &RECP = &RSParent(1).GetRecord(@("Record.ETY_CRGNMTMP"));
+   For &I = 1 To &RS2.ActiveRowCount
+      &RS2(&I).GetRecord(1).CopyFieldsTo(&REC2);
+      If (EditRecord(&REC2) And
+            &REC2.PAYMENT_AMT.Value > 0) Then
+         &REC2.GetField(Field.PROCESS_INSTANCE).Value = ETY_RUN_XLS_AET.PROCESS_INSTANCE.Value;
+         &REC2.GetField(Field.OPRID).Value = %OperatorId;
+         &REC2.GetField(Field.RUN_CNTL_ID).Value = ETY_RUN_XLS_AET.RUN_CNTL_ID.Value;
+         &SQL1.Execute(&REC2);
+         &RS2(&I).GetRecord(1).CopyFieldsTo(&RECP);
+         For &L = 1 To &RS2.GetRow(&I).ChildCount
+            &RS1 = &RS2.GetRow(&I).GetRowset(&L);
+            If (&RS1 <> Null) Then
+               &RSP = &RSParent.GetRow(1).GetRowset(&L);
+               ImportSegment(&RS1, &RSP);
+            End-If;
+         End-For;
+         If &RSParent.ActiveRowCount > 0 Then
+            &RSParent.DeleteRow(1);
+         End-If;
+      Else
+         &LOGFILE.WriteRowset(&RS);
+         &LOGFILE.WriteLine("****Correct error in this record and delete all error messages");
+         &LOGFILE.WriteRecord(&REC2);
+         For &L = 1 To &RS2.GetRow(&I).ChildCount
+            &RS1 = &RS2.GetRow(&I).GetRowset(&L);
+            If (&RS1 <> Null) Then
+               &LOGFILE.WriteRowset(&RS1);
+            End-If;
+         End-For;
+         throw CreateException(0, 0, "'%1' El archivo tiene errores de estructura", "Error");
+      End-If;
+   End-For;
+End-Function;
+
+Local ApiObject &oSession;
+
+/* Inicio #001 */
+Local object &XMLLibrary, &GeneradorXML, &CargaArchivos;
+Local string &ArchivoLocal;
+Local object &objCargaArchivos = create FF_FINANZAS_FUNCLIB:CARGA_MASIVA:CargaArchivos();
+
+&LOGFILE = create FF_FINANZAS_FUNCLIB:BROKER:ArchivoLog();
+
+REM *************************************************************************************************************************;
+REM * PeopleCode to Validate Data                                                                                           *;
+REM *************************************************************************************************************************;
+
+/* Si hay error al cargar el File Layout, la estructura del archivo no es correcta, NO SE CONTINUA CON EL PROCESO */
+try
+   
+   /*************************************************************************************************************************/
+   SQLExec("SELECT XLATLONGNAME FROM PSXLATITEMLANG WHERE FIELDNAME = 'FF_DBLINK_ORION' AND FIELDVALUE = 'L'", &ActivarLog);
+   ETY_RUN_XLS_AET.LOG_BASIS_FLG.Value = &ActivarLog;
+   If ETY_RUN_XLS_AET.LOG_BASIS_FLG.Value = "Y" Then
+      &LOGFILE.EscribirLog = True;
+   End-If;
+   /*************************************************************************************************************************/
+   
+   Local string &TextoMensaje, &Archivo;
+   Local File &ArchivoXLS;
+   Local string &Dir = GetEnv("PS_FILEDIR");
+   Local string &Sep = GetEnv("PS_FILEDIR");
+   Local number &fcounter;
+   Local boolean &GetAttrslt;
+   Local Record &REC1;
+   Local SQL &SQL1;
+   Local Rowset &RS1, &RS2;
+   Local integer &M;
+   
+   &Archivo = &Dir | "\" | ETY_RUN_XLS_AET.FILENAME.Value;
+   
+   If ETY_RUN_XLS_AET.FI_TIPO_CARGA.Value = "O" Then
+      &GetAttrslt = &objCargaArchivos.ff_GetAttachment("record://PSFILE_ATTDET", ETY_RUN_XLS_AET.ATTACHSYSFILENAME.Value, ETY_RUN_XLS_AET.FILENAME.Value, "PS_FILEDIR");
+   Else
+      &Archivo = &Dir | "\" | ETY_RUN_XLS_AET.ATTACHSYSFILENAME.Value;
+   End-If;
+   
+   If (&GetAttrslt = True And
+         ETY_RUN_XLS_AET.FI_TIPO_CARGA.Value = "O") Or
+         ETY_RUN_XLS_AET.FI_TIPO_CARGA.Value = "S" Then
+      
+      &ArchivoXLS = GetFile(&Archivo, "R", %FilePath_Absolute);
+      &ArchivoXLS.SetFileLayout(FileLayout.ETY_CAR_NOM_FL);
+      &RS1 = &ArchivoXLS.CreateRowset();
+      &RS1 = &ArchivoXLS.ReadRowset();
+      &RS = CreateRowset(Record.ETY_CRGNMTMP);
+      
+      /***************  To Remove the Header Row from the File, FileCount Variable is used to check  for 1st row  **************/
+      Local integer &FileCount = 0;
+      While &RS1 <> Null;
+         If &FileCount >= 0 Then
+            ImportSegment(&RS1, &RS);
+         End-If;
+         &RS1 = &ArchivoXLS.ReadRowset();
+         &FileCount = &FileCount + 1;
+      End-While;
+      REM &FileCount = &FileCount - 1;
+      MessageBox(0, "", 0, 0, "Total Registros en el archivo: " | &FileCount);
+      
+      &ArchivoXLS.Close();
+      
+      /* Termina Lectura del Archivo */
+      MessageBox(0, "", 0, 0, "Se ha completado la lectura del archivo SIN ERRROES.");
+      
+   End-If;
+   
+catch Exception &ex
+   
+   ETY_RUN_XLS_AET.ERROR_FLG = "Y";
+   ETY_RUN_XLS_AET.ERROR_CODE = "01";
+   ETY_RUN_XLS_AET.ERROR_DTL = &ex.ToString();
+   
+end-try;
+
+/* Si hay error, no continuar con la creación del XML*/
+If ETY_RUN_XLS_AET.ERROR_FLG = "Y" Then
+   ETY_RUN_XLS_AET.AE_APPLID = "ETY_CARNM_AE";
+   ETY_RUN_XLS_AET.AE_SECTION = "XLSError";
+Else
+   ETY_RUN_XLS_AET.AE_APPLID = "ETY_CARNM_AE";
+   ETY_RUN_XLS_AET.AE_SECTION = "CreaXML";
+End-If;

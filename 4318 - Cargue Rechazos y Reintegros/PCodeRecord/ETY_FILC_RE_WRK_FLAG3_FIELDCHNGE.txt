@@ -1,0 +1,7 @@
+/*Declare Function Init_home_State PeopleCode FUNCLIB_PMN.FUNCLIB FieldFormula;
+
+Init_home_State("Home", "Read-Write");
+
+Local string &strURL = GenerateComponentContentURL(%Portal, %Node, MenuName.PROCESSMONITOR, "GBL", Component.PROCESSMONITOR, Page.PMN_PRCSLIST, "U");
+ViewContentURLClassic(&strURL);
+*/

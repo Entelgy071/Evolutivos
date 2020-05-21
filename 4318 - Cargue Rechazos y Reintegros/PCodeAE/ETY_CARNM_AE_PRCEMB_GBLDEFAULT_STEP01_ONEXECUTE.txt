@@ -1,0 +1,150 @@
+/***********************************************************************
+* Proyecto:		carga nómina sin impuestos
+* Actividad:  	001
+* Responsable: 	Soporte ERP – Yolima Navarro
+* Fecha:		02/05/2017
+* Descripción:	Se invoca función para validación de embargos de terceros
+*************************************************************************/
+
+import FI_IAA_021_VAL_EMBARGOS:Handlers:*;
+
+
+Function FI_INFORMAR_EMBARGOS(&sBaseCurrencyIn As string, &rwstLevel1_par As Rowset, &nbr_valor As number, &str_embargos As string) Returns boolean
+   Local Record &rRecordVchrEmbTbl, &rRecordRowset;
+   Local number &j, &k, &num_valor;
+   Local string &str_mensaje;
+   Local boolean &bol_return = False;
+   rem &str_embargos = " ";
+   rem &num_valor = 0;
+   For &j = 1 To &rwstLevel1_par.ActiveRowCount
+      
+      &rRecordRowset = &rwstLevel1_par.GetRow(&j).GetRecord(1);
+      If All(&rRecordRowset.GetField(Field.VALUE).Value) Then
+         &bol_return = True;
+         
+         &nbr_valor = &nbr_valor + &rRecordRowset.GetField(Field.VALUE).Value;
+         If &str_embargos <> " " Then
+            &str_embargos = &str_embargos | ", " | &rRecordRowset.GetField(Field.FI_ID_EMBARGO).Value;
+         Else
+            &str_embargos = &rRecordRowset.GetField(Field.FI_ID_EMBARGO).Value
+         End-If;
+      End-If;
+   End-For;
+   Return &bol_return;
+End-Function;
+
+Function FI_HAND_ERROR(&str_descr As string)
+   PST_VCHR_AET.AE_APPSTATUS = 1;
+   SQLExec("DELETE FROM %Table(VCHR_TEMP_LN)  WHERE PROCESS_INSTANCE = :1 AND BUSINESS_UNIT = :2 AND VOUCHER_ID = :3", PST_VCHR_AET.PROCESS_INSTANCE.Value, FI_AP_VCHR_AET.BUSINESS_UNIT.Value, FI_AP_VCHR_AET.VOUCHER_ID.Value);
+   SQLExec("DELETE FROM %Table(PST_VCHR_TAO)  WHERE PROCESS_INSTANCE = :1 AND BUSINESS_UNIT = :2 AND VOUCHER_ID = :3", PST_VCHR_AET.PROCESS_INSTANCE.Value, FI_AP_VCHR_AET.BUSINESS_UNIT.Value, FI_AP_VCHR_AET.VOUCHER_ID.Value);
+   SQLExec("UPDATE %Table(VOUCHER) SET IN_PROCESS_FLG = 'N', PROCESS_INSTANCE = 0  WHERE PROCESS_INSTANCE = :1 AND BUSINESS_UNIT = :2 AND VOUCHER_ID = :3", PST_VCHR_AET.PROCESS_INSTANCE.Value, FI_AP_VCHR_AET.BUSINESS_UNIT.Value, FI_AP_VCHR_AET.VOUCHER_ID.Value);
+   SQLExec("DELETE FROM %Table(PYMNT_VCHR_XREF) A WHERE A.BUSINESS_UNIT = :1 AND A.VOUCHER_ID = :2 AND EXISTS (SELECT 'X' FROM %TABLE(FI_PYVCHXRF_TBL) B WHERE A.BUSINESS_UNIT = B.BUSINESS_UNIT AND A.VOUCHER_ID =B.VOUCHER_ID AND A.PYMNT_CNT = B.PYMNT_CNT AND B.PROCESS_INSTANCE = :3) AND A.PYMNT_SELCT_STATUS <> 'X'", FI_AP_VCHR_AET.BUSINESS_UNIT.Value, FI_AP_VCHR_AET.VOUCHER_ID.Value, PST_VCHR_AET.PROCESS_INSTANCE.Value);
+   
+   Local SQL &sql_embargos = CreateSQL("SELECT FI_ID_EMBARGO, AMOUNT * -1 FROM PS_FI_PYVCHXRF_TBL WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2 AND PROCESS_INSTANCE = :3", FI_AP_VCHR_AET.BUSINESS_UNIT.Value, FI_AP_VCHR_AET.VOUCHER_ID.Value, PST_VCHR_AET.PROCESS_INSTANCE.Value);
+   Local string &str_idEmbargo;
+   Local number &nbr_valor;
+   Local FI_IAA_021_VAL_EMBARGOS:Handlers:fi_ValidarEmbargos &ObjActualizar;
+   Local string &str_errNum, &str_errDescr;
+   Local Record &recContext;
+   Local boolean &bol_result;
+   
+   &recContext = CreateRecord(Record.FI_VAL_EMBA_WRK);
+   &recContext.NATIONAL_ID_TYPE.Value = " ";
+   &recContext.NATIONAL_ID.Value = " ";
+   &ObjActualizar = create FI_IAA_021_VAL_EMBARGOS:Handlers:fi_ValidarEmbargos(&recContext);
+   
+   
+   /*Se invoca el servicio para actualizar el embargo*/
+   
+   
+   While &sql_embargos.Fetch(&str_idEmbargo, &nbr_valor)
+      &bol_result = &ObjActualizar.fi_ActualizarEmbargosOrion(&str_idEmbargo, &nbr_valor, 0, &str_errNum, &str_errDescr);
+   End-While;
+   
+   SQLExec("DELETE FROM %Table(FI_PYVCHXRF_TBL) A WHERE A.BUSINESS_UNIT = :1 AND A.VOUCHER_ID = :2 AND A.PROCESS_INSTANCE = :3", FI_AP_VCHR_AET.BUSINESS_UNIT.Value, FI_AP_VCHR_AET.VOUCHER_ID.Value, PST_VCHR_AET.PROCESS_INSTANCE.Value);
+   
+   MessageBox(0, "", 0, 0, &str_descr, FI_AP_VCHR_AET.VOUCHER_ID.Value, FI_AP_VCHR_AET.BUSINESS_UNIT.Value);
+   
+   Exit (0);
+End-Function;
+
+
+Function FI_VALIDAR_EMBARGOS2(&str_BU As string, &str_VoucherId As string, &sBaseCurrencyIn As string, &sVendorIdIn As string, &str_tipo_id As string, &str_id As string, &sSource As string, &nbr_valor As number, &str_embargos As string) Returns boolean
+   rem   &str_tipo_id: Tipo de identificación del tercero al que se le van a validar los embargos;
+   rem   &str_id: identificación del tercero al que se le van a validar los embargos;
+   rem   &str_id: identificación del tercero al que se le van a validar los embargos;
+   rem   &str_crear_pago: Indica si se desea crear el deposito,  si &bol_preguntar es true este parametro se ignora;
+   rem   &bol_preguntar: Indica si se debe preguntar por pantalla si se desea crear el pago al juzgado;
+   Local Rowset &rRwstOut, &rwstLevel1;
+   Local Record &rRecordRowset, &recContext;
+   Local FI_IAA_021_VAL_EMBARGOS:Handlers:fi_ValidarEmbargos &ObjValidar;
+   Local number &i;
+   Local boolean &bol_return = False;
+   If &str_tipo_id <> "FID" Then
+      try
+         
+         &recContext = CreateRecord(Record.FI_VAL_EMBA_WRK);
+         &recContext.NATIONAL_ID_TYPE.Value = &str_tipo_id;
+         &recContext.NATIONAL_ID.Value = &str_id;
+         
+         
+         &ObjValidar = create FI_IAA_021_VAL_EMBARGOS:Handlers:fi_ValidarEmbargos(&recContext);
+         &rRwstOut = &ObjValidar.fi_ValidarEmbargosOrion();
+         If &rRwstOut <> Null Then
+            For &i = 1 To &rRwstOut.ActiveRowCount
+               &rRecordRowset = &rRwstOut.GetRow(&i).GetRecord(1);
+               If None(&rRecordRowset.GetField(Field.ERRNUM).Value) Then
+                  &rRecordRowset.GetField(Field.ERRNUM).Value = "0";
+               End-If;
+               &nbr_ERRNUM = Value(&rRecordRowset.GetField(Field.ERRNUM).Value);
+               If &nbr_ERRNUM = 0 Or
+                     &nbr_ERRNUM = 13 Then;
+                  
+                  &rwstLevel1 = &rRwstOut.GetRow(&i).GetRowset(1);
+                  If &sSource = "C" Then
+                     Local number &nbr_valor2;
+                     Local string &str_embargos2;
+                     &bol_return = FI_INFORMAR_EMBARGOS(&sBaseCurrencyIn, &rwstLevel1, &nbr_valor, &str_embargos);
+                     rem                      &nbr_valor = &nbr_valor + &nbr_valor2;
+                     
+                  End-If;
+               Else
+                  If Value(&rRecordRowset.GetField(Field.ERRNUM).Value) <> 4 Then
+                     MessageBox(0, "", 0, 0, "Error FI_VALIDAR_EMBARGOS: (" | &nbr_ERRNUM | ") " | &str_tipo_id | "-" | &str_id | " " | &rRecordRowset.GetField(Field.DESCR254).Value);
+                     &bol_return = True;
+                  End-If;
+               End-If;
+            End-For;
+         End-If;
+         Return &bol_return;
+      catch Exception &ex
+         Local string &str_error_fin;
+         &str_error_fin = "Ocurrio el error: " | &ex.ToString() | "; procesando el voucher %1 de la Unidad de Negocio %2";
+         If &sSource = "P" Then
+            FI_HAND_ERROR(&str_error_fin);
+         Else
+            MessageBox(0, "", 0, 0, &str_error_fin);
+         End-If;
+         Return False;
+      end-try;
+   Else
+      Return False;
+   End-If;
+End-Function;
+
+&sBusinessUnit = ETY_VND_XLS_AET.BUSINESS_UNIT.Value;
+&sVoucherId = ETY_VND_XLS_AET.VOUCHER_ID.Value;
+&sBaseCurrency = ETY_VND_XLS_AET.BASE_CURR.Value;
+&sNationalIdType = ETY_VND_XLS_AET.NATIONAL_ID_TYPE.Value;
+&sNationalId = ETY_VND_XLS_AET.NATIONAL_ID.Value;
+&sVendorId = ETY_VND_XLS_AET.VENDOR_ID.Value;
+&nbr_valor = 0;
+&str_embargos = "N";
+
+&bol_return2 = FI_VALIDAR_EMBARGOS2(&sBusinessUnit, &sVoucherId, &sBaseCurrency, &sVendorId, &sNationalIdType, &sNationalId, "C", &nbr_valor, &str_embargos);
+
+If &bol_return2 Then
+   REM MessageBox(0, "", 0, 0, "El(los) proveedor(es) tiene(n) los siguientes embargo(s) registrado(s) en el aplicativo ORION: %1. Por un valor total a embargar de %2. Identificación %3", &str_embargos, String(&nbr_valor), &sNationalId);
+   ETY_VND_XLS_AET.FF_FLG_EMBARGO.Value = "Y";
+   ETY_VND_XLS_AET.FF_IMPORTE_EMBARGO.Value = &nbr_valor;
+End-If;

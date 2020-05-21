@@ -1,0 +1,253 @@
+/*****************************************************************************************
+* Proyecto:		ETY_CNOM_TMP
+* Actividad:  	001
+* Responsable: 	Entelgy – Yolima Navarro
+* Fecha:		2017-09-25
+* Descripción:	Se reutiliza para carga de archivo excel directamente en peoplesoft
+*               Desarrollo Nómina Sin Impuestos
+*****************************************************************************************/
+/* Es paso hace la validación de errores y carga en la tabla final RECORD.ETY_CRGNOM_DTL*/
+
+import PS_PT:Integration:IRequestHandler;
+import FF_FINANZAS_FUNCLIB:BROKER:Xml:*;
+import FF_FINANZAS_FUNCLIB:BROKER:ArchivoLog:*;
+import FF_FINANZAS_FUNCLIB:BROKER:GeneradorAsientos:*;
+import FF_FINANZAS_FUNCLIB:CARGA_MASIVA:CargaArchivos:*;
+import EOEN_MVC:EOEN_MODEL:EOENInterface:*;
+
+Function EditRecord(&REC As Record) Returns boolean;
+   Local integer &E;
+   &REC.ExecuteEdits(%Edit_Required + %Edit_DateRange + %Edit_YesNo + %Edit_OneZero);
+   If &REC.IsEditError Then
+      For &E = 1 To &REC.FieldCount
+         &MYFIELD = &REC.GetField(&E);
+         If &MYFIELD.EditError Then
+            &MSGNUM = &MYFIELD.MessageNumber;
+            &MSGSET = &MYFIELD.MessageSetNumber;
+            ETY_RUN_XLS_AET.ERROR_DTL.Value = "Error: " | &MYFIELD.Name | " " | MsgGet(&MSGSET, &MSGNUM, "");
+         End-If;
+      End-For;
+      Return False;
+   Else
+      Return True;
+   End-If;
+End-Function;
+
+Function ImportSegment(&RS2 As Rowset, &RSParent As Rowset)
+   Local Rowset &RS1, &RSP;
+   Local string &RecordName;
+   Local Record &REC2, &RECP;
+   Local SQL &SQL1;
+   Local integer &I, &L;
+   &SQL1 = CreateSQL("%Insert(:1)");
+   &SQL1.BulkMode = True;
+   &RecordName = "RECORD." | &RS2.DBRecordName;
+   
+   &REC2 = CreateRecord(@("Record.ETY_CRGNMTMP"));
+   
+   If ETY_RUN_XLS_AET.FF_DET_PAGO = "A" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "B" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "C" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "D" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "J" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "L" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "N" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "P" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "R" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "S" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "U" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "1" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "2" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "3" Or
+         ETY_RUN_XLS_AET.FF_DET_PAGO = "4" Then
+      &REC3 = CreateRecord(@("Record.ETY_CRGNMTMPV"));
+   Else
+      &REC3 = CreateRecord(@("Record.ETY_CRGNMTMP"));
+   End-If;
+   &RECP = &RSParent(1).GetRecord(@("Record.ETY_CRGNMTMP"));
+   For &I = 1 To &RS2.ActiveRowCount
+      
+      &RS2(&I).ETY_CARNOM_WRK.NATIONAL_ID.Value = Substring(&RS2(&I).ETY_CARNOM_WRK.NATIONAL_ID.Value, 1, 20);
+      &RS2(&I).ETY_CARNOM_WRK.LAST_NAME.Value = Substring(&RS2(&I).ETY_CARNOM_WRK.LAST_NAME.Value, 1, 30);
+      &RS2(&I).ETY_CARNOM_WRK.SECOND_LAST_NAME.Value = Substring(&RS2(&I).ETY_CARNOM_WRK.SECOND_LAST_NAME.Value, 1, 30);
+      &RS2(&I).ETY_CARNOM_WRK.FIRST_NAME.Value = Substring(&RS2(&I).ETY_CARNOM_WRK.FIRST_NAME.Value, 1, 30);
+      &RS2(&I).ETY_CARNOM_WRK.MIDDLE_NAME.Value = Substring(&RS2(&I).ETY_CARNOM_WRK.MIDDLE_NAME.Value, 1, 30);
+      &RS2(&I).ETY_CARNOM_WRK.ADDRESS1.Value = Substring(&RS2(&I).ETY_CARNOM_WRK.ADDRESS1.Value, 1, 55);
+      &RS2(&I).ETY_CARNOM_WRK.PHONE.Value = Substring(&RS2(&I).ETY_CARNOM_WRK.PHONE.Value, 1, 24);
+      &RS2(&I).ETY_CARNOM_WRK.BANK_ACCOUNT_NUM.Value = Substring(&RS2(&I).ETY_CARNOM_WRK.BANK_ACCOUNT_NUM.Value, 1, 35);
+      &RS2(&I).ETY_CARNOM_WRK.DESCR100.Value = Substring(&RS2(&I).ETY_CARNOM_WRK.DESCR100.Value, 1, 100);
+      
+      
+      &RS2(&I).GetRecord(1).CopyFieldsTo(&REC2);
+      &RS2(&I).GetRecord(1).CopyFieldsTo(&REC3);
+      If (EditRecord(&REC3) And
+            &REC2.PAYMENT_AMT.Value > 0) Then
+         &REC2.GetField(Field.PROCESS_INSTANCE).Value = ETY_RUN_XLS_AET.PROCESS_INSTANCE.Value;
+         &REC2.GetField(Field.OPRID).Value = %OperatorId;
+         &REC2.GetField(Field.RUN_CNTL_ID).Value = ETY_RUN_XLS_AET.RUN_CNTL_ID.Value;
+         &REC2.GetField(Field.SEQ_NBR_TR).Value = ETY_RUN_XLS_AET.SEQ_NBR_TR.Value;
+         REM &nNationalID = Value(&REC2.GetField(Field.NATIONAL_ID).Value);
+         &SQL1.Execute(&REC2);
+         &RS2(&I).GetRecord(1).CopyFieldsTo(&RECP);
+         For &L = 1 To &RS2.GetRow(&I).ChildCount
+            &RS1 = &RS2.GetRow(&I).GetRowset(&L);
+            If (&RS1 <> Null) Then
+               &RSP = &RSParent.GetRow(1).GetRowset(&L);
+               ImportSegment(&RS1, &RSP);
+            End-If;
+         End-For;
+      Else
+         If &REC2.PAYMENT_AMT.Value <= 0 Then
+            ETY_RUN_XLS_AET.ERROR_DTL.Value = " El campo del valor del pago para la Identificación: " | &REC2.GetField(Field.NATIONAL_ID).Value | " no es válido";
+         End-If;
+         throw CreateException(0, 0, "'%1'" | ETY_RUN_XLS_AET.ERROR_DTL.Value, "");
+      End-If;
+   End-For;
+End-Function;
+
+Function HomologarPais(&stCodigoPaisXLS As string) Returns string;
+   Local SQL &sqlPais = CreateSQL("SELECT COUNTRY FROM %Table(COUNTRY_TBL) WHERE COUNTRY_2CHAR = :1", &stCodigoPaisXLS);
+   If &sqlPais.Fetch(&stCountry) Then
+      Return &stCountry;
+   End-If;
+   Return "COL";
+End-Function;
+
+Function HomologarDepto(&stCodigoPais As string, &stCodigDptoXLS As string) Returns string
+   Local SQL &sqlDpto = CreateSQL("SELECT STATE FROM %Table(STATE_TBL) WHERE NUMERIC_CD = :1 AND COUNTRY = :2", &stCodigDptoXLS, &stCodigoPais);
+   If &sqlDpto.Fetch(&stState) Then
+      Return &stState;
+   End-If;
+   Return "BOG";
+End-Function;
+
+Local ApiObject &oSession;
+
+/* Inicio #001 */
+&LOGFILE = create FF_FINANZAS_FUNCLIB:BROKER:ArchivoLog();
+
+REM *************************************************************************************************************************;
+REM * PeopleCode to Validate Data                                                                                           *;
+REM *************************************************************************************************************************;
+
+/* Si hay error al cargar el File Layout, la estructura del archivo no es correcta, NO SE CONTINUA CON EL PROCESO */
+
+try
+   
+   /*************************************************************************************************************************/
+   SQLExec("SELECT XLATLONGNAME FROM PSXLATITEMLANG WHERE FIELDNAME = 'FF_DBLINK_ORION' AND FIELDVALUE = 'L'", &ActivarLog);
+   ETY_RUN_XLS_AET.LOG_BASIS_FLG.Value = &ActivarLog;
+   If ETY_RUN_XLS_AET.LOG_BASIS_FLG.Value = "Y" Then
+      &LOGFILE.EscribirLog = False;
+   End-If;
+   /*************************************************************************************************************************/
+   
+   Local string &TextoMensaje, &Archivo;
+   Local File &ArchivoXLS;
+   Local string &Dir = GetEnv("PS_FILEDIR");
+   Local string &Sep = GetEnv("PS_FILEDIR");
+   Local number &fcounter;
+   Local boolean &GetAttrslt;
+   Local Record &REC1;
+   Local SQL &SQL1;
+   Local Rowset &RS1, &RS2;
+   Local integer &M;
+   Local object &objCargaArchivos = create FF_FINANZAS_FUNCLIB:CARGA_MASIVA:CargaArchivos();
+   
+   &Archivo = &Dir | "\" | ETY_RUN_XLS_AET.FILENAME.Value;
+   
+   If ETY_RUN_XLS_AET.FI_TIPO_CARGA.Value = "O" Then
+      &GetAttrslt = &objCargaArchivos.ff_GetAttachment("record://PSFILE_ATTDET", ETY_RUN_XLS_AET.ATTACHSYSFILENAME.Value, ETY_RUN_XLS_AET.FILENAME.Value, "PS_FILEDIR");
+   Else
+      &Archivo = &Dir | "\" | ETY_RUN_XLS_AET.ATTACHSYSFILENAME.Value;
+   End-If;
+   
+   If (&GetAttrslt = True And
+         ETY_RUN_XLS_AET.FI_TIPO_CARGA.Value = "O") Or
+         ETY_RUN_XLS_AET.FI_TIPO_CARGA.Value = "S" Then
+      
+      &ArchivoXLS = GetFile(&Archivo, "R", %FilePath_Absolute);
+      &ArchivoXLS.SetFileLayout(FileLayout.ETY_CAR_NOM_FL);
+      &RS1 = &ArchivoXLS.CreateRowset();
+      &RS1 = &ArchivoXLS.ReadRowset();
+      &RS = CreateRowset(Record.ETY_CRGNMTMP);
+      
+      /***************  To Remove the Header Row from the File, FileCount Variable is used to check  for 1st row  **************/
+      Local integer &FileCount = 0;
+      ETY_RUN_XLS_AET.SEQ_NBR_TR.Value = &FileCount;
+      While &RS1 <> Null;
+         If &FileCount >= 0 Then
+            /******Completa Código de Ciudad ****************************************/
+            &stCity = &RS1(1).ETY_CARNOM_WRK.CITY.Value;
+            If Len(&stCity) = 1 Then
+               &RS1(1).ETY_CARNOM_WRK.CITY.Value = &RS1(1).ETY_CARNOM_WRK.STATE.Value | "00" | &stCity;
+            Else
+               If Len(&stCity) = 2 Then
+                  &RS1(1).ETY_CARNOM_WRK.CITY.Value = &RS1(1).ETY_CARNOM_WRK.STATE.Value | "0" | &stCity;
+               Else
+                  If Len(&stCity) = 3 Then
+                     &RS1(1).ETY_CARNOM_WRK.CITY.Value = &RS1(1).ETY_CARNOM_WRK.STATE.Value | &stCity;
+                  End-If;
+               End-If;
+            End-If;
+            /******Completa Código de Ciudad ****************************************/
+            /****** Homologa País y Departamento ****************************************/
+            &stTempCountry = &RS1(1).ETY_CARNOM_WRK.COUNTRY.Value;
+            &stCountryCd = HomologarPais(&stTempCountry);
+            &stStateCd = HomologarDepto(&stCountryCd, &RS1(1).ETY_CARNOM_WRK.STATE.Value);
+            &RS1(1).ETY_CARNOM_WRK.COUNTRY.Value = &stCountryCd;
+            &RS1(1).ETY_CARNOM_WRK.STATE.Value = &stStateCd;
+            /****** Homologa País y Departamento ****************************************/
+            ImportSegment(&RS1, &RS);
+         End-If;
+         &RS1 = &ArchivoXLS.ReadRowset();
+         &FileCount = &FileCount + 1;
+         ETY_RUN_XLS_AET.SEQ_NBR_TR.Value = &FileCount;
+      End-While;
+      /***************  To Remove the Header Row from the File, FileCount Variable is used to check  for 1st row  **************/
+      
+      SQLExec("DELETE FROM PS_ETY_CARGA_T_DUP WHERE OPRID = :1 AND RUN_CNTL_ID = :2", %OperatorId, ETY_RUN_XLS_AET.RUN_CNTL_ID);
+      
+      Local Record &rcEtyCargaTDup;
+      
+      &rcEtyCargaTDup = CreateRecord(Record.ETY_CARGA_T_DUP);
+      
+      &sql = CreateSQL("SELECT NATIONAL_ID, COUNT(*) FROM PS_ETY_CRGNMTMP WHERE OPRID = :1 AND RUN_CNTL_ID = :2 AND PROCESS_INSTANCE = :3 GROUP BY NATIONAL_ID HAVING COUNT(*) > 1", %OperatorId, ETY_RUN_XLS_AET.RUN_CNTL_ID, ETY_RUN_XLS_AET.PROCESS_INSTANCE);
+      
+      While &sql.fetch(&strNationalId, &numCount)
+         
+         &rcEtyCargaTDup.OPRID.Value = %OperatorId;
+         
+         &rcEtyCargaTDup.RUN_CNTL_ID.Value = ETY_RUN_XLS_AET.RUN_CNTL_ID;
+         &rcEtyCargaTDup.PROCESS_INSTANCE.Value = ETY_RUN_XLS_AET.PROCESS_INSTANCE;
+         &rcEtyCargaTDup.NATIONAL_ID.Value = &strNationalId;
+         &rcEtyCargaTDup.COUNTER.Value = &numCount;
+         &rcEtyCargaTDup.Insert();
+         
+         MessageBox(0, "", 0, 0, "Número de Identificación repetido: " | &strNationalId | ", (" | &numCount | ")");
+         
+      End-While;
+      
+      MessageBox(0, "", 0, 0, "Total Registros en el archivo: " | &FileCount);
+      &ArchivoXLS.Close();
+      /* Termina Lectura del Archivo */
+      MessageBox(0, "", 0, 0, "Se ha completado la lectura del archivo SIN ERRORES.");
+      
+   End-If;
+   
+catch Exception &ex
+   
+   ETY_RUN_XLS_AET.ERROR_FLG = "Y";
+   ETY_RUN_XLS_AET.ERROR_CODE = "01";
+   ETY_RUN_XLS_AET.ERROR_DTL = &ex.ToString();
+   
+end-try;
+
+/* Si hay error, no continuar con la creación del XML*/
+If ETY_RUN_XLS_AET.ERROR_FLG = "Y" Then
+   ETY_RUN_XLS_AET.AE_APPLID = "ETY_CARNM_AE";
+   ETY_RUN_XLS_AET.AE_SECTION = "XLSError";
+Else
+   ETY_RUN_XLS_AET.AE_APPLID = "ETY_CARNM_AE";
+   ETY_RUN_XLS_AET.AE_SECTION = "CreaXML";
+End-If;

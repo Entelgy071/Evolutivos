@@ -1,0 +1,48 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_IMS_4191  			    27-12-2019	Soraya Higuera	-Generación, Encriptación y envió informe de estado de cuentas
+*******************************************************************************************************************************************/
+
+/*Inicio #00001*/
+
+import ETY_AP_ENCRYP_ARCHI:ETY_CALL_DENCRYP_PGP;
+
+/*create a query API object*/
+Local ApiObject &aRunQry;
+/*create a session API object*/
+Local ApiObject &MySession;
+Local Record &aQryPromptRec;
+Local string &fecha, &StrFilenameCsvIms;
+Local Record &recContext;
+Local ETY_AP_ENCRYP_ARCHI:ETY_CALL_DENCRYP_PGP &obj_encrypt;
+
+&obj_dencrypt = create ETY_AP_ENCRYP_ARCHI:ETY_CALL_DENCRYP_PGP();
+
+
+/*The current session*/
+
+/*Open query*/
+
+/*Devuelve la ruta donde se desea generar el archivo*/
+rem SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'ESTADOCUENTA'", &outStrFile1);
+
+REM SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'TR_PROCESADOS'", &outStrFile2);
+REM SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'TR_RECHAZADOS'", &outStrFile3);
+SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TRAN_IMS' AND STRING_ID = 'TRN_INF_CNTA'", &StrPathPsArchTrnIms);
+
+
+&recContext = GetRecord(Record.ETY_INFCUEN_AET);
+REM ETY_INFCUEN_AET.FILENAME.Value = "BBVA_0476_0756_6962654.csv";
+
+/*Se encripta el archivo*/
+REM &obj_dencrypt.fi_EncryptarArchivo1(&recContext);
+
+
+
+
+
+&StrFilenamePgpIms = &StrPathPsArchTrnIms | "ESTADOCUENTA_19-01-2020.csv.pgp";
+&StrFilenameCsvIms = &StrPathPsArchTrnIms | "ESTADOCUENTA_19-01-2020.csv";
+
+/*Desencripta el archivo **/
+&obj_dencrypt.fi_DencryptArchivo(&recContext, &StrFilenameCsvIms, &StrFilenamePgpIms);

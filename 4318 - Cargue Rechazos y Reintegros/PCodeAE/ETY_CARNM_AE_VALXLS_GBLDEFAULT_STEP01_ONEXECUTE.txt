@@ -1,0 +1,362 @@
+/*****************************************************************************************
+* Proyecto:		ETY_CNOM_TMP
+* Actividad:  	001
+* Responsable: 	Entelgy – Yolima Navarro
+* Fecha:		2017-09-25
+* Descripción:	Se reutiliza para carga de archivo excel directamente en peoplesoft
+*               Desarrollo Nómina Sin Impuestos
+*****************************************************************************************/
+/* Es paso hace la validación de errores y carga en la tabla final RECORD.ETY_CRGNOM_DTL*/
+
+import PS_PT:Integration:IRequestHandler;
+import FF_FINANZAS_FUNCLIB:BROKER:Xml:*;
+import FF_FINANZAS_FUNCLIB:BROKER:ArchivoLog:*;
+import FF_FINANZAS_FUNCLIB:BROKER:GeneradorAsientos:*;
+import FF_FINANZAS_FUNCLIB:CARGA_MASIVA:CargaArchivos:*;
+import EOEN_MVC:EOEN_MODEL:EOENInterface:*;
+
+Function HomologarPais(&stCodigoPaisXLS As string) Returns string;
+   Local SQL &sqlPais = CreateSQL("SELECT COUNTRY FROM %Table(COUNTRY_TBL) WHERE COUNTRY_2CHAR = :1", &stCodigoPaisXLS);
+   If &sqlPais.Fetch(&stCountry) Then
+      Return &stCountry;
+   End-If;
+   Return "COL";
+End-Function;
+
+Function HomologarDepto(&stCodigoPais As string, &stCodigDptoXLS As string) Returns string
+   Local SQL &sqlDpto = CreateSQL("SELECT STATE FROM %Table(STATE_TBL) WHERE NUMERIC_CD = :1 AND COUNTRY = :2", &stCodigDptoXLS, &stCodigoPais);
+   If &sqlDpto.Fetch(&stState) Then
+      Return &stState;
+   End-If;
+   Return "BOG";
+End-Function;
+
+Function F_IsDigits(&INSTRING) Returns boolean;
+   If None(&INSTRING) Then
+      Return False;
+   End-If;
+   &RetValue = True;
+   &SSTRING = RTrim(&INSTRING);
+   &NLEN = Len(&SSTRING);
+   For &I = 1 To &NLEN
+      If Find(Substring(&SSTRING, &I, 1), "0123456789") = 0 Then
+         &RetValue = False;
+         Break;
+      End-If;
+   End-For;
+   Return &RetValue;
+End-Function;
+
+
+Local ApiObject &oSession;
+
+/* Inicio #001 */
+&LOGFILE = create FF_FINANZAS_FUNCLIB:BROKER:ArchivoLog();
+
+REM *************************************************************************************************************************;
+REM * PeopleCode to Validate Data                                                                                           *;
+REM *************************************************************************************************************************;
+
+/* Si hay error al cargar el File Layout, la estructura del archivo no es correcta, NO SE CONTINUA CON EL PROCESO */
+
+try
+   
+   /*************************************************************************************************************************/
+   SQLExec("SELECT XLATLONGNAME FROM PSXLATITEMLANG WHERE FIELDNAME = 'FF_DBLINK_ORION' AND FIELDVALUE = 'L'", &ActivarLog);
+   ETY_RUN_XLS_AET.LOG_BASIS_FLG.Value = &ActivarLog;
+   If ETY_RUN_XLS_AET.LOG_BASIS_FLG.Value = "Y" Then
+      &LOGFILE.EscribirLog = False;
+   End-If;
+   /*************************************************************************************************************************/
+   
+   Local string &TextoMensaje, &Archivo;
+   Local File &ArchivoXLS;
+   Local string &Dir = GetEnv("PS_FILEDIR");
+   Local string &Sep = GetEnv("PS_FILEDIR");
+   Local number &fcounter;
+   Local boolean &GetAttrslt;
+   Local Record &REC1;
+   Local SQL &SQL1;
+   Local Rowset &RS1, &RS2;
+   Local integer &M;
+   Local object &objCargaArchivos = create FF_FINANZAS_FUNCLIB:CARGA_MASIVA:CargaArchivos();
+   
+   &Archivo = &Dir | "\" | ETY_RUN_XLS_AET.FILENAME.Value;
+   
+   If ETY_RUN_XLS_AET.FI_TIPO_CARGA.Value = "O" Then
+      &GetAttrslt = &objCargaArchivos.ff_GetAttachment("record://PSFILE_ATTDET", ETY_RUN_XLS_AET.ATTACHSYSFILENAME.Value, ETY_RUN_XLS_AET.FILENAME.Value, "PS_FILEDIR");
+   Else
+      &Archivo = &Dir | "\" | ETY_RUN_XLS_AET.ATTACHSYSFILENAME.Value;
+   End-If;
+   
+   If (&GetAttrslt = True And
+         ETY_RUN_XLS_AET.FI_TIPO_CARGA.Value = "O") Or
+         ETY_RUN_XLS_AET.FI_TIPO_CARGA.Value = "S" Then
+      
+      &ArchivoXLS = GetFile(&Archivo, "R", %FilePath_Absolute);
+      &ArchivoXLS.SetFileLayout(FileLayout.ETY_CAR_NOM_FL);
+      &RS1 = &ArchivoXLS.CreateRowset();
+      &RS1 = &ArchivoXLS.ReadRowset();
+      &RS = CreateRowset(Record.ETY_CRGNMTMP);
+      
+      /***************  To Remove the Header Row from the File, FileCount Variable is used to check  for 1st row  **************/
+      Local integer &FileCount = 0;
+      ETY_RUN_XLS_AET.SEQ_NBR_TR.Value = &FileCount;
+      
+      SQLExec("DELETE FROM PS_ETY_CARGA_ERROR WHERE OPRID = :1 AND RUN_CNTL_ID = :2 AND PROCESS_INSTANCE = :3", %OperatorId, ETY_RUN_XLS_AET.RUN_CNTL_ID, ETY_RUN_XLS_AET.PROCESS_INSTANCE);
+      
+      While &RS1 <> Null
+         &errorLog = " ";
+         &errorFlg = "N";
+         
+         If &FileCount >= 0 Then
+            /******Completa Código de Ciudad ****************************************/
+            &stCity = &RS1(1).ETY_CARNOM_WRK.CITY.Value;
+            If Len(&stCity) = 1 Then
+               &RS1(1).ETY_CARNOM_WRK.CITY.Value = &RS1(1).ETY_CARNOM_WRK.STATE.Value | "00" | &stCity;
+            End-If;
+            If Len(&stCity) = 2 Then
+               &RS1(1).ETY_CARNOM_WRK.CITY.Value = &RS1(1).ETY_CARNOM_WRK.STATE.Value | "0" | &stCity;
+            End-If;
+            If Len(&stCity) = 3 Then
+               &RS1(1).ETY_CARNOM_WRK.CITY.Value = &RS1(1).ETY_CARNOM_WRK.STATE.Value | &stCity;
+            End-If;
+            
+            /******Completa Código de Ciudad ****************************************/
+            /****** Homologa País y Departamento ****************************************/
+            &stTempCountry = &RS1(1).ETY_CARNOM_WRK.COUNTRY.Value;
+            &stCountryCd = HomologarPais(&stTempCountry);
+            &stStateCd = HomologarDepto(&stCountryCd, &RS1(1).ETY_CARNOM_WRK.STATE.Value);
+            &RS1(1).ETY_CARNOM_WRK.COUNTRY.Value = &stCountryCd;
+            &RS1(1).ETY_CARNOM_WRK.STATE.Value = &stStateCd;
+            /****** Homologa País y Departamento ****************************************/
+            REM ImportSegment(&RS1, &RS);
+            
+            
+            If ETY_RUN_XLS_AET.BUSINESS_UNIT_AP.Value <> &RS1(1).ETY_CARNOM_WRK.BUSINESS_UNIT.Value Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Unidad de Negocio Diferente, ";
+            End-If;
+            
+            If Not (IsNumber(&RS1(1).ETY_CARNOM_WRK.PAYMENT_AMT.Value)) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Valor pago No numérico, ";
+            End-If;
+            
+            If &RS1(1).ETY_CARNOM_WRK.PAYMENT_AMT.Value <> &RS1(1).ETY_CARNOM_WRK.PAYMENT_AMT.Value Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Valores pago no coinciden, ";
+            End-If;
+            
+            /*
+            If Not (IsNumber(&RS1(1).ETY_CARNOM_WRK.NATIONAL_ID.Value)) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Número de documento no numérico, ";
+            End-If;
+            */
+            
+            If None(&RS1(1).ETY_CARNOM_WRK.NATIONAL_ID.Value) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Falta Número de documento, ";
+            Else
+               If &RS1(1).ETY_CARNOM_WRK.NATIONAL_ID_TYPE.Value = "CE" Or
+                     &RS1(1).ETY_CARNOM_WRK.NATIONAL_ID_TYPE.Value = "NITE" Or
+                     &RS1(1).ETY_CARNOM_WRK.NATIONAL_ID_TYPE.Value = "PP" Or
+                     &RS1(1).ETY_CARNOM_WRK.NATIONAL_ID_TYPE.Value = "PJE" Then
+                  If Not (IsAlphaNumeric(&RS1(1).ETY_CARNOM_WRK.NATIONAL_ID.Value)) Then
+                     &errorFlg = "Y";
+                     &errorLog = &errorLog | " " | "Número de documento no numérico, ";
+                  End-If;
+               Else
+                  If Not (IsNumber(&RS1(1).ETY_CARNOM_WRK.NATIONAL_ID.Value)) Then
+                     &errorFlg = "Y";
+                     &errorLog = &errorLog | " " | "Número de documento no numérico, ";
+                  End-If;
+               End-If;
+            End-If;
+            
+            
+            SQLExec("SELECT LC_TIPO_PERSONA FROM  PS_LC_TPIDTYPE_VW WHERE NATIONAL_ID_TYPE = :1", &RS1(1).ETY_CARNOM_WRK.NATIONAL_ID_TYPE.Value, &srtExisteNationalIdType);
+            
+            If None(&srtExisteNationalIdType) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Tipo de documento no existe, ";
+            End-If;
+            
+            If &srtExisteNationalIdType = "J" Then
+               If None(&RS1(1).ETY_CARNOM_WRK.FIRST_NAME.Value) Then
+                  &errorFlg = "Y";
+                  &errorLog = &errorLog | " " | "Falta nombre tercero, ";
+               End-If;
+            Else
+               If None(&RS1(1).ETY_CARNOM_WRK.FIRST_NAME.Value) Then
+                  &errorFlg = "Y";
+                  &errorLog = &errorLog | " " | "Falta nombre tercero, ";
+               End-If;
+               If None(&RS1(1).ETY_CARNOM_WRK.LAST_NAME.Value) Then
+                  &errorFlg = "Y";
+                  &errorLog = &errorLog | " " | "Falta apellido tercero, ";
+               End-If;
+            End-If;
+            
+            If None(&RS1(1).ETY_CARNOM_WRK.ADDRESS1.Value) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Falta dirección tercero, ";
+            End-If;
+            
+            If None(&RS1(1).ETY_CARNOM_WRK.PHONE.Value) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Falta teléfono tercero, ";
+            End-If;
+            
+            If None(&RS1(1).ETY_CARNOM_WRK.COUNTRY.Value) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Falta país tercero, ";
+            End-If;
+            
+            If None(&RS1(1).ETY_CARNOM_WRK.STATE.Value) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Falta departamento tercero, ";
+            End-If;
+            
+            If None(&RS1(1).ETY_CARNOM_WRK.CITY.Value) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Falta ciudad tercero, ";
+            Else
+               SQLExec("SELECT LC_CIUDAD FROM PS_LC_CIUDAD_TBL WHERE COUNTRY = :1 AND STATE = :2 AND  LC_CIUDAD = :3", &RS1(1).ETY_CARNOM_WRK.COUNTRY.Value, &RS1(1).ETY_CARNOM_WRK.STATE.Value, &RS1(1).ETY_CARNOM_WRK.CITY.Value, &strExisteLcCiudad);
+               If None(&strExisteLcCiudad) Then
+                  &errorFlg = "Y";
+                  &errorLog = &errorLog | " " | "Ciudad tercero No Existe, ";
+               End-If;
+            End-If;
+            
+            If None(&RS1(1).ETY_CARNOM_WRK.PAYMENT_METHOD.Value) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Falta Método Pago, ";
+            Else
+               SQLExec("SELECT A.FIELDVALUE FROM PSXLATITEM A WHERE  A.EFFDT = (SELECT MAX(A_ED.EFFDT) FROM PSXLATITEM A_ED WHERE A.FIELDNAME = A_ED.FIELDNAME AND A.FIELDVALUE = A_ED.FIELDVALUE AND A_ED.EFFDT <= SYSDATE) AND A.EFF_STATUS = 'A' AND FIELDNAME = 'PYMNT_METHOD' AND A.FIELDVALUE = :1", &RS1(1).ETY_CARNOM_WRK.PAYMENT_METHOD.Value, &strExistePaymentMethod);
+               If None(&strExistePaymentMethod) Then
+                  &errorFlg = "Y";
+                  &errorLog = &errorLog | " " | "Método Pago No Existe, ";
+               End-If;
+            End-If;
+            
+            If ETY_RUN_XLS_AET.FF_DET_PAGO = "A" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "B" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "C" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "D" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "J" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "L" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "N" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "P" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "R" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "S" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "U" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "1" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "2" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "3" Or
+                  ETY_RUN_XLS_AET.FF_DET_PAGO = "4" Then
+            Else
+               If None(&RS1(1).ETY_CARNOM_WRK.BANK_CD.Value) Then
+                  &errorFlg = "Y";
+                  &errorLog = &errorLog | " " | "Falta código banco pago, ";
+               Else
+                  SQLExec("SELECT FF_CDBNKSFC FROM PS_FF_CDBNKSFC_TBL WHERE FF_CDBNKSFC = :1", &RS1(1).ETY_CARNOM_WRK.BANK_CD.Value, &strExisteFfCdbnksfc);
+                  If None(&strExisteFfCdbnksfc) Then
+                     &errorLog = &errorLog | " " | "Código banco no existe, ";
+                  End-If;
+               End-If;
+               If None(&RS1(1).ETY_CARNOM_WRK.BANK_ACCT_TYPE.Value) Then
+                  &errorFlg = "Y";
+                  &errorLog = &errorLog | " " | "Falta tipo cuenta pago, ";
+               Else
+                  SQLExec("SELECT A.FIELDVALUE FROM PSXLATITEM A WHERE  A.EFFDT = (SELECT MAX(A_ED.EFFDT) FROM PSXLATITEM A_ED WHERE A.FIELDNAME = A_ED.FIELDNAME AND A.FIELDVALUE = A_ED.FIELDVALUE AND A_ED.EFFDT <= SYSDATE) AND A.EFF_STATUS = 'A' AND FIELDNAME = 'BANK_ACCT_TYPE' AND A.FIELDVALUE = :1", &RS1(1).ETY_CARNOM_WRK.BANK_ACCT_TYPE.Value, &strExisteBankAcctType);
+                  If None(&strExisteBankAcctType) Then
+                     &errorFlg = "Y";
+                     &errorLog = &errorLog | " " | "Tipo cuenta pago No Existe, ";
+                  End-If;
+               End-If;
+               If None(&RS1(1).ETY_CARNOM_WRK.BANK_ACCOUNT_NUM.Value) Then
+                  &errorFlg = "Y";
+                  &errorLog = &errorLog | " " | "Falta número cuenta pago, ";
+               Else
+                  If Not (F_IsDigits(&RS1(1).ETY_CARNOM_WRK.BANK_ACCOUNT_NUM.Value)) Then
+                     &errorFlg = "Y";
+                     &errorLog = &errorLog | " " | "Número cuenta inválido, ";
+                  End-If;
+               End-If;
+            End-If;
+            
+            If None(&RS1(1).ETY_CARNOM_WRK.DESCR100.Value) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Falta descripción pago, ";
+            End-If;
+            
+            If None(&RS1(1).ETY_CARNOM_WRK.DATE.Value) Then
+               &errorFlg = "Y";
+               &errorLog = &errorLog | " " | "Falta fecha pago, ";
+            End-If;
+            
+         End-If;
+         
+         If &errorFlg = "Y" Then
+            
+            ETY_RUN_XLS_AET.ERROR_FLG = "Y";
+            
+            Local Record &rcEtyCargaError;
+            
+            &rcEtyCargaError = CreateRecord(Record.ETY_CARGA_ERROR);
+            
+            &rcEtyCargaError.OPRID.Value = %OperatorId;
+            &rcEtyCargaError.RUN_CNTL_ID.Value = ETY_RUN_XLS_AET.RUN_CNTL_ID;
+            &rcEtyCargaError.PROCESS_INSTANCE.Value = ETY_RUN_XLS_AET.PROCESS_INSTANCE;
+            &rcEtyCargaError.ROW_NBR.Value = &FileCount + 1;
+            &rcEtyCargaError.NATIONAL_ID_TYPE.Value = &RS1(1).ETY_CARNOM_WRK.NATIONAL_ID_TYPE.Value;
+            &rcEtyCargaError.NATIONAL_ID.Value = &RS1(1).ETY_CARNOM_WRK.NATIONAL_ID.Value;
+            &rcEtyCargaError.LAST_NAME.Value = &RS1(1).ETY_CARNOM_WRK.LAST_NAME.Value;
+            &rcEtyCargaError.SECOND_LAST_NAME.Value = &RS1(1).ETY_CARNOM_WRK.SECOND_LAST_NAME.Value;
+            &rcEtyCargaError.FIRST_NAME.Value = &RS1(1).ETY_CARNOM_WRK.FIRST_NAME.Value;
+            &rcEtyCargaError.MIDDLE_NAME.Value = &RS1(1).ETY_CARNOM_WRK.MIDDLE_NAME.Value;
+            &rcEtyCargaError.ADDRESS1.Value = &RS1(1).ETY_CARNOM_WRK.ADDRESS1.Value;
+            &rcEtyCargaError.PHONE.Value = &RS1(1).ETY_CARNOM_WRK.PHONE.Value;
+            &rcEtyCargaError.COUNTRY.Value = &RS1(1).ETY_CARNOM_WRK.COUNTRY.Value;
+            &rcEtyCargaError.STATE.Value = &RS1(1).ETY_CARNOM_WRK.STATE.Value;
+            &rcEtyCargaError.CITY.Value = &RS1(1).ETY_CARNOM_WRK.CITY.Value;
+            &rcEtyCargaError.PAYMENT_METHOD.Value = &RS1(1).ETY_CARNOM_WRK.PAYMENT_METHOD.Value;
+            &rcEtyCargaError.BANK_CD.Value = &RS1(1).ETY_CARNOM_WRK.BANK_CD.Value;
+            &rcEtyCargaError.BANK_ACCT_TYPE.Value = &RS1(1).ETY_CARNOM_WRK.BANK_ACCT_TYPE.Value;
+            &rcEtyCargaError.BANK_ACCOUNT_NUM.Value = &RS1(1).ETY_CARNOM_WRK.BANK_ACCOUNT_NUM.Value;
+            &rcEtyCargaError.PAYMENT_AMT.Value = &RS1(1).ETY_CARNOM_WRK.PAYMENT_AMT.Value;
+            &rcEtyCargaError.DESCR100.Value = &RS1(1).ETY_CARNOM_WRK.DESCR100.Value;
+            &rcEtyCargaError.DATE1.Value = &RS1(1).ETY_CARNOM_WRK.DATE.Value;
+            &rcEtyCargaError.DESCRLONG.Value = &errorLog;
+            &rcEtyCargaError.Insert();
+            SQLExec("COMMIT");
+         End-If;
+         
+         &RS1 = &ArchivoXLS.ReadRowset();
+         &FileCount = &FileCount + 1;
+         ETY_RUN_XLS_AET.SEQ_NBR_TR.Value = &FileCount;
+      End-While;
+      /***************  To Remove the Header Row from the File, FileCount Variable is used to check  for 1st row  **************/
+      
+      &ArchivoXLS.Close();
+      /* Termina Lectura del Archivo */
+      
+   End-If;
+   
+catch Exception &ex
+   
+   ETY_RUN_XLS_AET.ERROR_FLG = "Y";
+   ETY_RUN_XLS_AET.ERROR_CODE = "01";
+   ETY_RUN_XLS_AET.ERROR_DTL = &ex.ToString();
+   
+end-try;
+
+/* Si hay error, no continuar con la creación del XML*/
+If ETY_RUN_XLS_AET.ERROR_FLG = "Y" Then
+   ETY_RUN_XLS_AET.AE_APPLID = "ETY_CARNM_AE";
+   ETY_RUN_XLS_AET.AE_SECTION = "XLSError";
+Else
+   Exit (1);
+End-If;

@@ -1,0 +1,329 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_IMS_4191  			    27-12-2019	Soraya Higuera	-Encriptación y envio informe de estado de cuentas
+*******************************************************************************************************************************************/
+
+import FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS;
+import FI_IAA_CODE_MAPPING:fi_valCodes;
+import FI_IAA_CODE_MAPPING:fi_mappingGroup;
+import EOEN_EVENT_MANAGER:Base:baseEvent;
+import EOEN_EVENT_MANAGER:Base:Types:ExceptionType;
+
+class ETY_CALL_DENCRYP_PGP
+   method FF_CALL_DENCRYP_PGP();
+   method fi_EncryptarArchivo(&ContextRecord As Record);
+   method fi_EncryptarArchivo1(&ContextRecord As Record);
+   method fi_ProcessFinArchivo(&ContextRecord As Record, &StrFilenameCsvNtIms As string);
+   method fi_DencryptArchivo(&ContextRecord As Record, &StrFilenameCsvIms As string, &StrFilenamePgpIms As string);
+   method fi_ProcesoArchivo(&StrPathCopyTrnIms As string);
+   method fi_ProcesoArchivo2(&ContextRecord As Record, &StrPathCopyTrnIms As string);
+   method fi_ProcesoArchivo3(&ContextRecord As Record, &StrPathCopyTrnIms As string);
+   
+private
+   method fi_llamaLineaComandos(&ContextRecord As Record, &str_comando As string);
+   method fi_llamaLineaComandos2(&str_comando As string);
+end-class;
+
+rem Declare Function WildFiles PeopleCode ETY_CARGTR_WRK.BUTTON FieldFormula;
+
+method FF_CALL_DENCRYP_PGP
+end-method;
+
+
+method fi_EncryptarArchivo
+   /+ &ContextRecord as Record +/
+   
+   Local string &StrFilename, &StrPathPgp, &StrKeyIms, &StrTestCryptPS, &StrExtPgp, &StrPathDestinoIms, &StrPassWord, &str_comando;
+   
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'PATHPGP' ", &StrPathPgp);
+   REM SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMS' ", &StrKeyIms);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMSOK' ", &StrKeyIms);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_INF_CNTA' ", &StrPathDestinoIms);
+   
+   &StrFilename = &ContextRecord.FILENAME.Value;
+   &StrTestCryptPS = &StrPathDestinoIms | &StrFilename;
+   &StrExtPgp = ".pgp";
+   
+   &StrPathDestinoIms = &StrPathDestinoIms | &StrFilename | &StrExtPgp;
+   &StrPassWord = "fiduprevisora";
+   
+   &str_comando = """" | &StrPathPgp | """;--encrypt;""" | &StrTestCryptPS | """;--recipient;""" | &StrKeyIms | """;--output;""" | &StrPathDestinoIms | """";
+   /*&str_comando = """" | &StrPathPgp | """;--encrypt;""" | &StrTestCryptPS | """;--recipient;""" | &StrKeyIms | """;--passphrase;""" | &StrPassWord | """;--output;""" | &StrPathDestinoIms | """";*/
+   
+   /*Ejecuta creación nuevo archivo pgp*/
+   %This.fi_llamaLineaComandos(&ContextRecord, &str_comando);
+   
+end-method;
+
+
+method fi_llamaLineaComandos
+   /+ &ContextRecord as Record, +/
+   /+ &str_comando as String +/
+   
+   Local string &str_GroupId;
+   Local FI_IAA_CODE_MAPPING:fi_mappingGroup &obj_mapping;
+   Local number &nbr_conta, &nbr_seqno;
+   Local Record &rcd_id;
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_parametros;
+   Local FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS &obj_Utils = create FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS("Y");
+   Local string &str_errNum, &str_errDescr;
+   Local string &str_MapaId;
+   
+   &obj_mapping = create FI_IAA_CODE_MAPPING:fi_mappingGroup(&obj_Utils.GroupId, False);
+   
+   Local string &str_nombreDestino, &str_nombreCampo, &str_Valor;
+   Local SQL &sql_param = CreateSQL("SELECT MAPPING_FIELD_NAME, FI_NOMBRE_DESTINO,FI_NOMBRE_PARAMETR FROM PS_FI_PARAM_WS WHERE FI_CALLING_WS = 'Y' AND FI_TIPO_PARAMETRO = 'S'");
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_codes;
+   Local FI_IAA_CODE_MAPPING:fi_valCodes &obj_codes;
+   While &sql_param.Fetch(&str_MapaId, &str_nombreDestino, &str_nombreCampo)
+      Evaluate &str_nombreCampo
+      When "COMANDOPGP"
+         /*Extrae el path del pgp*/
+         &str_Valor = &str_comando;
+         Break;
+      End-Evaluate;
+      &obj_codes = create FI_IAA_CODE_MAPPING:fi_valCodes(&str_nombreDestino, &str_Valor);
+      If &arr_parametros = Null Then
+         &arr_parametros = CreateArrayRept(&obj_codes, 1);
+      Else
+         &arr_parametros.Push(&obj_codes);
+      End-If;
+   End-While;
+   
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_respuesta;
+   &arr_respuesta = &obj_Utils.fi_ConsumirWebService(&arr_parametros);
+   If &arr_respuesta = Null Then
+      rem      Error MsgGet(29000, 23, "Mensaje no Encontrado: El servicio web no generó respuesta");
+      &str_errNum = "1";
+      &str_errDescr = "Mensaje no Encontrado: El servicio web no generó respuesta";
+   Else
+      &str_errNum = "0";
+      For &nbr_conta = 1 To &arr_respuesta.Len
+         Evaluate &arr_respuesta [&nbr_conta].NombreCampo
+         When "RETURN"
+            &str_errDescr = &arr_respuesta [&nbr_conta].ValorCampo;
+            Break;
+         End-Evaluate;
+      End-For;
+   End-If;
+   
+   &ContextRecord.ERROR_CODE.Value = &str_errNum;
+   &ContextRecord.ERROR_DTL.Value = &str_errDescr;
+   MessageBox(0, "", 0, 0, " &str_errNum " | &str_errNum | " &str_errDescr " | &str_errDescr);
+   
+   
+end-method;
+
+
+
+method fi_ProcessFinArchivo
+   /+ &ContextRecord as Record, +/
+   /+ &StrFilenameCsvNtIms as String +/
+   
+   Local string &str_comando;
+   
+   &str_comando = "cmd;/c;del;" | &StrFilenameCsvNtIms;
+   %This.fi_llamaLineaComandos(&ContextRecord, &str_comando);
+   
+end-method;
+
+
+method fi_EncryptarArchivo1
+   /+ &ContextRecord as Record +/
+   
+   Local string &StrFilename, &StrPathPgp, &StrKeyIms, &StrTestCryptPS, &StrExtPgp, &StrPathDestinoIms, &StrPassWord, &str_comando;
+   
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'PATHPGP' ", &StrPathPgp);
+   rem SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMS' ", &StrKeyIms);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMSOK' ", &StrKeyIms);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = :1 AND A.STRING_ID = :2 ", "TRAN_IMS", "TRN_SINPROCESAR", &StrPathDestinoIms);
+   
+   &StrFilename = &ContextRecord.FILENAME.Value;
+   &StrTestCryptPS = &StrPathDestinoIms | &StrFilename;
+   &StrExtPgp = ".pgp";
+   
+   &StrPathDestinoIms = &StrPathDestinoIms | &StrFilename | &StrExtPgp;
+   &StrPassWord = "fiduprevisora";
+   
+   &str_comando = """" | &StrPathPgp | """;--encrypt;""" | &StrTestCryptPS | """;--recipient;""" | &StrKeyIms | """;--output;""" | &StrPathDestinoIms | """";
+   /*&str_comando = """" | &StrPathPgp | """;--encrypt;""" | &StrTestCryptPS | """;--recipient;""" | &StrKeyIms | """;--passphrase;""" | &StrPassWord | """;--output;""" | &StrPathDestinoIms | """";*/
+   
+   /*Ejecuta creación nuevo archivo pgp*/
+   %This.fi_llamaLineaComandos(&ContextRecord, &str_comando);
+   
+end-method;
+
+method fi_DencryptArchivo
+   /+ &ContextRecord as Record, +/
+   /+ &StrFilenameCsvIms as String, +/
+   /+ &StrFilenamePgpIms as String +/
+   
+   Local string &str_comando, &StrPathPgp, &StrKeyIms, &StrTestDeCryptPS, &StrTestDeCryptPScsv, &StrPassWord;
+   
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'PATHPGP' ", &StrPathPgp);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMS' ", &StrKeyIms);
+   &StrPassWord = "fiduprevisora";
+   
+   REM desencripcion del archivo /sharepsoft/IMS/Rechazos;
+   &str_comando = """" | &StrPathPgp | """;--decrypt;""" | &StrFilenamePgpIms | """;--output;""" | &StrFilenameCsvIms | """;--passphrase;""" | &StrPassWord;
+   %This.fi_llamaLineaComandos(&ContextRecord, &str_comando);
+   
+end-method;
+
+method fi_ProcesoArchivo
+   /+ &StrPathCopyTrnIms as String +/
+   
+   Local string &dato, &StrExtPgp, &StrPathPgp, &str_errNum, &str_errDescr, &str_comando;
+   Local string &StrPathDestinoIms, &StrKeyIms, &StrPathAProcesar, &StrFilename, &StrFileNameProcesar, &StrTestCryptPS;
+   Local string &StrPathPsSinProcesar, &StrPassWord, &StrTestDeCryptPS, &StrTestDeCryptPScsv, &DtHoy, &StrPathPsValidTrnIms, &StrIdTransferenciaIms;
+   
+   
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'PATHPGP' ", &StrPathPgp);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMS' ", &StrKeyIms);
+   
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRNPSPROCESIMS' ", &StrPathPsSinProcesar);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_SINPROCESAR' ", &StrPathAProcesar);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'PATHPSTRNIMS2' ", &StrPathPsValidTrnIms);
+   
+   rem &ContextRecord.ATTACHURL.Value = &StrPathPsSinProcesar;
+   rem &ContextRecord.STRING_TEXT_VAL.Value = &StrPathPsValidTrnIms;
+   
+   rem &StrPathPsSinProcesar = &StrPathPsSinProcesar | "Rechazos" | "\";
+   &str_comando = "cmd;/c;" | """md " | &StrPathPsValidTrnIms | """";
+   
+   %This.fi_llamaLineaComandos2(&str_comando);
+   
+   REM Inicio Movemos los archivos de ims\Sinprocesar\ hasta la ruta de PS /sharepsoft/IMS/;
+   
+   rem &StrPathCopyTrnIms = &StrPathAProcesar | &StrArchRechazo;
+   &str_comando = "cmd;/c;" | """move " | &StrPathCopyTrnIms | " " | &StrPathPsSinProcesar | """";
+   
+   %This.fi_llamaLineaComandos2(&str_comando);
+   
+   
+   
+   
+end-method;
+
+
+
+
+method fi_llamaLineaComandos2
+   /+ &str_comando as String +/
+   
+   Local string &str_GroupId;
+   Local FI_IAA_CODE_MAPPING:fi_mappingGroup &obj_mapping;
+   Local number &nbr_conta, &nbr_seqno;
+   Local Record &rcd_id;
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_parametros;
+   Local FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS &obj_Utils = create FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS("Y");
+   Local string &str_errNum, &str_errDescr;
+   Local string &str_MapaId;
+   
+   
+   &obj_mapping = create FI_IAA_CODE_MAPPING:fi_mappingGroup(&obj_Utils.GroupId, False);
+   
+   Local string &str_nombreDestino, &str_nombreCampo, &str_Valor;
+   Local SQL &sql_param = CreateSQL("SELECT MAPPING_FIELD_NAME, FI_NOMBRE_DESTINO,FI_NOMBRE_PARAMETR FROM PS_FI_PARAM_WS WHERE FI_CALLING_WS = 'Y' AND FI_TIPO_PARAMETRO = 'S'");
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_codes;
+   Local FI_IAA_CODE_MAPPING:fi_valCodes &obj_codes;
+   While &sql_param.Fetch(&str_MapaId, &str_nombreDestino, &str_nombreCampo)
+      Evaluate &str_nombreCampo
+      When "COMANDOPGP"
+         /*Extrae el path del pgp*/
+         &str_Valor = &str_comando;
+         Break;
+      End-Evaluate;
+      &obj_codes = create FI_IAA_CODE_MAPPING:fi_valCodes(&str_nombreDestino, &str_Valor);
+      If &arr_parametros = Null Then
+         &arr_parametros = CreateArrayRept(&obj_codes, 1);
+      Else
+         &arr_parametros.Push(&obj_codes);
+      End-If;
+   End-While;
+   
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_respuesta;
+   &arr_respuesta = &obj_Utils.fi_ConsumirWebService(&arr_parametros);
+   If &arr_respuesta = Null Then
+      rem      Error MsgGet(29000, 23, "Mensaje no Encontrado: El servicio web no generó respuesta");
+      &str_errNum = "1";
+      &str_errDescr = "Mensaje no Encontrado: El servicio web no generó respuesta";
+   Else
+      &str_errNum = "0";
+      For &nbr_conta = 1 To &arr_respuesta.Len
+         Evaluate &arr_respuesta [&nbr_conta].NombreCampo
+         When "RETURN"
+            &str_errDescr = &arr_respuesta [&nbr_conta].ValorCampo;
+            Break;
+         End-Evaluate;
+      End-For;
+   End-If;
+   
+   
+end-method;
+
+
+
+method fi_ProcesoArchivo2
+   /+ &ContextRecord as Record, +/
+   /+ &StrPathCopyTrnIms as String +/
+   
+   Local string &dato, &StrExtPgp, &StrPathPgp, &str_errNum, &str_errDescr, &str_comando;
+   Local string &StrPathDestinoIms, &StrKeyIms, &StrPathAProcesar, &StrFilename, &StrFileNameProcesar, &StrTestCryptPS;
+   Local string &StrPathPsSinProcesar, &StrPassWord, &StrTestDeCryptPS, &StrTestDeCryptPScsv, &DtHoy, &StrPathPsValidTrnIms, &StrIdTransferenciaIms;
+   
+   
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'PATHPGP' ", &StrPathPgp);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMS' ", &StrKeyIms);
+   
+   rem  SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_PROC_HONFS' ", &StrPathPsSinProcesar);
+   REM SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_SINPROCESAR' ", &StrPathAProcesar);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'PATHPSTRNIMS' ", &StrPathPsValidTrnIms);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_RECHAZADOS' ", &StrPathPsSinProcesar);
+   
+   rem &StrPathCopyTrnIms = "\\172.16.0.146\ims\Rechazos\Sinprocesar\BBVA_0476_0756_6962654.csv.pgp";
+   rem &StrPathPsSinProcesar = "\\172.16.0.146\ims\Rechazos\Rechazados\BBVA_0476_0756_6962654.csv.pgp";
+   
+   
+   rem &ContextRecord.ATTACHURL.Value = &StrPathPsSinProcesar;
+   rem &ContextRecord.STRING_TEXT_VAL.Value = &StrPathPsValidTrnIms;
+   rem &StrPathPsSinProcesar = &StrPathPsSinProcesar | "Rechazos\";
+   /*&str_comando = "cmd;/c;" | """md " | &StrPathPsSinProcesar | """";*/
+   
+   %This.fi_llamaLineaComandos(&ContextRecord, &str_comando);
+   REM Inicio Movemos los archivos de ims\Rechazos\Sinprocesar\ hasta la ruta de PS /sharepsoft/IMS/Rechazos/;
+   rem &StrPathCopyTrnIms = &StrPathAProcesar | &StrArchRechazo;
+   &str_comando = "cmd;/c;" | """move " | &StrPathCopyTrnIms | " " | &StrPathPsSinProcesar | """";
+   %This.fi_llamaLineaComandos(&ContextRecord, &str_comando);
+   
+end-method;
+
+method fi_ProcesoArchivo3
+   /+ &ContextRecord as Record, +/
+   /+ &StrPathCopyTrnIms as String +/
+   
+   Local string &dato, &StrExtPgp, &StrPathPgp, &str_errNum, &str_errDescr, &str_comando;
+   Local string &StrPathDestinoIms, &StrKeyIms, &StrPathAProcesar, &StrFilename, &StrFileNameProcesar, &StrTestCryptPS;
+   Local string &StrPathPsSinProcesar, &StrPassWord, &StrTestDeCryptPS, &StrTestDeCryptPScsv, &DtHoy, &StrPathPsValidTrnIms, &StrIdTransferenciaIms;
+   
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'PATHPGP' ", &StrPathPgp);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMS' ", &StrKeyIms);
+   
+   rem  SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_PROC_HONFS' ", &StrPathPsSinProcesar);
+   REM SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_SINPROCESAR' ", &StrPathAProcesar);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'PATHPSTRNIMS' ", &StrPathPsValidTrnIms);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRN_PROCESADOS' ", &StrPathPsSinProcesar);
+   
+   rem &ContextRecord.ATTACHURL.Value = &StrPathPsSinProcesar;
+   rem &ContextRecord.STRING_TEXT_VAL.Value = &StrPathPsValidTrnIms;
+   rem &StrPathPsSinProcesar = &StrPathPsSinProcesar | "Rechazos\";
+   &str_comando = "cmd;/c;" | """md " | &StrPathPsSinProcesar | """";
+   
+   %This.fi_llamaLineaComandos(&ContextRecord, &str_comando);
+   REM Inicio Movemos los archivos de ims\Rechazos\Sinprocesar\ hasta la ruta de PS /sharepsoft/IMS/Rechazos/;
+   rem &StrPathCopyTrnIms = &StrPathAProcesar | &StrArchRechazo;
+   &str_comando = "cmd;/c;" | """move " | &StrPathCopyTrnIms | " " | &StrPathPsSinProcesar | """";
+   %This.fi_llamaLineaComandos(&ContextRecord, &str_comando);
+   
+end-method;
+
