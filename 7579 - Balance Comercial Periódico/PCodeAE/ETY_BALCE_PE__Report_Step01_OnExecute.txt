@@ -1,0 +1,129 @@
+/*************************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------- 
+ 002       ETY_ERP_GL_EVO_7579     John Diaz          16 Abr 2020        Se agrega al reporte los niveles 6 y 8 del arbol.
+*************************************************************************************************************************************/
+/*INICIO 001*/
+
+import PSXP_RPTDEFNMANAGER:*;
+import PSXP_XMLGEN:*;
+
+Local Rowset &rs1, &rs2, &rs3;
+Local SQL &sql, &sql1, &sqlc;
+Local string &bu;
+Local Record &rec1, &rec2;
+Local number &I, &I1;
+
+
+&rs3 = CreateRowset(Record.ETY_PARAM_ESF);
+
+
+&rs2 = CreateRowset(Record.ETY_BCACT_TMP);
+&rs21 = CreateRowset(Record.ETY_BCDER_TMP);
+&rs23 = CreateRowset(Record.ETY_BCDE2_TMP);
+&rs24 = CreateRowset(Record.ETY_BCDE3_TMP);
+/*Inicio 002*/
+&rs25 = CreateRowset(Record.ETY_BCDE4_TMP);
+&rs26 = CreateRowset(Record.ETY_BCDE5_TMP);
+
+REM &rs1 = CreateRowset(Record.ETY_CABCP_TMP, &rs2, &rs21, &rs23, &rs24, &rs3);
+&rs1 = CreateRowset(Record.ETY_CABCP_TMP, &rs2, &rs21, &rs23, &rs24, &rs25, &rs26, &rs3);
+/*Fin 002*/
+
+rem &rec1 = CreateRecord(Record.ETY_CABCC_TMP);
+rem &sqlc = CreateSQL("SELECT * FROM %TABLE(ETY_CABCC_TMP)");
+
+
+&rs1.Fill();
+For &I = 1 To &rs1.ActiveRowCount
+   &rs2 = &rs1.GetRow(&I).GetRowset(Scroll.ETY_BCACT_TMP);
+   &rs2.Fill("WHERE BUSINESS_UNIT = :1 AND PROCESS_INSTANCE = :2", &rs1.GetRow(&I).ETY_CABCP_TMP.BUSINESS_UNIT.Value, &rs1.GetRow(&I).ETY_CABCP_TMP.PROCESS_INSTANCE.Value);
+   &rs2.Sort(ETY_BCACT_TMP.TREE_NODE_NUM, "A");
+   rem For &J = 1 To &rs2.ActiveRowCount
+      &rs2hijo = &rs2.GetRow(&J).GetRowset(Scroll.ETY_BCAC2_TMP);
+   rem &rs2hijo.FILL("WHERE BUSINESS_UNIT = :1 AND PROCESS_INSTANCE = :2 AND TREE_LEVEL_NUM > 2", &rs2.GetRow(&J).ETY_BCACT_TMP.BUSINESS_UNIT.Value, &rs2.GetRow(&J).ETY_BCACT_TMP.PROCESS_INSTANCE.Value);
+   rem End-For;
+   &rs21 = &rs1.GetRow(&I).GetRowset(Scroll.ETY_BCDER_TMP);
+   &rs21.Fill("WHERE BUSINESS_UNIT = :1 AND PROCESS_INSTANCE =:2", &rs1.GetRow(&I).ETY_CABCP_TMP.BUSINESS_UNIT.Value, &rs1.GetRow(&I).ETY_CABCP_TMP.PROCESS_INSTANCE.Value);
+   &rs21.Sort(ETY_BCDER_TMP.TREE_NODE_NUM, "A");
+   
+   &rs23 = &rs1.GetRow(&I).GetRowset(Scroll.ETY_BCDE2_TMP);
+   &rs23.Fill("WHERE BUSINESS_UNIT = :1 AND PROCESS_INSTANCE =:2", &rs1.GetRow(&I).ETY_CABCP_TMP.BUSINESS_UNIT.Value, &rs1.GetRow(&I).ETY_CABCP_TMP.PROCESS_INSTANCE.Value);
+   &rs23.Sort(ETY_BCDE2_TMP.TREE_NODE_NUM, "A");
+   
+   &rs24 = &rs1.GetRow(&I).GetRowset(Scroll.ETY_BCDE3_TMP);
+   &rs24.Fill("WHERE BUSINESS_UNIT = :1 AND PROCESS_INSTANCE =:2", &rs1.GetRow(&I).ETY_CABCP_TMP.BUSINESS_UNIT.Value, &rs1.GetRow(&I).ETY_CABCP_TMP.PROCESS_INSTANCE.Value);
+   &rs24.Sort(ETY_BCDE3_TMP.TREE_NODE_NUM, "A");
+   
+   /*Inicio 002*/
+   &rs25 = &rs1.GetRow(&I).GetRowset(Scroll.ETY_BCDE4_TMP);
+   &rs25.Fill("WHERE BUSINESS_UNIT = :1 AND PROCESS_INSTANCE =:2", &rs1.GetRow(&I).ETY_CABCP_TMP.BUSINESS_UNIT.Value, &rs1.GetRow(&I).ETY_CABCP_TMP.PROCESS_INSTANCE.Value);
+   &rs25.Sort(ETY_BCDE4_TMP.TREE_NODE_NUM, "A");
+   
+   &rs26 = &rs1.GetRow(&I).GetRowset(Scroll.ETY_BCDE5_TMP);
+   &rs26.Fill("WHERE BUSINESS_UNIT = :1 AND PROCESS_INSTANCE =:2", &rs1.GetRow(&I).ETY_CABCP_TMP.BUSINESS_UNIT.Value, &rs1.GetRow(&I).ETY_CABCP_TMP.PROCESS_INSTANCE.Value);
+   &rs26.Sort(ETY_BCDE5_TMP.TREE_NODE_NUM, "A");
+   /*Fin 002*/
+   
+   &rs3 = &rs1.GetRow(&I).GetRowset(Scroll.ETY_PARAM_ESF);
+   &rs3.Fill("WHERE EXISTS (SELECT * FROM PS_ETY_PARAM_ESF)");
+End-For;
+
+If ETY_BALCOME_AET.SETID.Value = "NIIF1" Then
+   &strReportName = "ETY_BALCOPNF";
+   &strTemplateName = "ETY_BALCOPNF_1";
+Else
+   &strReportName = "ETY_BALCOPER";
+   &strTemplateName = "ETY_BALCOPER_1";
+End-If;
+
+MessageBox(0, "", 0, 0, "&strReportName: " | &strReportName);
+&sLanguageCD = %Language_User;
+&dAsOfDate = %Date;
+/* GetURL(URL.QQ_XMLP_PATH);*/
+&FileXMLPath = "";
+/*Nombre del archivo XML*/
+&FileXMLGen = "ETY_BALANCE_COMERCIAL_PERIODICO_" | ETY_BALCOME_AET.PROCESS_INSTANCE.Value | ".XML";
+/* Setup Defn XML */
+
+
+&OutputPDFFilename = "ETY_BALANCE_COMERCIAL_PERIODICO_" | ETY_BALCOME_AET.PROCESS_INSTANCE.Value;
+
+/*Create XML File */
+&flFileTmp = GetFile(&FileXMLPath | &FileXMLGen, "W", "UTF-8", %FilePath_Absolute);
+If &flFileTmp.IsOpen Then
+   &rds = create psxp_xmlgen:RowSetDS();
+   /*obtengo el XML del Rowset con la información &RS1 */
+   &myXMLFile = &rds.getXMLData(&rs1, "");
+   &myXMLFile = Replace(&myXMLFile, 20, 3, " encoding = 'utf-8'?>");
+   &flFileTmp.WriteLine(&myXMLFile);
+   &flFileTmp.Close();
+End-If;
+
+/*&rds = create PSXP_XMLGEN:RowSetDS();
+&myschema = &rds.Getxsdschema(&rs1);
+&f1 = GetFile("LIBRO_DIARIO" | ".xsd", "w", %FilePath_Relative);
+&f1.writeline(&myschema);
+&f1.close();*/
+
+/* Creo Reporte en funciòn del reporte*/
+&ReportImprimir = create PSXP_RPTDEFNMANAGER:ReportDefn(&strReportName);
+&sOutFormat = &ReportImprimir.GetOutDestFormatString(%OutDestFormat);
+&ReportImprimir.Get();
+&ReportImprimir.ReportFilename = "BALANCE_COMERCIAL_PERIODICO_" | ETY_BALCOME_AET.PROCESS_INSTANCE.Value;
+
+/*Obtengo el origen de los datos del reporte, en este caso el archivo XML*/
+&ReportImprimir.SetRuntimeDataXMLFile(&FileXMLPath | &FileXMLGen);
+
+/*Genero el reporte*/
+&ReportImprimir.ProcessReport(&strTemplateName, &sLanguageCD, &dAsOfDate, &sOutFormat);
+&ReportImprimir.Publish("", "", "", ETY_BALCOME_AET.PROCESS_INSTANCE);
+<*
+/* Borrado del archivo Xml Generado*/
+&FILE = GetFile(&FileXMLPath | &FileXMLGen, "W", "UTF-8", %FilePath_Absolute);
+&FILE.Delete();*>
+/*&FILE = GetFile("LIBRO_DIARIO" | ".xsd", "w", %FilePath_Relative);
+&FILE.Delete();
+&FILE.Close();*/
+/*FIN 001*/
+

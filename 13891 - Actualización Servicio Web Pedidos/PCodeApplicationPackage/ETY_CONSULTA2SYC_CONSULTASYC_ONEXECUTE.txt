@@ -1,0 +1,1017 @@
+/***********************************************************************************************************************************
+ Ref       PROYECTO:                Autor:             Fecha:            Descripción:
+------------------------------------------------------------------------------------------------------------------------------------ 
+ 001       ETY_ERP_PO_EVO_13891     John Diaz         19-May-2020        Se agregan nuevos campos a la consulta WHEN 2.
+***********************************************************************************************************************************/
+import PS_PT:Integration:IRequestHandler;
+
+class ConsultaSYC implements PS_PT:Integration:IRequestHandler
+   method ConsultaSYC();
+   method OnRequest(&_MSG As Message) Returns Message;
+end-class;
+
+/* constructor */
+method ConsultaSYC
+end-method;
+
+method OnRequest
+   /+ &_MSG as Message +/
+   /+ Returns Message +/
+   /+ Extends/implements PS_PT:Integration:IRequestHandler.OnRequest +/
+   /* Variable Declaration */
+   
+   Local Message &request, &response;
+   Local Rowset &rsMesReq, &rsMesRes;
+   Local SQL &sql0, &sql, &sql1, &sql2, &sql3, &sql4, &SqlA, &SqlB, &SqlC;
+   Local string &BusUnit, &ReqId, &ReqName, &ContractNum, &PoID, &Chartf3, &InvItmID, &Chartf3Req, &InvItemIdReq, &IDReceipt, &IDVoucher, &PymntStatus, &DocSeqNbr, &ReqStatus;
+   Local date &ReqDt, &PoDt, &ReceiptDt, &VoucherDt, &BudgetDt, &EnteredDt;
+   Local number &h, &i, &j, &k, &MonAmount, &MonAmountReq, &ActAmount, &QtyReq, &MonAmtReceipt, &MonAmtVoucher, &TotAmtPed, &LineNbr, &SchedNbr, &DistribLineNum;
+   Local number &IdProcedimiento, &PriceReqL, &MerchandiseAmtL, &DistribLineNbr, &QtyPo, &PricePo, &MerchandiseAmt;
+   Local string &VarProced1, &VarProced2, &BudgetLineStatus, &Account, &Altacct, &Deptid, &OperatingUnit, &Product, &FundCode, &ClassFld, &ProgramCode, &ChartField2, &ChartField3, &ProjectId, &PoStatus, &BudgetHdrStatus;
+   Local string &BusUnitAP, &EntryStatus, &NationalId, &VndrLoc, &RecvStatus, &PostStatusAp, &InvItemId, &DocSeqNum, &DocSeqDate, &PymntSelctStatus;
+   Local number &GrossAmt, &GrossAmtBse, &EtyPymntAmtRtft, &EtyPymntAmtRtiv, &EtyPymntAmtRtic, &EtyPymntAmtTasa, &PymntAmt, &TipoContrato, &ModalidadContrato, &VoucherLineNum, &QtyVchr, &PaidAmt, &PymntCnt;
+   Local string &BankSetid, &BankCd, &BankAcctKey, &PymntId, &BusinessUnitAp, &VoucherId;
+   Local string &strExisteBu, &strExisteContrato, &strExisteSolicitud, &strExistePedido, &strExisteRecepcion, &strExisteComprobante, &PartDD, &PartMM, &PartYYYY, &PartSep1, &PartSep2;
+   Local boolean &IsDate;
+   /*Inicio 001*/
+   Local string &NATIONAL_ID, &NATIONAL_ID_TYPE, &NAME1, &LAST_NAME, &SECOND_LAST_NAME, &FIRST_NAME, &MIDDLE_NAME, &ADDRESS1, &PHONE;
+   /*Fin 001*/
+   
+   &request = &_MSG;
+   
+   &rsMesReq = &request.GetRowset();
+   
+   &IdProcedimiento = &rsMesReq(1).ETY_CON2SYC_REQ.ID_PROCEDIMIENTO.Value;
+   &VarProced1 = &rsMesReq(1).ETY_CON2SYC_REQ.VAR_PROCED_1.Value;
+   &VarProced2 = &rsMesReq(1).ETY_CON2SYC_REQ.VAR_PROCED_2.Value;
+   
+   /* Preparando respuesta */
+   &response = CreateMessage(Operation.ETY_CONSULTA2SYC_OS, %IntBroker_Response);
+   &rsMesRes = &response.GetRowset();
+   
+   
+   &rsMesRes(1).ETY_CON2SYC_RES.ID_PROCEDIMIENTO.Value = &IdProcedimiento;
+   &rsMesRes(1).ETY_CON2SYC_RES.VAR_PROCED_1.Value = &VarProced1;
+   &rsMesRes(1).ETY_CON2SYC_RES.VAR_PROCED_2.Value = &VarProced2;
+   &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "0";
+   
+   Evaluate &IdProcedimiento
+   When 0
+      
+      SQLExec("SELECT 'X' FROM PS_BUS_UNIT_TBL_PM WHERE BUSINESS_UNIT = :1", &VarProced1, &strExisteBu);
+      
+      If All(&strExisteBu) Then
+         
+         SQLExec("SELECT 'X' FROM PS_FF_REQ_HDR WHERE BUSINESS_UNIT = :1 AND CONTRACT_NUM = :2", &VarProced1, &VarProced2, &strExisteContrato);
+         If All(&strExisteContrato) Then
+            
+            If All(&VarProced1) And
+                  All(&VarProced2) Then
+               
+               /*DATOS SOLICITUD*/
+               
+               &h = 1;
+               
+               &sql0 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_SOL), &VarProced1, &VarProced2);
+               
+               rem SQLExec(SQL.ETY_CONSSYC_SOL, &VarProced2, &BusUnit, &ReqId, &ReqName, &ContractNum, &ReqDt, &Chartf3Req, &MonAmountReq, &ActAmount);
+               
+               While &sql0.Fetch(&BusUnit, &ReqId, &ReqName, &ContractNum, &ReqDt, &Chartf3Req, &MonAmountReq, &ActAmount, &ReqStatus)
+                  
+                  
+                  
+                  REM &rsMesRes.InsertRow(1);
+                  
+                  &rsMesRes(1).GetRowset(1)(&h).ETY_CONSYCS_RS0.REQ_ID.Value = &ReqId;
+                  &rsMesRes(1).GetRowset(1)(&h).ETY_CONSYCS_RS0.REQ_NAME.Value = &ReqName;
+                  &rsMesRes(1).GetRowset(1)(&h).ETY_CONSYCS_RS0.CONTRACT_NUM.Value = &ContractNum;
+                  &rsMesRes(1).GetRowset(1)(&h).ETY_CONSYCS_RS0.CHARTFIELD3.Value = &Chartf3Req;
+                  &rsMesRes(1).GetRowset(1)(&h).ETY_CONSYCS_RS0.MONETARY_AMOUNT.Value = &MonAmountReq;
+                  &rsMesRes(1).GetRowset(1)(&h).ETY_CONSYCS_RS0.REQ_DT.Value = &ReqDt;
+                  &rsMesRes(1).GetRowset(1)(&h).ETY_CONSYCS_RS0.REQ_STATUS.Value = &ReqStatus;
+                  
+                  
+                  /*ARTICULOS Y CANTIDAD DE LA SOLICITUD*/
+                  
+                  &i = 1;
+                  
+                  &sql = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_SOL0), &BusUnit, &ReqId);
+                  
+                  While &sql.Fetch(&QtyReq, &InvItemIdReq)
+                     
+                     &rsMesRes(1).GetRowset(1)(&h).GetRowset(1)(&i).ETY_CONSYCS_LS0.QTY.Value = &QtyReq;
+                     &rsMesRes(1).GetRowset(1)(&h).GetRowset(1)(&i).ETY_CONSYCS_LS0.INV_ITEM_ID.Value = &InvItemIdReq;
+                     
+                     &rsMesRes(1).GetRowset(1)(&h).GetRowset(1).InsertRow(&i);
+                     
+                     &i = &i + 1;
+                     
+                  End-While;
+                  
+                  /*DATOS PEDIDO*/
+                  &i = 1;
+                  
+                  &sql = CreateSQL(FetchSQL(SQL.ETY_CONSULTASYC2), &BusUnit, &ReqId);
+                  
+                  &TotAmtPed = 0;
+                  
+                  While &sql.Fetch(&PoID, &MonAmount, &Chartf3, &PoDt, &InvItmID, &LineNbr, &SchedNbr, &DistribLineNum)
+                     
+                     &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).ETY_CONSYCP_RS0.PO_ID.Value = &PoID;
+                     &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).ETY_CONSYCP_RS0.MONETARY_AMOUNT.Value = &MonAmount;
+                     &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).ETY_CONSYCP_RS0.CHARTFIELD3.Value = &Chartf3;
+                     &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).ETY_CONSYCP_RS0.PO_DT.Value = &PoDt;
+                     
+                     &TotAmtPed = &TotAmtPed + &MonAmount;
+                     
+                     /*ARTICULOS Y CANTIDAD DEL PEDIDO*/
+                     
+                     &j = 1;
+                     
+                     &sql1 = CreateSQL(FetchSQL(SQL.ETY_CONSULTASYC3), &BusUnit, &PoID, &LineNbr, &SchedNbr, &DistribLineNum);
+                     
+                     While &sql1.Fetch(&QtyReq, &InvItemIdReq)
+                        
+                        &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(1)(&j).ETY_CONSYCP_LS0.QTY.Value = &QtyReq;
+                        &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(1)(&j).ETY_CONSYCP_LS0.INV_ITEM_ID.Value = &InvItemIdReq;
+                        
+                        &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(1).InsertRow(&j);
+                        
+                        &j = &j + 1;
+                        
+                     End-While;
+                     
+                     /*RECEPCIONES*/
+                     
+                     &j = 1;
+                     
+                     &sql1 = CreateSQL(FetchSQL(SQL.ETY_CONSULTASYC4), &BusUnit, &PoID);
+                     
+                     While &sql1.Fetch(&IDReceipt, &ReceiptDt, &MonAmtReceipt)
+                        
+                        &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2)(&j).ETY_CONSYCR_RS0.RECEIVER_ID.Value = &IDReceipt;
+                        &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2)(&j).ETY_CONSYCR_RS0.MONETARY_AMOUNT.Value = &MonAmtReceipt;
+                        &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2)(&j).ETY_CONSYCR_RS0.RECEIPT_DT.Value = &ReceiptDt;
+                        
+                        /*COMPROBANTES*/
+                        
+                        &k = 1;
+                        
+                        &sql2 = CreateSQL(FetchSQL(SQL.ETY_CONSULTASYC5), &BusUnit, &IDReceipt);
+                        
+                        While &sql2.Fetch(&IDVoucher, &MonAmtVoucher, &VoucherDt, &PymntStatus, &DocSeqNbr)
+                           
+                           &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2)(&j).GetRowset(1)(&k).ETY_CONSYCV_RS0.VOUCHER_ID.Value = &IDVoucher;
+                           &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2)(&j).GetRowset(1)(&k).ETY_CONSYCV_RS0.MONETARY_AMOUNT.Value = &MonAmtVoucher;
+                           &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2)(&j).GetRowset(1)(&k).ETY_CONSYCV_RS0.ENTERED_DT.Value = &VoucherDt;
+                           &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2)(&j).GetRowset(1)(&k).ETY_CONSYCV_RS0.DESCR.Value = &PymntStatus;
+                           &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2)(&j).GetRowset(1)(&k).ETY_CONSYCV_RS0.DOC_SEQ_NBR.Value = &DocSeqNbr;
+                           
+                           &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2)(&j).GetRowset(1).InsertRow(&k);
+                           &k = &k + 1;
+                           
+                        End-While;
+                        
+                        &rsMesRes(1).GetRowset(1)(&h).GetRowset(2)(&i).GetRowset(2).InsertRow(&j);
+                        &j = &j + 1;
+                        
+                     End-While;
+                     
+                     &rsMesRes(1).GetRowset(1)(&h).GetRowset(2).InsertRow(&i);
+                     &i = &i + 1;
+                     
+                  End-While;
+                  
+                  &rsMesRes(1).GetRowset(1)(&h).ETY_CONSYCS_RS0.ACTUAL_AMT.Value = &MonAmountReq - &TotAmtPed;
+                  
+                  &rsMesRes(1).GetRowset(1).InsertRow(&h);
+                  &h = &h + 1;
+                  
+               End-While;
+            End-If;
+         Else
+            &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "3";
+         End-If;
+      Else
+         &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "2";
+      End-If;
+      
+   When 1
+      
+      SQLExec("SELECT 'X' FROM PS_BUS_UNIT_TBL_PM WHERE BUSINESS_UNIT = :1", &VarProced1, &strExisteBu);
+      
+      If All(&strExisteBu) Then
+         
+         SQLExec("SELECT 'X' FROM PS_FF_REQ_HDR WHERE BUSINESS_UNIT = :1 AND CONTRACT_NUM = :2", &VarProced1, &VarProced2, &strExisteContrato);
+         
+         If All(&strExisteContrato) Then
+            
+            If All(&VarProced1) And
+                  All(&VarProced2) Then
+               
+               /*DATOS SOLICITUD*/
+               
+               &h = 1;
+               
+               &sql0 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_SOL1), &VarProced1, &VarProced2);
+               
+               rem SQLExec(SQL.ETY_CONSSYC_SOL, &VarProced2, &BusUnit, &ReqId, &ReqName, &ContractNum, &ReqDt, &Chartf3Req, &MonAmountReq, &ActAmount);
+               
+               While &sql0.Fetch(&BusUnit, &ReqId, &ReqName, &TipoContrato, &ModalidadContrato, &ContractNum, &ReqDt, &Chartf3Req, &MonAmountReq, &ActAmount, &ReqStatus)
+                  
+                  REM &rsMesRes.InsertRow(1);
+                  
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.REQ_ID.Value = &ReqId;
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.REQ_NAME.Value = &ReqName;
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.FF_TIPO_CONTRATO.Value = &TipoContrato;
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.FF_MOD_CONTRATO.Value = &ModalidadContrato;
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.CONTRACT_NUM.Value = &ContractNum;
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.CHARTFIELD3.Value = &Chartf3Req;
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.MONETARY_AMOUNT.Value = &MonAmountReq;
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.REQ_DT.Value = &ReqDt;
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.REQ_STATUS.Value = &ReqStatus;
+                  
+                  /*DATOS PEDIDO*/
+                  
+                  &sql = CreateSQL(FetchSQL(SQL.ETY_CONSULTASYC2), &BusUnit, &ReqId);
+                  
+                  &TotAmtPed = 0;
+                  
+                  While &sql.Fetch(&PoID, &MonAmount, &Chartf3, &PoDt, &InvItmID, &LineNbr, &SchedNbr, &DistribLineNum)
+                     &TotAmtPed = &TotAmtPed + &MonAmount;
+                  End-While;
+                  
+                  &rsMesRes(1).GetRowset(2)(&h).ETY_CONSYCS_RS1.ACTUAL_AMT.Value = &MonAmountReq - &TotAmtPed;
+                  
+                  /*ARTICULOS Y CANTIDAD DE LA SOLICITUD*/
+                  
+                  &i = 1;
+                  
+                  &sql1 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_SOL2), &BusUnit, &ReqId);
+                  
+                  While &sql1.Fetch(&LineNbr, &QtyReq, &InvItemIdReq, &PriceReqL, &MerchandiseAmtL)
+                     
+                     &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).ETY_CONSYCS_LS1.LINE_NBR.Value = &LineNbr;
+                     &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).ETY_CONSYCS_LS1.INV_ITEM_ID.Value = &InvItemIdReq;
+                     &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).ETY_CONSYCS_LS1.QTY.Value = &QtyReq;
+                     &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).ETY_CONSYCS_LS1.PRICE_REQ.Value = &PriceReqL;
+                     &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).ETY_CONSYCS_LS1.MERCHANDISE_AMT.Value = &MerchandiseAmtL;
+                     
+                     &j = 1;
+                     
+                     &sql2 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DIS1), &BusUnit, &ReqId, &LineNbr);
+                     
+                     While &sql2.Fetch(&DistribLineNbr, &BudgetDt, &BudgetLineStatus, &Account, &Altacct, &Deptid, &OperatingUnit, &Product, &FundCode, &ClassFld, &ProgramCode, &ChartField2, &ChartField3, &ProjectId)
+                        
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.DISTRIB_LINE_NUM.Value = &DistribLineNbr;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.BUDGET_DT.Value = &BudgetDt;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.BUDGET_LINE_STATUS.Value = &BudgetLineStatus;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.ACCOUNT.Value = &Account;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.ALTACCT.Value = &Altacct;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.DEPTID.Value = &Deptid;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.OPERATING_UNIT.Value = &OperatingUnit;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.PRODUCT.Value = &Product;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.FUND_CODE.Value = &FundCode;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.CLASS_FLD.Value = &ClassFld;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.PROGRAM_CODE.Value = &ProgramCode;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.CHARTFIELD2.Value = &ChartField2;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.CHARTFIELD3.Value = &ChartField3;
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCS_DS1.PROJECT_ID.Value = &ProjectId;
+                        
+                        &rsMesRes(1).GetRowset(2)(&h).GetRowset(1)(&i).GetRowset(1).InsertRow(&j);
+                        
+                        &j = &j + 1;
+                        
+                     End-While;
+                     
+                     &rsMesRes(1).GetRowset(2)(&h).GetRowset(1).InsertRow(&i);
+                     
+                     &i = &i + 1;
+                     
+                  End-While;
+                  
+                  /**/
+                  
+                  &rsMesRes(1).GetRowset(2).InsertRow(&h);
+                  &h = &h + 1;
+                  
+               End-While;
+            End-If;
+            
+         Else
+            &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "3";
+         End-If;
+      Else
+         &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "2";
+      End-If;
+      
+   When 2
+      
+      SQLExec("SELECT 'X' FROM PS_BUS_UNIT_TBL_PM WHERE BUSINESS_UNIT = :1", &VarProced1, &strExisteBu);
+      
+      If All(&strExisteBu) Then
+         
+         SQLExec("SELECT 'X' FROM PS_REQ_HDR WHERE BUSINESS_UNIT = :1 AND REQ_ID = :2", &VarProced1, &VarProced2, &strExisteSolicitud);
+         
+         If All(&strExisteSolicitud) Then
+            
+            If All(&VarProced1) And
+                  All(&VarProced2) Then
+               
+               &h = 1;
+               
+               &sql0 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_PED2), &VarProced1, &VarProced2);
+               
+               While &sql0.Fetch(&PoID, &MonAmount, &Chartf3, &VndrLoc, &PoDt, &PoStatus)
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.PO_ID.Value = &PoID;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.MONETARY_AMOUNT.Value = &MonAmount;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.VNDR_LOC.Value = &VndrLoc;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.CHARTFIELD3.Value = &Chartf3;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.PO_DT.Value = &PoDt;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.PO_STATUS.Value = &PoStatus;
+                  /*Inicio 001*/
+                  SQLExec("SELECT NATIONAL_ID, NATIONAL_ID_TYPE FROM PS_LC_TERCERO_NID WHERE LC_TERCERO_ID = :1", &Chartf3, &NATIONAL_ID, &NATIONAL_ID_TYPE);
+                  SQLExec(SQL.ETY_VENDOR_SQL, &Chartf3, &NAME1, &LAST_NAME, &SECOND_LAST_NAME, &FIRST_NAME, &MIDDLE_NAME, &ADDRESS1, &PHONE);
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.NATIONAL_ID.Value = &NATIONAL_ID;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.NATIONAL_ID_TYPE.Value = &NATIONAL_ID_TYPE;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.LAST_NAME.Value = &LAST_NAME;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.SECOND_LAST_NAME.Value = &SECOND_LAST_NAME;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.NAME1.Value = &NAME1;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.FIRST_NAME.Value = &FIRST_NAME;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.MIDDLE_NAME.Value = &MIDDLE_NAME;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.ADDRESS1.Value = &ADDRESS1;
+                  &rsMesRes(1).GetRowset(3)(&h).ETY_CONSYCP_RS2.PHONE.Value = &PHONE;
+                  /*Fin 001*/
+                  
+                  &i = 1;
+                  
+                  &sql1 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_PEDLN2), &VarProced1, &PoID);
+                  
+                  While &sql1.Fetch(&LineNbr, &InvItmID, &QtyPo, &PricePo, &MerchandiseAmt)
+                     &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS2.LINE_NBR.Value = &LineNbr;
+                     &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS2.INV_ITEM_ID.Value = &InvItmID;
+                     &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS2.QTY_PO.Value = &QtyPo;
+                     &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS2.PRICE_PO.Value = &PricePo;
+                     &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS2.MERCHANDISE_AMT.Value = &MerchandiseAmt;
+                     
+                     &rsMesRes(1).GetRowset(3)(&h).GetRowset(1).InsertRow(&i);
+                     
+                     &j = 1;
+                     
+                     &sql2 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DIS2), &VarProced1, &PoID, &LineNbr);
+                     
+                     While &sql2.Fetch(&DistribLineNbr, &BudgetDt, &BudgetLineStatus, &Account, &Altacct, &Deptid, &OperatingUnit, &Product, &FundCode, &ClassFld, &ProgramCode, &ChartField2, &ChartField3, &ProjectId)
+                        
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.DISTRIB_LINE_NUM.Value = &DistribLineNbr;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.BUDGET_DT.Value = &BudgetDt;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.BUDGET_LINE_STATUS.Value = &BudgetLineStatus;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.ACCOUNT.Value = &Account;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.ALTACCT.Value = &Altacct;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.DEPTID.Value = &Deptid;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.OPERATING_UNIT.Value = &OperatingUnit;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.PRODUCT.Value = &Product;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.FUND_CODE.Value = &FundCode;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.CLASS_FLD.Value = &ClassFld;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.PROGRAM_CODE.Value = &ProgramCode;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.CHARTFIELD2.Value = &ChartField2;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.CHARTFIELD3.Value = &ChartField3;
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCP_DS2.PROJECT_ID.Value = &ProjectId;
+                        
+                        &rsMesRes(1).GetRowset(3)(&h).GetRowset(1)(&i).GetRowset(1).InsertRow(&j);
+                        
+                        &j = &j + 1;
+                        
+                     End-While;
+                     
+                     &i = &i + 1;
+                     
+                  End-While;
+                  
+                  &rsMesRes(1).GetRowset(3).InsertRow(&h);
+                  &h = &h + 1;
+               End-While;
+               
+            End-If;
+            
+         Else
+            &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "4";
+         End-If;
+      Else
+         &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "2";
+      End-If;
+      
+   When 3
+      
+      SQLExec("SELECT 'X' FROM PS_BUS_UNIT_TBL_PM WHERE BUSINESS_UNIT = :1", &VarProced1, &strExisteBu);
+      
+      If All(&strExisteBu) Then
+         
+         SQLExec("SELECT 'X' FROM PS_REQ_HDR WHERE BUSINESS_UNIT = :1 AND REQ_ID = :2", &VarProced1, &VarProced2, &strExisteSolicitud);
+         
+         If All(&strExisteSolicitud) Then
+            
+            If All(&VarProced1) And
+                  All(&VarProced2) Then
+               
+               &h = 1;
+               
+               &sql0 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_PED3), &VarProced1, &VarProced2);
+               
+               While &sql0.Fetch(&PoID, &MonAmount, &VndrLoc, &Chartf3, &PoDt, &PoStatus, &BudgetHdrStatus)
+                  &rsMesRes(1).GetRowset(4)(&h).ETY_CONSYCP_RS3.PO_ID.Value = &PoID;
+                  &rsMesRes(1).GetRowset(4)(&h).ETY_CONSYCP_RS3.MONETARY_AMOUNT.Value = &MonAmount;
+                  &rsMesRes(1).GetRowset(4)(&h).ETY_CONSYCP_RS3.VNDR_LOC.Value = &VndrLoc;
+                  &rsMesRes(1).GetRowset(4)(&h).ETY_CONSYCP_RS3.CHARTFIELD3.Value = &Chartf3;
+                  &rsMesRes(1).GetRowset(4)(&h).ETY_CONSYCP_RS3.PO_DT.Value = &PoDt;
+                  &rsMesRes(1).GetRowset(4)(&h).ETY_CONSYCP_RS3.PO_STATUS.Value = &PoStatus;
+                  &rsMesRes(1).GetRowset(4)(&h).ETY_CONSYCP_RS3.BUDGET_HDR_STATUS.Value = &BudgetHdrStatus;
+                  
+                  &i = 1;
+                  
+                  &sql1 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_PEDLN2), &VarProced1, &PoID);
+                  
+                  While &sql1.Fetch(&LineNbr, &InvItmID, &QtyPo, &PricePo, &MerchandiseAmt)
+                     &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS3.LINE_NBR.Value = &LineNbr;
+                     &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS3.INV_ITEM_ID.Value = &InvItmID;
+                     &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS3.QTY_PO.Value = &QtyPo;
+                     &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS3.PRICE_PO.Value = &PricePo;
+                     &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).ETY_CONSYCP_LS3.MERCHANDISE_AMT.Value = &MerchandiseAmt;
+                     
+                     &rsMesRes(1).GetRowset(4)(&h).GetRowset(1).InsertRow(&i);
+                     
+                     
+                     &k = 1;
+                     
+                     &sql2 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DIS2), &VarProced1, &PoID, &LineNbr);
+                     
+                     While &sql2.Fetch(&DistribLineNbr, &BudgetDt, &BudgetLineStatus, &Account, &Altacct, &Deptid, &OperatingUnit, &Product, &FundCode, &ClassFld, &ProgramCode, &ChartField2, &ChartField3, &ProjectId)
+                        
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.DISTRIB_LINE_NUM.Value = &DistribLineNbr;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.BUDGET_DT.Value = &BudgetDt;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.BUDGET_LINE_STATUS.Value = &BudgetLineStatus;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.ACCOUNT.Value = &Account;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.ALTACCT.Value = &Altacct;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.DEPTID.Value = &Deptid;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.OPERATING_UNIT.Value = &OperatingUnit;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.PRODUCT.Value = &Product;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.FUND_CODE.Value = &FundCode;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.CLASS_FLD.Value = &ClassFld;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.PROGRAM_CODE.Value = &ProgramCode;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.CHARTFIELD2.Value = &ChartField2;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.CHARTFIELD3.Value = &ChartField3;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1)(&k).ETY_CONSYCP_DS3.PROJECT_ID.Value = &ProjectId;
+                        
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(1).InsertRow(&k);
+                        
+                        &k = &k + 1;
+                        
+                     End-While;
+                     
+                     
+                     /*RECEPCIONES*/
+                     
+                     &j = 1;
+                     
+                     &sql3 = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYC_REC3), &VarProced1, &PoID);
+                     
+                     While &sql3.Fetch(&IDReceipt, &RecvStatus, &ReceiptDt, &MonAmtReceipt, &VndrLoc)
+                        
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(2)(&j).ETY_CONSYCR_RS3.RECEIVER_ID.Value = &IDReceipt;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(2)(&j).ETY_CONSYCR_RS3.RECV_STATUS.Value = &RecvStatus;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(2)(&j).ETY_CONSYCR_RS3.MONETARY_AMOUNT.Value = &MonAmtReceipt;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(2)(&j).ETY_CONSYCR_RS3.RECEIPT_DT.Value = &ReceiptDt;
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(2)(&j).ETY_CONSYCR_RS3.VNDR_LOC.Value = &VndrLoc;
+                        
+                        &rsMesRes(1).GetRowset(4)(&h).GetRowset(1)(&i).GetRowset(2).InsertRow(&j);
+                        &j = &j + 1;
+                        
+                     End-While;
+                     
+                     &i = &i + 1;
+                     
+                  End-While;
+                  
+                  &rsMesRes(1).GetRowset(4).InsertRow(&h);
+                  &h = &h + 1;
+               End-While;
+               
+            End-If;
+            
+         Else
+            &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "4";
+         End-If;
+      Else
+         &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "2";
+      End-If;
+      
+   When 4
+      
+      SQLExec("SELECT 'X' FROM PS_BUS_UNIT_TBL_PM WHERE BUSINESS_UNIT = :1", &VarProced1, &strExisteBu);
+      
+      If All(&strExisteBu) Then
+         
+         SQLExec("SELECT 'X' FROM PS_PO_HDR WHERE BUSINESS_UNIT = :1 AND PO_ID = :2", &VarProced1, &VarProced2, &strExistePedido);
+         
+         If All(&strExistePedido) Then
+            
+            If All(&VarProced1) And
+                  All(&VarProced2) Then
+               
+               &h = 1;
+               
+               &sql0 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_PED4), &VarProced1, &VarProced2);
+               
+               While &sql0.Fetch(&PoID, &MonAmount, &VndrLoc, &Chartf3, &PoDt, &PoStatus, &BudgetHdrStatus)
+                  
+                  &rsMesRes(1).GetRowset(5)(&h).ETY_CONSYCP_RS4.PO_ID.Value = &PoID;
+                  &rsMesRes(1).GetRowset(5)(&h).ETY_CONSYCP_RS4.MONETARY_AMOUNT.Value = &MonAmount;
+                  &rsMesRes(1).GetRowset(5)(&h).ETY_CONSYCP_RS4.VNDR_LOC.Value = &VndrLoc;
+                  &rsMesRes(1).GetRowset(5)(&h).ETY_CONSYCP_RS4.CHARTFIELD3.Value = &Chartf3;
+                  &rsMesRes(1).GetRowset(5)(&h).ETY_CONSYCP_RS4.PO_DT.Value = &PoDt;
+                  &rsMesRes(1).GetRowset(5)(&h).ETY_CONSYCP_RS4.PO_STATUS.Value = &PoStatus;
+                  &rsMesRes(1).GetRowset(5)(&h).ETY_CONSYCP_RS4.BUDGET_HDR_STATUS.Value = &BudgetHdrStatus;
+                  
+                  
+                  &k = 1;
+                  
+                  &sql2 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DIS4), &VarProced1, &PoID);
+                  
+                  While &sql2.Fetch(&LineNbr, &DistribLineNbr, &BudgetDt, &BudgetLineStatus, &Account, &Altacct, &Deptid, &OperatingUnit, &Product, &FundCode, &ClassFld, &ProgramCode, &ChartField2, &ChartField3, &ProjectId)
+                     
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.LINE_NBR.Value = &LineNbr;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.DISTRIB_LINE_NUM.Value = &DistribLineNbr;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.BUDGET_DT.Value = &BudgetDt;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.BUDGET_LINE_STATUS.Value = &BudgetLineStatus;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.ACCOUNT.Value = &Account;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.ALTACCT.Value = &Altacct;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.DEPTID.Value = &Deptid;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.OPERATING_UNIT.Value = &OperatingUnit;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.PRODUCT.Value = &Product;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.FUND_CODE.Value = &FundCode;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.CLASS_FLD.Value = &ClassFld;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.PROGRAM_CODE.Value = &ProgramCode;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.CHARTFIELD2.Value = &ChartField2;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.CHARTFIELD3.Value = &ChartField3;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1)(&k).ETY_CONSYCP_DS4.PROJECT_ID.Value = &ProjectId;
+                     
+                     
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(1).InsertRow(&k);
+                     
+                     &k = &k + 1;
+                     
+                  End-While;
+                  
+                  /*RECEPCIONES*/
+                  
+                  &i = 1;
+                  
+                  &sql1 = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCR4), &VarProced1, &PoID);
+                  
+                  While &sql1.Fetch(&IDReceipt, &ReceiptDt, &MonAmtReceipt, &RecvStatus, &VndrLoc)
+                     
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).ETY_CONSYCR_RS4.RECEIVER_ID.Value = &IDReceipt;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).ETY_CONSYCR_RS4.MONETARY_AMOUNT.Value = &MonAmtReceipt;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).ETY_CONSYCR_RS4.RECEIPT_DT.Value = &ReceiptDt;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).ETY_CONSYCR_RS4.RECV_STATUS.Value = &RecvStatus;
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).ETY_CONSYCR_RS4.VNDR_LOC.Value = &VndrLoc;
+                     
+                     &j = 1;
+                     
+                     &sql3 = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCRL4), &VarProced1, &IDReceipt);
+                     
+                     While &sql3.Fetch(&LineNbr, &InvItmID, &QtyPo, &PricePo, &MerchandiseAmt)
+                        &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).GetRowset(1)(&j).ETY_CONSYCR_LS4.RECV_LN_NBR.Value = &LineNbr;
+                        &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).GetRowset(1)(&j).ETY_CONSYCR_LS4.INV_ITEM_ID.Value = &InvItmID;
+                        &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).GetRowset(1)(&j).ETY_CONSYCR_LS4.QTY_SH_RECVD.Value = &QtyPo;
+                        &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).GetRowset(1)(&j).ETY_CONSYCR_LS4.PRICE_PO.Value = &PricePo;
+                        &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).GetRowset(1)(&j).ETY_CONSYCR_LS4.MERCHANDISE_AMT.Value = &MerchandiseAmt;
+                        
+                        
+                        &rsMesRes(1).GetRowset(5)(&h).GetRowset(2)(&i).GetRowset(1).InsertRow(&j);
+                        
+                        &j = &j + 1;
+                        
+                     End-While;
+                     
+                     
+                     &rsMesRes(1).GetRowset(5)(&h).GetRowset(2).InsertRow(&i);
+                     &i = &i + 1;
+                  End-While;
+                  
+                  
+                  &rsMesRes(1).GetRowset(5).InsertRow(&h);
+                  &h = &h + 1;
+               End-While;
+               
+            End-If;
+            
+         Else
+            &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "5";
+         End-If;
+      Else
+         &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "2";
+      End-If;
+      
+   When 5
+      
+      SQLExec("SELECT 'X' FROM PS_BUS_UNIT_TBL_PM WHERE BUSINESS_UNIT = :1", &VarProced1, &strExisteBu);
+      
+      If All(&strExisteBu) Then
+         
+         SQLExec("SELECT 'X' FROM PS_RECV_HDR WHERE BUSINESS_UNIT = :1 AND RECEIVER_ID = :2", &VarProced1, &VarProced2, &strExisteRecepcion);
+         
+         If All(&strExisteRecepcion) Then
+            
+            If All(&VarProced1) And
+                  All(&VarProced2) Then
+               
+               /*RECEPCIONES*/
+               
+               &h = 1;
+               
+               &sql1 = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCR5), &VarProced1, &VarProced2);
+               
+               While &sql1.Fetch(&IDReceipt, &ReceiptDt, &MonAmtReceipt, &ReqStatus, &VndrLoc)
+                  
+                  &rsMesRes(1).GetRowset(6)(&h).ETY_CONSYCR_RS5.RECEIVER_ID.Value = &IDReceipt;
+                  &rsMesRes(1).GetRowset(6)(&h).ETY_CONSYCR_RS5.MONETARY_AMOUNT.Value = &MonAmtReceipt;
+                  &rsMesRes(1).GetRowset(6)(&h).ETY_CONSYCR_RS5.RECEIPT_DT.Value = &ReceiptDt;
+                  &rsMesRes(1).GetRowset(6)(&h).ETY_CONSYCR_RS5.REQ_STATUS.Value = &ReqStatus;
+                  &rsMesRes(1).GetRowset(6)(&h).ETY_CONSYCR_RS5.VNDR_LOC.Value = &VndrLoc;
+                  
+                  
+                  /*COMPROBANTES*/
+                  
+                  &SqlC = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCV5), &VarProced1, &IDReceipt);
+                  
+                  While &SqlC.Fetch(&BusUnitAP, &IDVoucher)
+                     
+                     &i = 1;
+                     
+                     &sql2 = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCC5), &BusUnitAP, &IDVoucher);
+                     
+                     While &sql2.Fetch(&BusUnitAP, &IDVoucher, &VndrLoc, &EnteredDt, &PostStatusAp, &GrossAmt, &EtyPymntAmtRtft, &EtyPymntAmtRtiv, &EtyPymntAmtRtic, &EtyPymntAmtTasa, &PymntAmt)
+                        
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.BUSINESS_UNIT.Value = &BusUnitAP;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.VOUCHER_ID.Value = &IDVoucher;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.VNDR_LOC.Value = &VndrLoc;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.ENTERED_DT.Value = &EnteredDt;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.POST_STATUS_AP.Value = &PostStatusAp;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.GROSS_AMT.Value = &GrossAmt;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.ETY_PYMNT_AMT_RTFT.Value = &EtyPymntAmtRtft;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.ETY_PYMNT_AMT_RTIV.Value = &EtyPymntAmtRtiv;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.ETY_PYMNT_AMT_RTIC.Value = &EtyPymntAmtRtic;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.ETY_PYMNT_AMT_TASA.Value = &EtyPymntAmtTasa;
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS5.PYMNT_AMT.Value = &PymntAmt;
+                        
+                        &j = 1;
+                        
+                        &sql3 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DISV5), &BusUnitAP, &IDVoucher);
+                        
+                        While &sql3.Fetch(&VoucherLineNum, &MerchandiseAmt, &InvItemId, &QtyVchr, &DistribLineNbr, &BudgetDt, &BudgetLineStatus, &Account, &Altacct, &Deptid, &OperatingUnit, &Product, &FundCode, &ClassFld, &ProgramCode, &ChartField2, &ChartField3, &ProjectId)
+                           
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.VOUCHER_LINE_NUM.Value = &VoucherLineNum;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.MERCHANDISE_AMT.Value = &MerchandiseAmt;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.INV_ITEM_ID.Value = &InvItemId;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.QTY_VCHR.Value = &QtyVchr;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.DISTRIB_LINE_NUM.Value = &DistribLineNbr;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.BUDGET_DT.Value = &BudgetDt;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.BUDGET_LINE_STATUS.Value = &BudgetLineStatus;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.ACCOUNT.Value = &Account;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.ALTACCT.Value = &Altacct;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.DEPTID.Value = &Deptid;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.OPERATING_UNIT.Value = &OperatingUnit;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.PRODUCT.Value = &Product;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.FUND_CODE.Value = &FundCode;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.CLASS_FLD.Value = &ClassFld;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.PROGRAM_CODE.Value = &ProgramCode;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.CHARTFIELD2.Value = &ChartField2;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.CHARTFIELD3.Value = &ChartField3;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS5.PROJECT_ID.Value = &ProjectId;
+                           
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(1).InsertRow(&j);
+                           
+                           &j = &j + 1;
+                           
+                        End-While;
+                        
+                        &k = 1;
+                        
+                        &sql4 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DISE5), &BusUnitAP, &IDVoucher);
+                        
+                        While &sql4.Fetch(&PymntCnt, &DocSeqNum, &DocSeqDate, &PymntSelctStatus, &PaidAmt, &NationalId)
+                           
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS5.PYMNT_CNT.Value = &PymntCnt;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS5.DOC_SEQ_NBR.Value = &DocSeqNum;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS5.DOC_SEQ_DATE.Value = &DocSeqDate;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS5.PYMNT_SELCT_STATUS.Value = &PymntSelctStatus;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS5.PAID_AMT.Value = &PaidAmt;
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS5.NATIONAL_ID.Value = &NationalId;
+                           
+                           
+                           &rsMesRes(1).GetRowset(6)(&h).GetRowset(1)(&i).GetRowset(2).InsertRow(&k);
+                           
+                           &k = &k + 1;
+                           
+                        End-While;
+                        
+                        &rsMesRes(1).GetRowset(6)(&h).GetRowset(1).InsertRow(&i);
+                        &i = &i + 1;
+                        
+                     End-While;
+                     
+                  End-While;
+                  
+                  &rsMesRes(1).GetRowset(6).InsertRow(&h);
+                  &h = &h + 1;
+               End-While;
+               
+            End-If;
+            
+         Else
+            &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "6";
+         End-If;
+      Else
+         &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "2";
+      End-If;
+      
+   When 6
+      
+      SQLExec("SELECT 'X' FROM PS_BUS_UNIT_TBL_AP WHERE BUSINESS_UNIT = :1", &VarProced1, &strExisteBu);
+      
+      If All(&strExisteBu) Then
+         
+         SQLExec("SELECT 'X' FROM PS_VOUCHER WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", &VarProced1, &VarProced2, &strExisteComprobante);
+         
+         If All(&strExisteComprobante) Then
+            
+            If All(&VarProced1) And
+                  All(&VarProced2) Then
+               
+               
+               SQLExec("SELECT BUSINESS_UNIT_RECV, RECEIVER_ID FROM PS_VCHR_RECV_MTCH WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", &VarProced1, &VarProced2, &BusUnit, &IDReceipt);
+               
+               
+               /*RECEPCIONES*/
+               
+               &h = 1;
+               
+               &sql1 = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCR5), &BusUnit, &IDReceipt);
+               
+               While &sql1.Fetch(&IDReceipt, &ReceiptDt, &MonAmtReceipt, &ReqStatus, &VndrLoc)
+                  
+                  &rsMesRes(1).GetRowset(7)(&h).ETY_CONSYCR_RS6.RECEIVER_ID.Value = &IDReceipt;
+                  &rsMesRes(1).GetRowset(7)(&h).ETY_CONSYCR_RS6.MONETARY_AMOUNT.Value = &MonAmtReceipt;
+                  &rsMesRes(1).GetRowset(7)(&h).ETY_CONSYCR_RS6.RECEIPT_DT.Value = &ReceiptDt;
+                  &rsMesRes(1).GetRowset(7)(&h).ETY_CONSYCR_RS6.REQ_STATUS.Value = &ReqStatus;
+                  &rsMesRes(1).GetRowset(7)(&h).ETY_CONSYCR_RS6.VNDR_LOC.Value = &VndrLoc;
+                  
+                  
+                  /*COMPROBANTES*/
+                  
+                  &i = 1;
+                  
+                  &sql2 = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCC6), &VarProced1, &VarProced2);
+                  
+                  While &sql2.Fetch(&BusUnitAP, &IDVoucher, &VndrLoc, &EnteredDt, &PostStatusAp, &GrossAmt, &EtyPymntAmtRtft, &EtyPymntAmtRtiv, &EtyPymntAmtRtic, &EtyPymntAmtTasa, &PymntAmt)
+                     
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.BUSINESS_UNIT.Value = &BusUnitAP;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.VOUCHER_ID.Value = &IDVoucher;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.VNDR_LOC.Value = &VndrLoc;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.ENTERED_DT.Value = &EnteredDt;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.POST_STATUS_AP.Value = &PostStatusAp;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.GROSS_AMT.Value = &GrossAmt;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.ETY_PYMNT_AMT_RTFT.Value = &EtyPymntAmtRtft;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.ETY_PYMNT_AMT_RTIV.Value = &EtyPymntAmtRtiv;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.ETY_PYMNT_AMT_RTIC.Value = &EtyPymntAmtRtic;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.ETY_PYMNT_AMT_TASA.Value = &EtyPymntAmtTasa;
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS6.PYMNT_AMT.Value = &PymntAmt;
+                     
+                     &j = 1;
+                     
+                     &sql3 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DISV5), &BusUnitAP, &IDVoucher);
+                     
+                     While &sql3.Fetch(&VoucherLineNum, &MerchandiseAmt, &InvItemId, &QtyVchr, &DistribLineNbr, &BudgetDt, &BudgetLineStatus, &Account, &Altacct, &Deptid, &OperatingUnit, &Product, &FundCode, &ClassFld, &ProgramCode, &ChartField2, &ChartField3, &ProjectId)
+                        
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.VOUCHER_LINE_NUM.Value = &VoucherLineNum;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.MERCHANDISE_AMT.Value = &MerchandiseAmt;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.INV_ITEM_ID.Value = &InvItemId;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.QTY_VCHR.Value = &QtyVchr;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.DISTRIB_LINE_NUM.Value = &DistribLineNbr;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.BUDGET_DT.Value = &BudgetDt;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.BUDGET_LINE_STATUS.Value = &BudgetLineStatus;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.ACCOUNT.Value = &Account;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.ALTACCT.Value = &Altacct;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.DEPTID.Value = &Deptid;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.OPERATING_UNIT.Value = &OperatingUnit;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.PRODUCT.Value = &Product;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.FUND_CODE.Value = &FundCode;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.CLASS_FLD.Value = &ClassFld;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.PROGRAM_CODE.Value = &ProgramCode;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.CHARTFIELD2.Value = &ChartField2;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.CHARTFIELD3.Value = &ChartField3;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS6.PROJECT_ID.Value = &ProjectId;
+                        
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(1).InsertRow(&j);
+                        
+                        &j = &j + 1;
+                        
+                     End-While;
+                     
+                     &k = 1;
+                     
+                     &sql4 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DISE5), &BusUnitAP, &IDVoucher);
+                     
+                     While &sql4.Fetch(&PymntCnt, &DocSeqNum, &DocSeqDate, &PymntSelctStatus, &PaidAmt, &NationalId)
+                        
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS6.PYMNT_CNT.Value = &PymntCnt;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS6.DOC_SEQ_NBR.Value = &DocSeqNum;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS6.DOC_SEQ_DATE.Value = &DocSeqDate;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS6.PYMNT_SELCT_STATUS.Value = &PymntSelctStatus;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS6.PAID_AMT.Value = &PaidAmt;
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS6.NATIONAL_ID.Value = &NationalId;
+                        
+                        
+                        &rsMesRes(1).GetRowset(7)(&h).GetRowset(1)(&i).GetRowset(2).InsertRow(&k);
+                        
+                        &k = &k + 1;
+                        
+                     End-While;
+                     
+                     
+                     &rsMesRes(1).GetRowset(7)(&h).GetRowset(1).InsertRow(&i);
+                     &i = &i + 1;
+                     
+                  End-While;
+                  
+                  &rsMesRes(1).GetRowset(7).InsertRow(&h);
+                  &h = &h + 1;
+               End-While;
+               
+            End-If;
+            
+         Else
+            &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "7";
+         End-If;
+      Else
+         &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "2";
+      End-If;
+      
+   When 7
+      
+      SQLExec("SELECT 'X' FROM PS_BUS_UNIT_TBL_GL WHERE BUSINESS_UNIT = :1", &VarProced1, &strExisteBu);
+      
+      If All(&strExisteBu) Then
+         
+         &IsDate = False;
+         
+         &PartDD = Substring(&VarProced2, 1, 2);
+         &PartSep1 = Substring(&VarProced2, 3, 1);
+         &PartMM = Substring(&VarProced2, 4, 2);
+         &PartSep2 = Substring(&VarProced2, 6, 1);
+         &PartYYYY = Substring(&VarProced2, 7, 4);
+         
+         If IsNumber(&PartDD) And
+               &PartSep1 = "/" And
+               IsNumber(&PartMM) And
+               &PartSep2 = "/" And
+               IsNumber(&PartYYYY) Then
+            REM &IsDate = True;
+            &IsDate = IsDate(&PartYYYY | "-" | &PartMM | "-" | &PartDD);
+         End-If;
+         
+         If &IsDate Then
+            
+            If All(&VarProced1) And
+                  All(&VarProced2) Then
+               
+               
+               &SqlA = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCE7), &VarProced1, &VarProced2);
+               
+               While &SqlA.Fetch(&BankSetid, &BankCd, &BankAcctKey, &PymntId)
+                  
+                  &SqlB = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCX7), &BankSetid, &BankCd, &BankAcctKey, &PymntId);
+                  
+                  While &SqlB.Fetch(&BusinessUnitAp, &VoucherId)
+                     
+                     SQLExec("SELECT BUSINESS_UNIT_RECV, RECEIVER_ID FROM PS_VCHR_RECV_MTCH WHERE BUSINESS_UNIT = :1 AND VOUCHER_ID = :2", &BusinessUnitAp, &VoucherId, &BusUnit, &IDReceipt);
+                     
+                     
+                     /*RECEPCIONES*/
+                     
+                     &h = 1;
+                     
+                     &sql1 = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCR5), &BusUnit, &IDReceipt);
+                     
+                     While &sql1.Fetch(&IDReceipt, &ReceiptDt, &MonAmtReceipt, &ReqStatus, &VndrLoc)
+                        
+                        &rsMesRes(1).GetRowset(8)(&h).ETY_CONSYCR_RS7.RECEIVER_ID.Value = &IDReceipt;
+                        &rsMesRes(1).GetRowset(8)(&h).ETY_CONSYCR_RS7.MONETARY_AMOUNT.Value = &MonAmtReceipt;
+                        &rsMesRes(1).GetRowset(8)(&h).ETY_CONSYCR_RS7.RECEIPT_DT.Value = &ReceiptDt;
+                        &rsMesRes(1).GetRowset(8)(&h).ETY_CONSYCR_RS7.REQ_STATUS.Value = &ReqStatus;
+                        &rsMesRes(1).GetRowset(8)(&h).ETY_CONSYCR_RS7.VNDR_LOC.Value = &VndrLoc;
+                        
+                        &rsMesRes(1).GetRowset(8).InsertRow(&h);
+                        &h = &h + 1;
+                     End-While;
+                     
+                     /*COMPROBANTES*/
+                     
+                     &i = 1;
+                     
+                     &sql2 = CreateSQL(FetchSQL(SQL.ETY_CONSULTA2SYCC6), &BusinessUnitAp, &VoucherId);
+                     
+                     While &sql2.Fetch(&BusUnitAP, &IDVoucher, &VndrLoc, &EnteredDt, &PostStatusAp, &GrossAmt, &EtyPymntAmtRtft, &EtyPymntAmtRtiv, &EtyPymntAmtRtic, &EtyPymntAmtTasa, &PymntAmt)
+                        
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.BUSINESS_UNIT.Value = &BusUnitAP;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.VOUCHER_ID.Value = &IDVoucher;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.VNDR_LOC.Value = &VndrLoc;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.ENTERED_DT.Value = &EnteredDt;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.POST_STATUS_AP.Value = &PostStatusAp;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.GROSS_AMT.Value = &GrossAmt;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.ETY_PYMNT_AMT_RTFT.Value = &EtyPymntAmtRtft;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.ETY_PYMNT_AMT_RTIV.Value = &EtyPymntAmtRtiv;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.ETY_PYMNT_AMT_RTIC.Value = &EtyPymntAmtRtic;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.ETY_PYMNT_AMT_TASA.Value = &EtyPymntAmtTasa;
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).ETY_CONSYCV_RS7.PYMNT_AMT.Value = &PymntAmt;
+                        
+                        &j = 1;
+                        
+                        &sql3 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DISV5), &BusUnitAP, &IDVoucher);
+                        
+                        While &sql3.Fetch(&VoucherLineNum, &MerchandiseAmt, &InvItemId, &QtyVchr, &DistribLineNbr, &BudgetDt, &BudgetLineStatus, &Account, &Altacct, &Deptid, &OperatingUnit, &Product, &FundCode, &ClassFld, &ProgramCode, &ChartField2, &ChartField3, &ProjectId)
+                           
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.VOUCHER_LINE_NUM.Value = &VoucherLineNum;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.MERCHANDISE_AMT.Value = &MerchandiseAmt;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.INV_ITEM_ID.Value = &InvItemId;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.QTY_VCHR.Value = &QtyVchr;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.DISTRIB_LINE_NUM.Value = &DistribLineNbr;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.BUDGET_DT.Value = &BudgetDt;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.BUDGET_LINE_STATUS.Value = &BudgetLineStatus;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.ACCOUNT.Value = &Account;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.ALTACCT.Value = &Altacct;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.DEPTID.Value = &Deptid;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.OPERATING_UNIT.Value = &OperatingUnit;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.PRODUCT.Value = &Product;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.FUND_CODE.Value = &FundCode;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.CLASS_FLD.Value = &ClassFld;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.PROGRAM_CODE.Value = &ProgramCode;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.CHARTFIELD2.Value = &ChartField2;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.CHARTFIELD3.Value = &ChartField3;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1)(&j).ETY_CONSYCV_DS7.PROJECT_ID.Value = &ProjectId;
+                           
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(1).InsertRow(&j);
+                           
+                           &j = &j + 1;
+                           
+                        End-While;
+                        
+                        
+                        &k = 1;
+                        
+                        &sql4 = CreateSQL(FetchSQL(SQL.ETY_CONS2SYC_DISE5), &BusUnitAP, &IDVoucher);
+                        
+                        While &sql4.Fetch(&PymntCnt, &DocSeqNum, &DocSeqDate, &PymntSelctStatus, &PaidAmt, &NationalId)
+                           
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS7.PYMNT_CNT.Value = &PymntCnt;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS7.DOC_SEQ_NBR.Value = &DocSeqNum;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS7.DOC_SEQ_DATE.Value = &DocSeqDate;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS7.PYMNT_SELCT_STATUS.Value = &PymntSelctStatus;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS7.PAID_AMT.Value = &PaidAmt;
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(2)(&k).ETY_CONSYCE_LS7.NATIONAL_ID.Value = &NationalId;
+                           
+                           
+                           &rsMesRes(1).GetRowset(8)(&h).GetRowset(1)(&i).GetRowset(2).InsertRow(&k);
+                           
+                           &k = &k + 1;
+                           
+                        End-While;
+                        
+                        
+                        &rsMesRes(1).GetRowset(8)(&h).GetRowset(1).InsertRow(&i);
+                        &i = &i + 1;
+                        
+                     End-While;
+                     
+                     /**/
+                     
+                  End-While; /*SqlB*/
+                  
+               End-While; /*SqlA*/
+               
+            End-If;
+         Else
+            &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "8";
+         End-If;
+      Else
+         &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "2";
+      End-If;
+      
+   When-Other
+      &rsMesRes(1).ETY_CON2SYC_RES.ERROR_CODE.Value = "1";
+   End-Evaluate;
+   
+   Return &response;
+   
+end-method;
+
