@@ -70,8 +70,9 @@ Local SQL &sqlEXTRCT_TXDTL, &sqlEXTRCT_VAT, &sqlEXT_INST_SEC, &sqlEXT_INST_SUM, 
 Local SQL &sqlEXTRCT_CONTR, &sqlEXTRCT_UTL, &sqlEXT_SHIP_TO, &sqlEXT_EXSDTL, &sqlEXT_CONFIG_DTL;
 Local SQL &sqlEXT_SUM_GPHR, &sqlEXT_SUM_NT, &sqlEXT_SUM_IVC, &sqlEXT_SUM_LNNT;
 /*Inicio 001*/
+Local boolean &Integracion = True;
 Local SQL &sqlPSCODESET, &sqlDOC_DIAN_FE;
-Local string &EObligaciones, &Obsv, &TipDocLeg;
+Local string &EObligaciones, &Obsv, &TipDocLeg, &ERROR_EXCEP, &PROCESS_INST;
 Local array &ResEstado, &DescrEstaDoc;
 Local Record &recDOC_DIAN_FE, &recUpdDOC_DIAN_FE;
 Local integer &Count = 0;
@@ -111,6 +112,8 @@ While &sqlEXTRCT.Fetch(&recEXTRCT)
    
    &FILE.WriteLine("Resolucion=" | &strNroResolucion);
    /*Inicio 001*/
+   BI_XMLP_AET.AE_APPSTATUS = 1;
+   &PROCESS_INST = BI_XMLP_AET.PROCESS_INSTANCE.Value;
    REM &FILE.WriteLine("TotImpReper=" | &recEXTRCT.TOT_VAT.Value);
    REM &FILE.WriteLine("TotImpRete=" | "0.00");
    REM &FILE.WriteLine("ImporteTotalPes=" | &recEXTRCT.INVOICE_AMOUNT.Value);
@@ -227,16 +230,13 @@ While &sqlEXTRCT.Fetch(&recEXTRCT)
    /*Parametros registro fiscal segun Nit emisor*/
    SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = :1 AND STRING_ID = :2", &PROGRAM_ID, &strE_NATIONAL_ID, &strE_RegFiscal);
    
-   Evaluate &strE_RegFiscal
-   When "48"
+   If &recEXTRCT.TOT_VAT.Value = 0 Then
+      &strE_IdTributo = &CodTributos;
+      &strE_NomTributo = &NomTributos;
+   Else
       &strE_IdTributo = "01";
       &strE_NomTributo = "IVA";
-      Break;
-   When "49"
-      &strE_IdTributo = "ZZ";
-      &strE_NomTributo = "No causa";
-      Break;
-   End-Evaluate;
+   End-If;
    
    /*Parametrización obligaciones tributarias del Emisor.*/
    &sqlPSCODESET = CreateSQL("SELECT MATCHNAME FROM PSCODESET WHERE CODESETGROUPNAME = :1 AND CODESETNAME = :2", &CODESETGROUPNAME, &strE_NATIONAL_ID);
@@ -280,9 +280,11 @@ While &sqlEXTRCT.Fetch(&recEXTRCT)
       &str_ETipoEmisor = "2";
    End-If;
    
-   If &strE_LC_TIPO_CONTRIBUY = "02" Then
+   /*Inicio 001*/
+   /*If &strE_LC_TIPO_CONTRIBUY = "02" Then
       &str_ETipoEmisor = "3";
-   End-If;
+   End-If;*/
+   /*Fin 001*/
    
    &FILE.WriteLine("ETipoEmisor=" | &str_ETipoEmisor);
    /*Inicio 001*/
@@ -313,8 +315,8 @@ While &sqlEXTRCT.Fetch(&recEXTRCT)
    &FILE.WriteLine("EDeparFiscal=" | &strE_Departamento);
    &FILE.WriteLine("EDireccionFiscal=" | &strE_ADDRESS1);
    &FILE.WriteLine("ECodPaisFiscal=" | &strE_COUNTRY2);
-   &FILE.WriteLine("EIdTributo=" | &strE_IdTributo);
-   &FILE.WriteLine("ENomTributo=" | &strE_NomTributo);
+   &FILE.WriteLine("EIdTributo=" | "01");
+   &FILE.WriteLine("ENomTributo=" | "IVA");
    &FILE.WriteLine("EEmailDep=" | &strE_EMAILID);
    /*Fin 001*/
    &FILE.WriteLine("ERazonSocial=" | &strE_LC_NOMBRE_TERCERO);
@@ -607,10 +609,9 @@ While &sqlEXTRCT.Fetch(&recEXTRCT)
             
             SQLExec("SELECT E.ETY_CODIMPUESTO FROM PS_VAT_ENT_RGSTRN D, PS_ETY_TAX_HDR_TBL E WHERE D.VAT_ENTITY = :1 AND D.LOCATION_SETID = E.SETID AND E.TAX_CD = :2", &recEXTRCT_VAT.VAT_ENTITY.Value, &recEXTRCT_VAT.TAX_CD_VAT.Value, &str_ETY_CODIMPUESTO);
             
-            REM &FILE.WriteLine("CodImpuesto=" | "01");
             /*Inicio 001*/
+            &FILE.WriteLine("CodImpuesto=" | "01");
             REM &FILE.WriteLine("CodImpuesto=" | &str_ETY_CODIMPUESTO);
-            &FILE.WriteLine("CodImpuesto=" | &strE_IdTributo);
             /*Fin 001*/
             
          End-While;
@@ -1030,7 +1031,44 @@ You can use this code to
             /*Fin 001*/
             
          catch Exception &e
-            REM MessageBox(0, "", 0, 0, "Error: " | &e.ToString());
+            /*Inicio 001*/
+            &ERROR_EXCEP = &e.ToString();
+            If Len(&ERROR_EXCEP) > 253 Then
+               &ERROR_EXCEP = Substring(&ERROR_EXCEP, 1, 253);
+            End-If;
+            
+            /*Se inserta en la tabla de estados de la DIAN*/
+            &recDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
+            &recUpdDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
+            
+            &recDOC_DIAN_FE.BUSINESS_UNIT.Value = &recEXTRCT.BUSINESS_UNIT.Value;
+            &recDOC_DIAN_FE.INVOICE.Value = &recEXTRCT.INVOICE.Value;
+            
+            If &recDOC_DIAN_FE.SelectByKey() Then
+               &recUpdDOC_DIAN_FE.PROCESS_INSTANCE.Value = &PROCESS_INST;
+               &recUpdDOC_DIAN_FE.STATE_NAME.Value = "ERROR";
+               &recUpdDOC_DIAN_FE.ETY_ESTADO_DOC.Value = "ERROR";
+               &recUpdDOC_DIAN_FE.ETY_DESCR_ESTADO.Value = "ERROR";
+               &recUpdDOC_DIAN_FE.DESCR_LONG.Value = &ERROR_EXCEP;
+               &recUpdDOC_DIAN_FE.ACTIONTYPE.Value = &strE_TypeDoc;
+               &recUpdDOC_DIAN_FE.ETY_TIPO_DOC_FE.Value = &TipDocLeg;
+               &recUpdDOC_DIAN_FE.Update(&recDOC_DIAN_FE);
+            Else
+               &recDOC_DIAN_FE.BUSINESS_UNIT.Value = &recEXTRCT.BUSINESS_UNIT.Value;
+               &recDOC_DIAN_FE.INVOICE.Value = &recEXTRCT.INVOICE.Value;
+               &recDOC_DIAN_FE.PROCESS_INSTANCE.Value = &PROCESS_INST;
+               &recDOC_DIAN_FE.STATE_NAME.Value = "ERROR";
+               &recDOC_DIAN_FE.ETY_ESTADO_DOC.Value = "ERROR";
+               &recDOC_DIAN_FE.ETY_DESCR_ESTADO.Value = "ERROR";
+               &recDOC_DIAN_FE.DESCR_LONG.Value = &ERROR_EXCEP;
+               &recDOC_DIAN_FE.ACTIONTYPE.Value = &strE_TypeDoc;
+               &recDOC_DIAN_FE.ETY_TIPO_DOC_FE.Value = &TipDocLeg;
+               &recDOC_DIAN_FE.Insert();
+            End-If;
+            
+            &Integracion = False;
+            MessageBox(0, "", 0, 0, "Error: " | &e.ToString());
+            /*Fin 001*/
          end-try;
          
          /**/
@@ -1046,57 +1084,60 @@ End-While;
 &sqlEXTRCT.Close();
 
 /*Inicio 001*/
-&recDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
-&recUpdDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
-
-&sqlDOC_DIAN_FE = GetSQL("%SelectAll(:1) WHERE PROCESS_INSTANCE = :2 AND ETY_TIPO_DOC_FE = :3", &recDOC_DIAN_FE, BI_XMLP_AET.PROCESS_INSTANCE.Value, &TipDocLeg);
-While &sqlDOC_DIAN_FE.Fetch(&recDOC_DIAN_FE)
-   If &Count = 0 Then
-      GetJavaClass("java.lang.Thread").sleep(150 * 1000);
-   End-If;
+If &Integracion Then
+   BI_XMLP_AET.AE_APPSTATUS = 0;
+   &recDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
+   &recUpdDOC_DIAN_FE = CreateRecord(Record.ETY_DOC_DIAN_FE);
    
-   /*Parametrización tipos de documento para el servicio consulta de estado*/
-   SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TIPO_DOC' AND STRING_ID = 'FACTURA'", &DocType);
-   
-   /*Llama la integración consulta de estado*/
-   &ResEstado = &obj.ConEstadoDocumento(&recDOC_DIAN_FE.BUSINESS_UNIT.Value, &recDOC_DIAN_FE.ACTIONTYPE.Value, &recDOC_DIAN_FE.INVOICE.Value, &DocType);
-   
-   /*Estado documento retornado por la DIAN*/
-   &StrRCode = &ResEstado [2];
-   
-   /*Observaciones del estado del documento retornado por la DIAN*/
-   &Obsv = &ResEstado [3];
-   If Len(&Obsv) > 253 Then
-      &Obsv = Substring(&Obsv, 1, 253);
-   End-If;
-   
-   /*Descripcion del estado del documento*/
-   &DescrEstaDoc = EstadosDocumentos(&StrRCode);
-   &DecrEstado = &DescrEstaDoc [1];
-   &Estado = &DescrEstaDoc [2];
-   
-   &recUpdDOC_DIAN_FE.STATE_NAME.Value = &ResEstado [2];
-   &recUpdDOC_DIAN_FE.ETY_ESTADO_DOC.Value = &Estado;
-   &recUpdDOC_DIAN_FE.ETY_DESCR_ESTADO.Value = &DecrEstado;
-   &recUpdDOC_DIAN_FE.DESCR_LONG.Value = &Obsv;
-   &recUpdDOC_DIAN_FE.DOCUMENT.Value = &DocType;
-   &recUpdDOC_DIAN_FE.ETY_CUFE_FE.Value = &ResEstado [4];
-   &recUpdDOC_DIAN_FE.Update(&recDOC_DIAN_FE);
-   
-   MessageBox(0, "", 0, 0, "-----------SERVICIO CONSULTA ESTADO DOCUMENTO-------------");
-   MessageBox(0, "", 0, 0, "Unidad Negocio: " | &recDOC_DIAN_FE.BUSINESS_UNIT.Value);
-   MessageBox(0, "", 0, 0, "Documento: " | &recDOC_DIAN_FE.INVOICE.Value);
-   MessageBox(0, "", 0, 0, "ResultCode: " | &ResEstado [1]);
-   MessageBox(0, "", 0, 0, "ResultMessage: " | &ResEstado [2]);
-   MessageBox(0, "", 0, 0, "Estado: " | &Estado);
-   MessageBox(0, "", 0, 0, "Descr Estado: " | &DecrEstado);
-   MessageBox(0, "", 0, 0, "Observations: " | &ResEstado [3]);
-   
-   If &Estado <> "ACEPTADA" Then
-      BI_XMLP_AET.AE_APPSTATUS = 1;
-   End-If;
-   
-   &Count = &Count + 1;
-End-While;
-&sqlDOC_DIAN_FE.Close();
+   &sqlDOC_DIAN_FE = GetSQL("%SelectAll(:1) WHERE PROCESS_INSTANCE = :2 AND ETY_TIPO_DOC_FE = :3", &recDOC_DIAN_FE, BI_XMLP_AET.PROCESS_INSTANCE.Value, &TipDocLeg);
+   While &sqlDOC_DIAN_FE.Fetch(&recDOC_DIAN_FE)
+      If &Count = 0 Then
+         GetJavaClass("java.lang.Thread").sleep(150 * 1000);
+      End-If;
+      
+      /*Parametrización tipos de documento para el servicio consulta de estado*/
+      SQLExec("SELECT STRING_TEXT FROM PS_STRINGS_TBL WHERE PROGRAM_ID = 'TIPO_DOC' AND STRING_ID = 'FACTURA'", &DocType);
+      
+      /*Llama la integración consulta de estado*/
+      &ResEstado = &obj.ConEstadoDocumento(&recDOC_DIAN_FE.BUSINESS_UNIT.Value, &recDOC_DIAN_FE.ACTIONTYPE.Value, &recDOC_DIAN_FE.INVOICE.Value, &DocType);
+      
+      /*Estado documento retornado por la DIAN*/
+      &StrRCode = &ResEstado [2];
+      
+      /*Observaciones del estado del documento retornado por la DIAN*/
+      &Obsv = &ResEstado [3];
+      If Len(&Obsv) > 253 Then
+         &Obsv = Substring(&Obsv, 1, 253);
+      End-If;
+      
+      /*Descripcion del estado del documento*/
+      &DescrEstaDoc = EstadosDocumentos(&StrRCode);
+      &DecrEstado = &DescrEstaDoc [1];
+      &Estado = &DescrEstaDoc [2];
+      
+      &recUpdDOC_DIAN_FE.STATE_NAME.Value = &ResEstado [2];
+      &recUpdDOC_DIAN_FE.ETY_ESTADO_DOC.Value = &Estado;
+      &recUpdDOC_DIAN_FE.ETY_DESCR_ESTADO.Value = &DecrEstado;
+      &recUpdDOC_DIAN_FE.DESCR_LONG.Value = &Obsv;
+      &recUpdDOC_DIAN_FE.DOCUMENT.Value = &DocType;
+      &recUpdDOC_DIAN_FE.ETY_CUFE_FE.Value = &ResEstado [4];
+      &recUpdDOC_DIAN_FE.Update(&recDOC_DIAN_FE);
+      
+      MessageBox(0, "", 0, 0, "-----------SERVICIO CONSULTA ESTADO DOCUMENTO-------------");
+      MessageBox(0, "", 0, 0, "Unidad Negocio: " | &recDOC_DIAN_FE.BUSINESS_UNIT.Value);
+      MessageBox(0, "", 0, 0, "Documento: " | &recDOC_DIAN_FE.INVOICE.Value);
+      MessageBox(0, "", 0, 0, "ResultCode: " | &ResEstado [1]);
+      MessageBox(0, "", 0, 0, "ResultMessage: " | &ResEstado [2]);
+      MessageBox(0, "", 0, 0, "Estado: " | &Estado);
+      MessageBox(0, "", 0, 0, "Descr Estado: " | &DecrEstado);
+      MessageBox(0, "", 0, 0, "Observations: " | &ResEstado [3]);
+      
+      If &Estado <> "ACEPTADA" Then
+         BI_XMLP_AET.AE_APPSTATUS = 1;
+      End-If;
+      
+      &Count = &Count + 1;
+   End-While;
+   &sqlDOC_DIAN_FE.Close();
+End-If;
 /*Fin 001*/
