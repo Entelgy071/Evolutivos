@@ -1,0 +1,13 @@
+ETY_CXPXRUB_AET.AE_APPLID.Value = "ETY_CXPXR_AE";
+
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.PAID_PRINCIPAL_AMT >>" | ETY_CXPXR_D_AET.PAID_PRINCIPAL_AMT);
+If ETY_CXPXR_D_AET.PAID_PRINCIPAL_AMT > 0 Then
+   If ETY_CXPXR_D_AET.PYMNT_CNT.Value = 1 Then
+      ETY_CXPXRUB_AET.AE_SECTION.Value = "Dtl_Unic";
+   Else
+      ETY_CXPXRUB_AET.AE_SECTION.Value = "Dtl_Mult";
+   End-If;
+Else
+   MessageBox(0, "", 0, 0, "El voucher " | ETY_CXPXR_H_AET.VOUCHER_ID | " No pasará a los detalles");
+   Exit (1);
+End-If;

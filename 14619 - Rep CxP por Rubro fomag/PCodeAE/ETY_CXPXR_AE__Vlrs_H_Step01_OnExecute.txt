@@ -1,0 +1,9 @@
+MessageBox(0, "", 0, 0, "********************** HEADER - Vlrs_HDR ************************");
+MessageBox(0, "", 0, 0, "ETY_CXPXRUB_AET.BUSINESS_UNIT      ->" | ETY_CXPXRUB_AET.BUSINESS_UNIT);
+MessageBox(0, "", 0, 0, "ETY_CXPXRUB_AET.TREE_NAME          ->" | ETY_CXPXRUB_AET.TREE_NAME);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.VOUCHER_ID         ->" | ETY_CXPXR_H_AET.VOUCHER_ID);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.ACCOUNT            ->" | ETY_CXPXR_H_AET.ACCOUNT);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.MONETARY_AMOUNT_01>->" | ETY_CXPXR_H_AET.MONETARY_AMOUNT_01);
+rem MESSAGEBOX(0,"",0,0,""|);
+MessageBox(0, "", 0, 0, "*****************************************************************");
+ETY_CXPXR_H_AET.DESCR.Value = "";

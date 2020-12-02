@@ -1,0 +1,444 @@
+/********************************************************************************************************
+Proyecto	 		Ref			Fecha	 	Desarrollador	Descripción
+---------------------------------------------------------------------------------------------------------
+<ETY_SPRINT3_96748>	<001>	<27/09/2020>	 <MGG>			<Grisa Claves contables en copia de recepción>
+*********************************************************************************************************/
+Declare Function do_vendor PeopleCode FUNCLIB_AP.VENDOR_ID FieldFormula;
+Declare Function get_vndr_addr PeopleCode FUNCLIB_AP.VENDOR_ID FieldFormula;
+Declare Function Vndr_WthdSW PeopleCode FUNCLIB_APINTFC.VCHR_COPY_HDR FieldFormula;
+Declare Function dsply_asset2 PeopleCode DISTRIB_LINE.ASSET_ID FieldFormula;
+Declare Function DsplyAssetID PeopleCode DISTRIB_LINE.ASSET_ID FieldFormula;
+Declare Function openitem_dsply PeopleCode FUNCLIB_AP.ACCOUNT FieldFormula;
+Declare Function BudgetDt_Display PeopleCode FUNCLIB_APINTFC.VCHR_COPY_HDR FieldFormula;
+Declare Function set_mtch_apprvl PeopleCode FUNCLIB_APINTFC.VCHR_COPY_HDR FieldFormula;
+Declare Function set_goto_recv PeopleCode FUNCLIB_APINTFC.VCHR_COPY_HDR FieldFormula;
+Declare Function display_porecv_opt PeopleCode VCHR_HDR_WRK.CPY_PO_PB FieldChange;
+<* Incio 001 *>
+Declare Function EsParmCadCar PeopleCode FUNCLIB_FS.ALTACCT FieldFormula;
+
+<* Fin 001 *>
+Function stat_dsply_atCopy(&DistMethod, &recDistLn2, &recDistWrk);
+   /********************************************************************/
+   /* Also Called by:   VCHR_PANELS_WRK.VCHR_CORR_CPY_PB - FieldChange */
+   /*                   VCHR_3PRD_WRK.VCHR_TP_CPYV_PB - FieldChange    */
+   /********************************************************************/
+   Local Record &recGLAcctTbl, &recStatTbl;
+   Local any &Date;
+   
+   /* Populate the UOM on the Distrib Line Grid */
+   &recGLAcctTbl = CreateRecord(Record.GL_ACCOUNT_TBL);
+   &recGLAcctTbl.SETID.Value = GetSetId(Field.BUSINESS_UNIT, &recDistLn2.BUSINESS_UNIT_GL.Value, Record.GL_ACCOUNT_TBL, "");
+   &recGLAcctTbl.ACCOUNT.Value = &recDistLn2.ACCOUNT.Value;
+   &Date = %Date;
+   &recGLAcctTbl.SelectByKeyEffDt(&Date);
+   
+   &recStatTbl = CreateRecord(Record.STAT_TBL);
+   &recStatTbl.SETID.Value = GetSetId(Field.BUSINESS_UNIT, &recDistLn2.BUSINESS_UNIT_GL.Value, Record.STAT_TBL, "");
+   &recStatTbl.STATISTICS_CODE.Value = &recDistLn2.STATISTICS_CODE.Value;
+   &recStatTbl.SelectByKeyEffDt(&Date);
+   
+   <* INICIO 001 *>
+   Rem MessageBox(0, "", 0, 0, "BUSINESS_UNIT voucher --------------> " | &recDistLn2.BUSINESS_UNIT.VALUE);
+   Rem MessageBox(0, "", 0, 0, "BUSINESS_UNIT Pedido --------------> " | &recDistLn2.BUSINESS_UNIT_PO.VALUE);
+   
+   &Parametrizado = EsParmCadCar(&recDistLn2.BUSINESS_UNIT.VALUE);
+   
+   If &Parametrizado Then
+      &recDistLn2.BUSINESS_UNIT_GL.Enabled = False;
+      &recDistLn2.ACCOUNT.Enabled = False;
+      &recDistLn2.ALTACCT.Enabled = False;
+      &recDistLn2.OPERATING_UNIT.Enabled = False;
+      &recDistLn2.FUND_CODE.Enabled = False;
+      &recDistLn2.DEPTID.Enabled = False;
+      &recDistLn2.PROGRAM_CODE.Enabled = False;
+      &recDistLn2.CLASS_FLD.Enabled = False;
+      &recDistLn2.BUDGET_REF.Enabled = False;
+      &recDistLn2.PRODUCT.Enabled = False;
+      &recDistLn2.BUSINESS_UNIT_PC.Enabled = False;
+      &recDistLn2.PROJECT_ID.Enabled = False;
+      &recDistLn2.ACTIVITY_ID.Enabled = False;
+      &recDistLn2.RESOURCE_TYPE.Enabled = False;
+      &recDistLn2.RESOURCE_CATEGORY.Enabled = False;
+      &recDistLn2.RESOURCE_SUB_CAT.Enabled = False;
+      &recDistLn2.AFFILIATE.Enabled = False;
+      /* Se deja invisible porque otro proceso posterior lo habilita*/;
+      &recDistLn2.AFFILIATE.VISIBLE = False;
+      &recDistLn2.AFFILIATE_INTRA1.Enabled = False;
+      &recDistLn2.AFFILIATE_INTRA2.Enabled = False;
+      &recDistLn2.CHARTFIELD2.Enabled = False;
+      &recDistLn2.CHARTFIELD1.Enabled = False;
+      &recDistLn2.CHARTFIELD3.Enabled = False;
+      &recDistLn2.OPEN_ITEM_KEY.Enabled = False;
+      &recDistLn2.ENTRY_EVENT.Enabled = False;
+      &recDistLn2.BUDGET_DT.Enabled = False;
+   End-If;
+   <* FIN 001 *>
+   
+   &recDistLn2.STATISTIC_AMOUNT.Enabled = False;
+   &recDistLn2.STATISTICS_CODE.Enabled = False;
+   &recDistWrk.UNIT_OF_MEASURE.Enabled = False;
+   &recDistLn2.MERCHANDISE_AMT.Enabled = True;
+   &recDistLn2.QTY_VCHR.Enabled = True;
+   
+   If &DistMethod = "Q" Then
+      &recDistWrk.UNIT_OF_MEASURE.Value = &recStatTbl.UNIT_OF_MEASURE.Value;
+      &recDistLn2.STATISTICS_CODE.Enabled = True;
+      &recDistLn2.MERCHANDISE_AMT.Enabled = False;
+   End-If;
+   
+   If &recGLAcctTbl.STATISTICS_ACCOUNT.Value = "Y" Then
+      &recDistWrk.UNIT_OF_MEASURE.Value = &recGLAcctTbl.UNIT_OF_MEASURE.Value;
+      &recDistLn2.STATISTICS_CODE.DisplayOnly = True;
+      &recDistLn2.MERCHANDISE_AMT.DisplayOnly = True;
+      &recDistLn2.QTY_VCHR.DisplayOnly = True;
+      &recDistLn2.STATISTIC_AMOUNT.Enabled = True;
+      &recDistWrk.UNIT_OF_MEASURE.Enabled = True;
+   End-If;
+   
+End-Function;
+
+Function get_vchr_info(&SHRID);
+   If None(VOUCHER.VENDOR_ID) Then
+      SQLExec("select vendor_setid, vendor_id, vndr_loc, address_seq_num from ps_voucher where vchr_template_id =  :1 and business_unit = :2", VCHR_PANELS_WRK.VCHR_TEMPLATE_ID, VOUCHER.BUSINESS_UNIT, &VENDOR_SETID, &VENDOR_ID, &vndr_loc, &address_seq_num);
+      VOUCHER.VENDOR_ID = &VENDOR_ID;
+      VOUCHER.VNDR_LOC = &vndr_loc;
+      &PYMNT_ROW = 0;
+      &VOUCHER_ROW = 0;
+      do_vendor(&PYMNT_ROW, &VOUCHER_ROW, &address_seq_num, False);
+      VCHR_PANELS_WRK.VENDOR_NAME_SHORT = VENDOR.VENDOR_NAME_SHORT;
+   End-If;
+   
+   SQLExec("Select gross_amt, pymnt_terms_cd, txn_currency_cd, tax_exempt, usetax_amt, saletx_amt,  freight_amt, misc_amt, SALETX_PRORATE_FLG, USETAX_PRORATE_FLG, DST_CNTRL_ID, VNDR_LOC, ADDRESS_SEQ_NUM from ps_voucher where vchr_template_id =  :1 and vendor_setid = :2 and vendor_id = :3 and business_unit = :4", VCHR_PANELS_WRK.VCHR_TEMPLATE_ID, &SHRID, VOUCHER.VENDOR_ID, VOUCHER.BUSINESS_UNIT, VOUCHER.GROSS_AMT, VOUCHER.PYMNT_TERMS_CD, VOUCHER.TXN_CURRENCY_CD, VOUCHER.TAX_EXEMPT, VOUCHER.USETAX_AMT, VOUCHER.SALETX_AMT, VOUCHER.FREIGHT_AMT, VOUCHER.MISC_AMT, VOUCHER.SALETX_PRORATE_FLG, VOUCHER.USETAX_PRORATE_FLG, VOUCHER.DST_CNTRL_ID, &TMPL_VNDR_LOC, &TMPL_VNDR_ADDR);
+   
+   SQLExec("Select vat_entrd_amt, vat_dclrtn_point, vat_calc_type, physical_nature, vat_treatment_grp, country_loc_buyer, state_loc_buyer, state_loc_buyer, country_loc_seller, state_loc_seller, vat_svc_supply_flg, vat_service_type, country_vat_perfrm, state_vat_perfrm, country_vat_supply, state_vat_supply, country_ship_from, state_ship_from, country_ship_to, state_ship_to, country_vat_rptg, country_vat_billfr, country_vat_billto, state_vat_default, vat_recovery_pct, vat_calc_gross_net, vat_recalc_flg, vat_calc_frght_flg, vat_calc_misc_flg, vat_round_rule, vat_nrcvr_pro_flg, vat_cf_anlsys_type, vat_nrcvr_chrg_cd, vat_rpt_cntry_src, vat_rptg_curr_ctrl, vat_rptg_curr_flg, vat_excptn_type, vat_excptn_certif, vat_advpay_flg, vat_rgstrn_seller, vat_dflt_done_flg from ps_voucher where vchr_template_id =  :1 and vendor_setid = :2 and vendor_id = :3 and business_unit = :4", VCHR_PANELS_WRK.VCHR_TEMPLATE_ID, &SHRID, VOUCHER.VENDOR_ID, VOUCHER.BUSINESS_UNIT, VOUCHER.VAT_ENTRD_AMT, VOUCHER.VAT_DCLRTN_POINT, VOUCHER.VAT_CALC_TYPE, VOUCHER.PHYSICAL_NATURE, VOUCHER.VAT_TREATMENT_GRP, VOUCHER.COUNTRY_LOC_BUYER, VOUCHER.STATE_LOC_BUYER, VOUCHER.STATE_LOC_BUYER, VOUCHER.COUNTRY_LOC_SELLER, VOUCHER.STATE_LOC_SELLER, VOUCHER.VAT_SVC_SUPPLY_FLG, VOUCHER.VAT_SERVICE_TYPE, VOUCHER.COUNTRY_VAT_PERFRM, VOUCHER.STATE_VAT_PERFRM, VOUCHER.COUNTRY_VAT_SUPPLY, VOUCHER.STATE_VAT_SUPPLY, VOUCHER.COUNTRY_SHIP_FROM, VOUCHER.STATE_SHIP_FROM, VOUCHER.COUNTRY_SHIP_TO, VOUCHER.STATE_SHIP_TO, VOUCHER.COUNTRY_VAT_RPTG, VOUCHER.COUNTRY_VAT_BILLFR, VOUCHER.COUNTRY_VAT_BILLTO, VOUCHER.STATE_VAT_DEFAULT, VOUCHER.VAT_RECOVERY_PCT, VOUCHER.VAT_CALC_GROSS_NET, VOUCHER.VAT_RECALC_FLG, VOUCHER.VAT_CALC_FRGHT_FLG, VOUCHER.VAT_CALC_MISC_FLG, VOUCHER.VAT_ROUND_RULE, VOUCHER.VAT_NRCVR_PRO_FLG, VOUCHER.VAT_CF_ANLSYS_TYPE, VOUCHER.VAT_NRCVR_CHRG_CD, VOUCHER.VAT_RPT_CNTRY_SRC, VOUCHER.VAT_RPTG_CURR_CTRL, VOUCHER.VAT_RPTG_CURR_FLG, VOUCHER.VAT_EXCPTN_TYPE, VOUCHER.VAT_EXCPTN_CERTIF, VOUCHER.VAT_ADVPAY_FLG, VOUCHER.VAT_RGSTRN_SELLER, VOUCHER.VAT_DFLT_DONE_FLG);
+   rem--Release 8.8, ICE #506193000, 533705000, 552065000--Copy vendor info to voucher as saved on template voucher;
+   
+   Evaluate VOUCHER.VAT_DCLRTN_POINT.Value
+   When "I"
+   When "D"
+      If All(VOUCHER.INVOICE_DT.Value) Then
+         VOUCHER.VAT_DCLRTN_DT.Value = VOUCHER.INVOICE_DT.Value;
+      Else
+         VOUCHER.VAT_DCLRTN_DT.Value = %Date;
+      End-If;
+   End-Evaluate;
+   
+   Evaluate True
+   When (VOUCHER.VNDR_LOC <> &TMPL_VNDR_LOC)
+      rem--If template vendor loc different from default entered for voucher, then copy template loc and process for change in loc;
+      VOUCHER.VNDR_LOC = &TMPL_VNDR_LOC;
+      &PYMNT_ROW = 0;
+      &VOUCHER_ROW = 0;
+      do_vendor(&PYMNT_ROW, &VOUCHER_ROW, &TMPL_VNDR_ADDR, False);
+      Break;
+   When (VOUCHER.ADDRESS_SEQ_NUM <> &TMPL_VNDR_ADDR)
+      rem--If template vendor addr different from default entered for voucher, then copy template addr and process for change in addr;
+      get_vndr_addr(GetRecord(Record.VOUCHER), GetRecord(Record.VCHR_PANELS_WK3), GetField(VOUCHER.VENDOR_SETID), &TMPL_VNDR_ADDR);
+   End-Evaluate;
+   
+   If VOUCHER.VAT_NRCVR_PRO_FLG = "Y" Then
+      Hide(VOUCHER.VAT_CF_ANLSYS_TYPE);
+   End-If;
+   VCHR_PANELS_WRK.TXN_CURRENCY_CD = VOUCHER.TXN_CURRENCY_CD;
+End-Function;
+
+Function get_vchr_ln_data(&BU, &VOUCHER_ID);
+   
+   &WS1_RS = GetLevel0().GetRow(1).GetRowset(Scroll.VCHR_TMPL_WS1);
+   &WS1_RS.Flush();
+   &LINE_ROWS = &WS1_RS.Select(Record.VOUCHER_LINE, "Where business_unit =  :1 and voucher_id = :2", &BU, &VOUCHER_ID);
+   &DISTRIB_ROWS = &WS1_RS.Select(Scroll.VCHR_TMPL_WS2, Record.DISTRIB_LINE, "Where business_unit =  :1 and voucher_id = :2", &BU, &VOUCHER_ID);
+   &WTHD_ROWS = &WS1_RS.Select(Scroll.VCHR_LN_WTHD_WS, Record.VCHR_LINE_WTHD, "Where business_unit =  :1 and voucher_id = :2", &BU, &VOUCHER_ID);
+   &MISC_ROWS = &WS1_RS.Select(Scroll.VCHR_TMPL_WS3, Record.VCHRLN_MISC_CHG, "Where business_unit =  :1 and voucher_id = :2", &BU, &VOUCHER_ID);
+   &RVMTH_ROWS = &WS1_RS.Select(Scroll.VCHR_TMPL_WS4, Record.VCHR_RECV_MTCH, "Where business_unit =  :1 and voucher_id = :2", &BU, &VOUCHER_ID);
+End-Function;
+
+Function loop_thru_lines() Returns string;
+   
+   Local Row &RowDerived;
+   Local Record &RecDerived;
+   Local number &J;
+   
+   &VOUCHER_RS = GetLevel0();
+   &rVCHR_REC = &VOUCHER_RS.GetRow(1).GetRecord(Record.VOUCHER);
+   &rVchrPnlWrkREC = &VOUCHER_RS.GetRow(1).GetRecord(Record.VCHR_PANELS_WRK);
+   
+   
+   /*--------------------------------------------------------------------------*/
+   /* Loop through WORK Voucher Lines (VCHR_TMPL_WS1) and copy into            */
+   /* VOUCHER_LINE;                                                            */
+   /*--------------------------------------------------------------------------*/
+   &VCHR_CURR_ROW = CurrentRowNumber(&VOUCHER_LEVEL);
+   &TEMPLATE_ROWS = ActiveRowCount(VCHR_TMPL_WS1.MERCHANDISE_AMT);
+   &VCHR_LINE_ROW = ActiveRowCount(VOUCHER_LINE.VOUCHER_ID);
+   &VCHR_TTL_LINES = &VCHR_LINE_ROW;
+   &VCHR_TTL_LINES = &VCHR_TTL_LINES - 1;
+   &NEW_VCHR_LINE = &VCHR_LINE_ROW;
+   &INSERT_FLG = "N";
+   UpdateValue(VOUCHER_LINE.VOUCHER_LINE_NUM, &VCHR_LINE_ROW, &NEW_VCHR_LINE);
+   
+   &WS1_RS = GetLevel0().GetRow(1).GetRowset(Scroll.VCHR_TMPL_WS1);
+   &VLINE_RS = GetLevel0().GetRow(1).GetRowset(Scroll.VOUCHER_LINE);
+   
+   
+   For &BUFFER_ROW = 1 To &TEMPLATE_ROWS
+      If &INSERT_FLG = "Y" Then
+         &NEW_VCHR_LINE = &NEW_VCHR_LINE + 1;
+         &INSERT_ROW = ActiveRowCount(VOUCHER_LINE.VOUCHER_ID);
+         InsertRow(Record.VOUCHER_LINE, &INSERT_ROW);
+      End-If;
+      
+      &COPY_ROW = ActiveRowCount(VOUCHER_LINE.VOUCHER_ID);
+      &WS1_REC = &WS1_RS.GetRow(&BUFFER_ROW).GetRecord(Record.VCHR_TMPL_WS1);
+      &VLINE_REC = &VLINE_RS.GetRow(&COPY_ROW).GetRecord(Record.VOUCHER_LINE);
+      &VLINE_WRK_REC = &VLINE_RS.GetRow(&COPY_ROW).GetRecord(Record.VCHR_PANELS_WRK);
+      &VLINE_WK1_REC = &VLINE_RS.GetRow(&COPY_ROW).GetRecord(Record.VCHR_PANELS_WK1);
+      
+      &WS1_REC.WTHD_SW.Value = Vndr_WthdSW(VOUCHER.VENDOR_SETID.Value, VOUCHER.VENDOR_ID.Value);
+      
+      &WS1_REC.CopyFieldsTo(&VLINE_REC);
+      
+      &VCHR_BAL_CHG_AMT = &VLINE_REC.MERCHANDISE_AMT.Value;
+      &VLINE_REC.VOUCHER_LINE_NUM.Value = &COPY_ROW;
+      &SOURCE = &WS1_REC.VOUCHER_LINE_NUM.Value;
+      &TARGET = &VLINE_REC.VOUCHER_LINE_NUM.Value;
+      /*  JM - VOUCHER BALANCING
+      remark update the voucher balance amt;
+      If &INSERT_FLG = "N" Then
+         VCHR_PANELS_WRK.VCHR_BALANCE_AMT = VCHR_PANELS_WRK.VCHR_BALANCE_AMT - &VCHR_BAL_CHG_AMT;
+      End-If;
+      */
+      
+      &TAX_CD_SUT = &VLINE_REC.TAX_CD_SUT.Value;
+      If All(&TAX_CD_SUT) Then
+         &SHRID = GetSetId("BUSINESS_UNIT", &VLINE_REC.BUSINESS_UNIT.Value, "TAX_AUTHORITY", "");
+         &TAX_CD = &TAX_CD_SUT;
+         If All(VOUCHER.INVOICE_DT) Then
+            &EFFDT = VOUCHER.INVOICE_DT;
+         Else
+            &EFFDT = %Date;
+         End-If;
+         SQLExec("SELECT sum(b.tax_pct) from ps_tax_cd a, ps_tax_authority b where a.setid = b.setid and a.tax_authority_cd = b.tax_authority_cd and a.setid = :1 and a.tax_cd = :2 and b.eff_status = 'A' and b.effdt = (select max(c.effdt) from ps_tax_authority c where c.setid = b.setid and c.tax_authority_cd = a.tax_authority_cd and c.effdt <= %DateIn(:3))", &SHRID, &TAX_CD, &EFFDT, &TAX_PCT);
+         &VPW1_REC = &VLINE_RS.GetRow(&COPY_ROW).GetRecord(Record.VCHR_PANELS_WK1);
+         &VPW1_REC.TAX_PCT.Value = &TAX_PCT;
+      End-If;
+      
+      
+      &INSERT_FLG = "Y";
+      /*--------------------------------------------------------------------------*/
+      /* Loop through WORK DISTRIBUTIONS (VCHR_TMPL_WS2) and copy into            */
+      /* DISTRIB_LINE;                                                            */
+      /*--------------------------------------------------------------------------*/
+      &WS2_RS = &WS1_RS.GetRow(&BUFFER_ROW).GetRowset(Scroll.VCHR_TMPL_WS2);
+      &TEMPLATE_ROWS2 = &WS2_RS.ActiveRowCount;
+      
+      remark now loop through distributions;
+      &LN_BALANCE_AMT = &VCHR_BAL_CHG_AMT;
+      &NEW_DIST_LINE = 0;
+      &INSERT_FLG2 = "N";
+      
+      For &BUFFER_ROW2 = 1 To &TEMPLATE_ROWS2;
+         &WS2_REC = &WS2_RS.GetRow(&BUFFER_ROW2).GetRecord(Record.VCHR_TMPL_WS2);
+         &DIST_VCHR_LINE = &WS2_REC.VOUCHER_LINE_NUM.Value;
+         
+         If &DIST_VCHR_LINE = &SOURCE Then
+            &DISTR_RS = &VLINE_RS.GetRow(&COPY_ROW).GetRowset(Scroll.DISTRIB_LINE);
+            &NEW_DIST_LINE = &NEW_DIST_LINE + 1;
+            &INSERT_ROW2 = &DISTR_RS.ActiveRowCount;
+            
+            If &INSERT_FLG2 = "Y" Then
+               &DISTR_RS.InsertRow(&INSERT_ROW2);
+            End-If;
+            
+            &COPY_ROW2 = &DISTR_RS.ActiveRowCount;
+            &DISTR_REC = &DISTR_RS.GetRow(&COPY_ROW2).GetRecord(Record.DISTRIB_LINE);
+            &DISTR_WRK_REC = &DISTR_RS.GetRow(&COPY_ROW2).GetRecord(Record.VCHR_PANELS_WRK);
+            &DISTR_WK1_REC = &DISTR_RS.GetRow(&COPY_ROW2).GetRecord(Record.VCHR_PANELS_WK1);
+            
+            &WS2_REC.CopyFieldsTo(&DISTR_REC);
+            
+            &INSERT_FLG2 = "Y";
+            
+            remark update voucher line number;
+            &DISTR_REC.VOUCHER_LINE_NUM.Value = &TARGET;
+            
+            remark update distribution line number;
+            &DISTR_REC.DISTRIB_LINE_NUM.Value = &NEW_DIST_LINE;
+            
+            remark update line balance amount;
+            &DST_MERCH_AMT = &DISTR_REC.MERCHANDISE_AMT.Value;
+            &LN_BALANCE_AMT = &LN_BALANCE_AMT - &DST_MERCH_AMT;
+            &ACCOUNT = &DISTR_REC.ACCOUNT.Value;
+            
+            If INSTALLATION.PC = "Y" Then
+               &RowDerived = &DISTR_RS.GetRow(&COPY_ROW2);
+               
+               For &J = 1 To &RowDerived.RecordCount
+                  &RecDerived = &RowDerived.GetRecord(&J);
+                  
+                  If &RecDerived.Name = "DERIVED" Then
+                     
+                     If &RecDerived.GetField(Field.EDIT_RES_CAT).IsInBuf Then
+                        &CRRNTREC = &DISTR_REC;
+                        &BUSINESS_UNIT_PC = &CRRNTREC.BUSINESS_UNIT_PC.Value;
+                        
+                        SQLExec("SELECT CATEGORY_EDIT, SUBCATEGORY_EDIT FROM PS_BUS_UNIT_TBL_PC WHERE BUSINESS_UNIT = :1", &BUSINESS_UNIT_PC, &CAT_EDIT_TMP, &SUBCAT_EDIT_TMP);
+                        
+                        &RecDerived.GetField(Field.EDIT_RES_CAT).Value = &CAT_EDIT_TMP;
+                        &RecDerived.GetField(Field.EDIT_RES_SUB).Value = &SUBCAT_EDIT_TMP;
+                     End-If;
+                     Break;
+                  End-If;
+               End-For;
+            End-If;
+            
+            stat_dsply_atCopy(&VLINE_REC.DISTRIB_MTHD_FLG.Value, &DISTR_REC, &DISTR_WRK_REC);
+            
+            DsplyAssetID(&DISTR_REC.ASSET_ID.Value, &DISTR_WK1_REC.ASSET_ID.Value, &DISTR_WK1_REC.SEQNBR.Value);
+            dsply_asset2(&DISTR_REC, &DISTR_WK1_REC, "N");
+            
+            openitem_dsply(&DISTR_REC);
+            BudgetDt_Display(&rVCHR_REC, &DISTR_REC, &rVchrPnlWrkREC, INSTALLATION.COMMITMENT_CNTL_AP)
+         End-If;
+      End-For;
+      
+      remark update voucher line with distribution totals;
+      &VLINE_REC.MAX_DISTRIB_LINE.Value = &NEW_DIST_LINE;
+      &VLINE_REC.TOTAL_DISTRIBS.Value = &NEW_DIST_LINE;
+      
+      remark update work record with line balance amt;
+      &VLINE_WRK_REC.LN_BALANCE_AMT.Value = &LN_BALANCE_AMT;
+      
+      remark update voucher panels work with merchandise amt of this line;
+      &MERCH_AMT = &VLINE_REC.MERCHANDISE_AMT.Value;
+      
+      &VCHR_TTL_LINES = &VCHR_TTL_LINES + 1;
+      
+      REMARK -- SET DEFAULT FOR VAT DISPLAY  VCHR_PANELS_WK1.VAT_APPL_CHG_FLG = "Y";
+      
+      /*--------------------------------------------------------------------------*/
+      /* Loop through Work MISC CHARGES (VCHR_TMPL_WS3) and copy into             */
+      /* VCHRLN_MISC_CHG                                                          */
+      /*--------------------------------------------------------------------------*/
+      &WS3_RS = &WS1_RS.GetRow(&BUFFER_ROW).GetRowset(Scroll.VCHR_TMPL_WS3);
+      &TEMPLATE_ROWS3 = &WS3_RS.ActiveRowCount;
+      &MISC_RS = &VLINE_RS.GetRow(&COPY_ROW).GetRowset(Scroll.VCHRLN_MISC_CHG);
+      
+      remark now loop through misc rows;
+      &NEW_MISC_LINE = 0;
+      &INSERT_FLG3 = "N";
+      
+      For &BUFFER_ROW3 = 1 To &TEMPLATE_ROWS3;
+         &WS3_REC = &WS3_RS.GetRow(&BUFFER_ROW3).GetRecord(Record.VCHR_TMPL_WS3);
+         &WS3_LINE = &WS3_REC.GetField(Field.VOUCHER_LINE_NUM).Value;
+         If &WS3_LINE = &SOURCE Then
+            &NEW_MISC_LINE = &NEW_MISC_LINE + 1;
+            &INSERT_ROW3 = &MISC_RS.ActiveRowCount;
+            If &INSERT_FLG3 = "Y" Then
+               &MISC_RS.InsertRow(&INSERT_ROW3);
+            End-If;
+            &COPY_ROW3 = &MISC_RS.ActiveRowCount;
+            &MISC_REC = &MISC_RS.GetRow(&COPY_ROW3).GetRecord(Record.VCHRLN_MISC_CHG);
+            &WS3_REC.CopyFieldsTo(&MISC_REC);
+            &INSERT_FLG3 = "Y";
+            remark update voucher line number;
+            &MISC_REC.VOUCHER_LINE_NUM.Value = &TARGET;
+         End-If;
+      End-For;
+      
+      /*--------------------------------------------------------------------------*/
+      /* Loop through work withholding lines (VCHR_LN_WTHD_WS)  and copy into     */
+      /* VCHR_LINE_WTHD;                                                          */
+      /*--------------------------------------------------------------------------*/
+      &WS4_RS = &WS1_RS.GetRow(&BUFFER_ROW).GetRowset(Scroll.VCHR_LN_WTHD_WS);
+      &TEMPLATE_ROWS4 = &WS4_RS.ActiveRowCount;
+      &WTHD_RS = &VLINE_RS.GetRow(&COPY_ROW).GetRowset(Scroll.VCHR_LINE_WTHD);
+      remark now loop through misc rows;
+      &NEW_WTHD_LINE = 0;
+      &INSERT_FLG4 = "N";
+      For &BUFFER_ROW4 = 1 To &TEMPLATE_ROWS4;
+         &WS4_REC = &WS4_RS.GetRow(&BUFFER_ROW4).GetRecord(Record.VCHR_LN_WTHD_WS);
+         &WS4_LINE = &WS4_REC.GetField(Field.VOUCHER_LINE_NUM).Value;
+         If &WS4_LINE = &SOURCE Then
+            &NEW_WTHD_LINE = &NEW_WTHD_LINE + 1;
+            &INSERT_ROW4 = &WTHD_RS.ActiveRowCount;
+            If &INSERT_FLG4 = "Y" Then
+               &WTHD_RS.InsertRow(&INSERT_ROW4);
+            End-If;
+            &COPY_ROW4 = &WTHD_RS.ActiveRowCount;
+            &WTHD_REC = &WTHD_RS.GetRow(&COPY_ROW4).GetRecord(Record.VCHR_LINE_WTHD);
+            &WS4_REC.CopyFieldsTo(&WTHD_REC);
+            &INSERT_FLG4 = "Y";
+            remark update voucher line number;
+            &WTHD_REC.VOUCHER_LINE_NUM.Value = &TARGET;
+         End-If;
+      End-For;
+      /*--------------------------------------------------------------------------*/
+      /* Loop through vchr recv match work scroll (VCHR_TMPL_WS4) and copy into   */
+      /* VCHR_RECV_MTCH;                                                          */
+      /*--------------------------------------------------------------------------*/
+      &WS44_RS = &WS1_RS.GetRow(&BUFFER_ROW).GetRowset(Scroll.VCHR_TMPL_WS4);
+      &TEMPLATE_ROWS44 = &WS44_RS.ActiveRowCount;
+      &RVMTH_RS = &VLINE_RS.GetRow(&COPY_ROW).GetRowset(Scroll.VCHR_RECV_MTCH);
+      remark now loop through vchr recv match rows;
+      &INSERT_FLG44 = "N";
+      For &BUFFER_ROW44 = 1 To &TEMPLATE_ROWS44;
+         &WS44_REC = &WS44_RS.GetRow(&BUFFER_ROW44).GetRecord(Record.VCHR_TMPL_WS4);
+         &WS44_LINE = &WS44_REC.GetField(Field.VOUCHER_LINE_NUM).Value;
+         If &WS44_LINE = &SOURCE Then
+            &INSERT_ROW44 = &RVMTH_RS.ActiveRowCount;
+            If &INSERT_FLG44 = "Y" Then
+               &RVMTH_RS.InsertRow(&INSERT_ROW44);
+            End-If;
+            &COPY_ROW44 = &RVMTH_RS.ActiveRowCount;
+            &RVMTH_REC = &RVMTH_RS.GetRow(&COPY_ROW44).GetRecord(Record.VCHR_RECV_MTCH);
+            &WS44_REC.CopyFieldsTo(&RVMTH_REC);
+            &INSERT_FLG44 = "Y";
+            remark update voucher line number;
+            &RVMTH_REC.VOUCHER_LINE_NUM.Value = &TARGET;
+         End-If;
+      End-For;
+   End-For;
+   Return &NEW_VCHR_LINE;
+End-Function;
+
+Function updt_vchr(&NEW_VCHR_LINE);
+   remark update voucher with max and total voucher line numbers;
+   If VCHR_PANELS_WRK.VOUCHER_MAX_LINE < &NEW_VCHR_LINE Then
+      UpdateValue(VCHR_PANELS_WRK.VOUCHER_MAX_LINE, CurrentRowNumber(), &NEW_VCHR_LINE);
+   End-If;
+   &VCHR_TTL_LINES = GetLevel0().GetRow(1).GetRowset(Scroll.VOUCHER_LINE).ActiveRowCount;
+   UpdateValue(VOUCHER.VCHR_TTL_LINES, CurrentRowNumber(), &VCHR_TTL_LINES);
+   
+   set_mtch_apprvl(&MTCH_REQD, &MTCH_STATUS, &APPR_STATUS, &VCHR_TTL_LINES);
+   UpdateValue(VOUCHER.MATCH_ACTION, CurrentRowNumber(), &MTCH_REQD);
+   UpdateValue(VOUCHER.MATCH_STATUS_VCHR, CurrentRowNumber(), &MTCH_STATUS);
+   If VOUCHER.MATCH_STATUS_VCHR = "T" Or
+         VOUCHER.MATCH_STATUS_VCHR = "E" Then
+      UnGray(VOUCHER.UNMTCH_PAY_FLG);
+   Else
+      Gray(VOUCHER.UNMTCH_PAY_FLG);
+   End-If;
+   set_goto_recv();
+   display_porecv_opt();
+End-Function;
+
+
+Function update_xref();
+   &XREF_ROW = 1;
+   SQLExec("SELECT A.PYMNT_MESSAGE FROM PS_PYMNT_VCHR_XREF A, PS_VOUCHER B WHERE B.VCHR_TEMPLATE_ID =  :1 and B.VENDOR_SETID = :2 and B.VENDOR_ID = :3 and B.BUSINESS_UNIT = :4 AND A.BUSINESS_UNIT = B.BUSINESS_UNIT AND A.VOUCHER_ID = B.VOUCHER_ID", VCHR_PANELS_WRK.VCHR_TEMPLATE_ID, &SHRID, VOUCHER.VENDOR_ID, VOUCHER.BUSINESS_UNIT, &PYMNT_MESSAGE);
+   UpdateValue(PYMNT_VCHR_XREF.PYMNT_MESSAGE, &XREF_ROW, &PYMNT_MESSAGE);
+End-Function;
+
+Function flush_scrolls();
+   ScrollFlush(Record.VCHR_TMPL_WS1);
+   ScrollFlush(Record.PYMNT_VCHR_WS);
+End-Function;
+
+/************** Mainline ********************/
+
+If All(VCHR_PANELS_WRK.VCHR_TEMPLATE_ID) Then
+   UnGray(VCHR_PANELS_WRK.VCHR_TMPLT_CPY_PB);
+Else
+   Gray(VCHR_PANELS_WRK.VCHR_TMPLT_CPY_PB);
+End-If;

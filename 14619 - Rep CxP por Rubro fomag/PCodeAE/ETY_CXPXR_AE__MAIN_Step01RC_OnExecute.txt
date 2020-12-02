@@ -1,0 +1,5 @@
+Global string &Business_Unit_Old, &Voucher_Id_Old, &Tree_Node_Old;
+
+&Business_Unit_Old = "";
+&Voucher_Id_Old = "";
+&Tree_Node_Old = "";

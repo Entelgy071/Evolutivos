@@ -1,0 +1,177 @@
+/**************************************************************************
+PROYECTO	: FF_GL_BALANCE_MV_001	
+FECHA		: 2012-Dic-06
+ACTIVIDAD	: 001
+RESPONSABLE	: QUANAM - Martin Varela
+DESCR		: Balance de Prueba Resumido - Se carga los detalles del Reporte
+**************************************************************************
+PROYECTO	: FF_GL_BALANCE_MV_001	
+FECHA		: 2012-Dic-06
+ACTIVIDAD	: 002
+RESPONSABLE	: QUANAM - Guillermo Docampo
+DESCR		: Balance de Prueba Resumido - Se cargan los detalles de los nodos finales
+**************************************************************************
+PROYECTO	: FF_GL_INC_27386_000
+FECHA		: 2014-Oct-10
+ACTIVIDAD	: 003
+RESPONSABLE	: DATCO - César García
+DESCR		: Se cambian las tablas del reporte,  por las tablas temporales
+**************************************************************************/
+
+/*Inicio #001*/
+/* En este peoplecode se actualizan todos los valores de monetary amount*/
+Declare Function get_edit_by_index PeopleCode FUNCLIB_FS.EDITTABLE FieldFormula;
+
+Local string &strChartfield1;
+Local SQL &sqlChartfield1;
+Local array &arrParam1 = CreateArrayAny();
+Local array &arrParam2 = CreateArrayAny();
+Local number &num_nivel, &nbr_year;
+
+
+&FrstDayYear = Date3(Year(FF_BALRES_AET.DATE_FROM.Value), 1, 1);
+&nbr_year = Year(FF_BALRES_AET.DATE_FROM.Value);
+&fieldName = FF_BALRES_AET.FIELDNAME.Value;
+&fieldName2 = FF_BALRES_AET.FIELDNAME2.Value;
+
+&strSQL = "select ROUND(sum(C.monetary_amount),2)   FROM %TABLE(FF_TRLEA3) A   , %TABLE(FF_TRNDE3) B   , PS_JRNL_LN C   , PS_JRNL_HEADER D  WHERE A.LC_TREE_NODE_NUM BETWEEN B.LC_TREE_NODE_NUM AND B.LC_TREE_NOD_NM_END    AND A.SETID = B.SETID    AND A.TREE_NAME = B.TREE_NAME    AND D.JRNL_HDR_STATUS IN ('P','U')    AND C.LEDGER ='" | FF_BALRES_AET.LEDGER | "' AND (C." | &fieldName | " BETWEEN A.RANGE_FROM AND A.RANGE_TO)    AND D.BUSINESS_UNIT = C.BUSINESS_UNIT    AND D.JOURNAL_ID = C.JOURNAL_ID    AND D.JOURNAL_DATE = C.JOURNAL_DATE    AND D.UNPOST_SEQ = C.UNPOST_SEQ ";
+REM MGG &strSQL = "select ROUND(sum(C.monetary_amount),2)   FROM %TABLE(FF_TRLEA3) A   , %TABLE(FF_TRNDE3) B   , PS_JRNL_LN C   , PS_JRNL_HEADER D  WHERE A.LC_TREE_NODE_NUM BETWEEN B.LC_TREE_NODE_NUM AND B.LC_TREE_NOD_NM_END    AND A.SETID = B.SETID    AND A.TREE_NAME = B.TREE_NAME    AND D.JRNL_HDR_STATUS IN ('P','U')    AND C.LEDGER ='" | FF_BALRES_AET.LEDGER | "' AND D.ACCOUNTING_PERIOD = '913' AND (C." | &fieldName | " BETWEEN A.RANGE_FROM AND A.RANGE_TO)    AND D.BUSINESS_UNIT = C.BUSINESS_UNIT    AND D.JOURNAL_ID = C.JOURNAL_ID    AND D.JOURNAL_DATE = C.JOURNAL_DATE    AND D.UNPOST_SEQ = C.UNPOST_SEQ ";
+
+&strSQL1 = &strSQL | " AND C." | &fieldName2 | " = :1 and C." | &fieldName | " = :2 and C.business_unit between :3 and :4 and ((C.journal_date >= %datein(:5) and C.journal_date < %datein(:6)) or (d.fiscal_year =:7 and d.accounting_period = 0))  and A.setid = :8 and A.tree_name = :9 and B.tree_node = :10";
+
+&arrParam1.Push(FF_BALRES_AET.CF_VALUE2.Value, FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, FF_BALRES_AET.BUSINESS_UNIT_TO.Value, &FrstDayYear, FF_BALRES_AET.DATE_FROM.Value, &nbr_year, FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, FF_BALRES_AET.TREE_NODE.Value);
+
+/*Selecciono los chartfields que aplican para este grupo contable*/
+&sqlChartfield1 = CreateSQL("SELECT FIELDNAME, CF_VALUE_FROM, CF_VALUE_TO FROM PS_FF_BALCC_RUN WHERE OPRID = :1 AND RUN_CNTL_ID = :2 AND PRIMARY_FLG <> 'Y' AND LC_INCLUIR_CC = 'Y' AND CF_VALUE_FROM <> ' ' AND CF_VALUE_TO <> ' '", FF_BALRES_AET.OPRID.Value, FF_BALRES_AET.RUN_CNTL_ID.Value);
+
+&strSQL2 = &strSQL | " AND C." | &fieldName2 | " = :1 and C." | &fieldName | " = :2 and C.business_unit between :3 and :4 and C.journal_date between %datein(:5) and  %datein(:6) and d.accounting_period not in  (0, 999) and A.setid = :7 and A.tree_name = :8 and B.tree_node = :9 and monetary_amount > 0";
+&arrParam2.Push(FF_BALRES_AET.CF_VALUE2.Value, FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, FF_BALRES_AET.BUSINESS_UNIT_TO.Value, FF_BALRES_AET.DATE_FROM.Value, FF_BALRES_AET.DATE_TO.Value, FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, FF_BALRES_AET.TREE_NODE.Value);
+
+&strSQL3 = &strSQL | " AND C." | &fieldName2 | " = :1 AND C." | &fieldName | " = :2 and C.business_unit between :3 and :4 and C.journal_date between %datein(:5) and  %datein(:6) and d.accounting_period not in  (0, 999) and A.setid = :7 and A.tree_name = :8 and B.tree_node = :9 and monetary_amount < 0";
+
+/*Por cada chartfield agrego condicion al select e inserto el valor del parametro en el array*/
+&strChart = " ";
+&strChart1 = " ";
+While &sqlChartfield1.Fetch(&CHARTFIELD, &CF_VALUE_FROM, &CF_VALUE_TO)
+   &strChart = &strChart | " AND C." | &CHARTFIELD | " BETWEEN :" | (&arrParam1.Len + 1) | " AND :" | (&arrParam1.Len + 2);
+   &strChart1 = &strChart1 | " AND C." | &CHARTFIELD | " BETWEEN :" | (&arrParam2.Len + 1) | " AND :" | (&arrParam2.Len + 2);
+   &arrParam1.Push(&CF_VALUE_FROM, &CF_VALUE_TO);
+   &arrParam2.Push(&CF_VALUE_FROM, &CF_VALUE_TO);
+End-While;
+
+&strSQL1 = &strSQL1 | &strChart;
+&strSQL2 = &strSQL2 | &strChart1;
+&strSQL3 = &strSQL3 | &strChart1;
+
+REM MGG &strSQL = "select ROUND(sum(C.monetary_amount),2)   FROM %TABLE(FF_TRLEA3) A   , %TABLE(FF_TRNDE3) B   , PS_JRNL_LN C   , PS_JRNL_HEADER D  WHERE A.LC_TREE_NODE_NUM BETWEEN B.LC_TREE_NODE_NUM AND B.LC_TREE_NOD_NM_END    AND A.SETID = B.SETID    AND A.TREE_NAME = B.TREE_NAME    AND D.JRNL_HDR_STATUS IN ('P','U')    AND C.LEDGER ='" | FF_BALRES_AET.LEDGER | "' AND D.ACCOUNTING_PERIOD = '913' AND (C." | &fieldName | " BETWEEN A.RANGE_FROM AND A.RANGE_TO)    AND D.BUSINESS_UNIT = C.BUSINESS_UNIT    AND D.JOURNAL_ID = C.JOURNAL_ID    AND D.JOURNAL_DATE = C.JOURNAL_DATE    AND D.UNPOST_SEQ = C.UNPOST_SEQ ";
+
+SQLExec(&strSQL1, &arrParam1, &nbrSaldoAnt);
+
+rem SQLExec("select sum(monetary_amount) from ps_ff_tre_jrn_vw where " | &fieldName | " = :1 and business_unit between :2 and :3 and journal_date >= %datein(:4) and journal_date < %datein(:5) and setid = :6 and tree_name = :7 and tree_node = :8", FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, FF_BALRES_AET.BUSINESS_UNIT_TO.Value, &FrstDayYear, FF_BALRES_AET.DATE_FROM.Value, FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, FF_BALRES_AET.TREE_NODE.Value, &nbrSaldoAnt);
+
+If &nbrSaldoAnt < 0 Then
+   &nbrSaldoAntDeb = 0;
+   &nbrSaldoAntCred = Abs(&nbrSaldoAnt);
+Else
+   &nbrSaldoAntDeb = &nbrSaldoAnt;
+   &nbrSaldoAntCred = 0;
+End-If;
+
+rem SQLExec("select sum(monetary_amount) from ps_ff_tre_jrn_vw where " | &fieldName | " = :1 and business_unit between :2 and :3 and journal_date between %datein(:4) and  %datein(:5) and setid = :6 and tree_name = :7 and tree_node = :8 and monetary_amount > 0", FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, FF_BALRES_AET.BUSINESS_UNIT_TO.Value, FF_BALRES_AET.DATE_FROM.Value, FF_BALRES_AET.DATE_TO.Value, FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, FF_BALRES_AET.TREE_NODE.Value, &nbrMovDeb);
+
+rem SQLExec("select sum(monetary_amount) from ps_ff_tre_jrn_vw where " | &fieldName | " = :1 and business_unit between :2 and :3 and journal_date between %datein(:4) and  %datein(:5) and setid = :6 and tree_name = :7 and tree_node = :8 and monetary_amount < 0", FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, FF_BALRES_AET.BUSINESS_UNIT_TO.Value, FF_BALRES_AET.DATE_FROM.Value, FF_BALRES_AET.DATE_TO.Value, FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, FF_BALRES_AET.TREE_NODE.Value, &nbrMovCred);
+
+SQLExec(&strSQL2, &arrParam2, &nbrMovDeb);
+
+SQLExec(&strSQL3, &arrParam2, &nbrMovCred);
+
+&nbrMovCred = Abs(&nbrMovCred);
+
+/*Actualizo ultimas 2 columnas*/
+&nbrSaldoAct = &nbrSaldoAntDeb - &nbrSaldoAntCred + &nbrMovDeb - &nbrMovCred;
+
+If &nbrSaldoAct < 0 Then
+   &nbrSaldoActDeb = 0;
+   &nbrSaldoActCred = Abs(&nbrSaldoAct);
+Else
+   &nbrSaldoActDeb = &nbrSaldoAct;
+   &nbrSaldoActCred = 0;
+End-If;
+
+
+/*Se carga la descripcion del campo CC actual, dependiendo del agrupamiento*/
+If FF_BALRES_AET.FIELDNAME2.Value = "BUSINESS_UNIT" Then
+   SQLExec("select DESCR from ps_bus_unit_lang where language_cd = 'ESP' and business_unit = :1", FF_BALRES_AET.CF_VALUE2.Value, &strDescrCC);
+Else
+   
+   <*
+   &EDITTABLE = get_edit_by_index(FF_BALRES_AET.FIELDNAME2.Value, &cPrompt_tbl_idx, "LC_LMA_MOV_V1");
+   &EDITTABLE = "RECORD." | &EDITTABLE;
+   &str_field = "FIELD." | FF_BALRES_AET.FIELDNAME2.Value;
+   Local Record &rec_descr = CreateRecord(@&EDITTABLE);
+   &rec_descr.SETID.Value = FF_BALRES_AET.SETID.Value;
+   &rec_descr.GetField(@&str_field).Value = FF_BALRES_AET.CF_VALUE2.Value;
+   
+   If &rec_descr.SelectByKey() Then
+      &strDescrCC = &rec_descr.DESCR.Value;
+   End-If;*>
+   
+End-If;
+
+/*Se carga la descripcion del nodo*/
+SQLExec("select a.descr from ps_tree_node_lang a, pstreedefn b where a.language_cd = 'ESP' and a.setid = :1 and a.tree_node = :2 and a.setid = b.setid and b.tree_name = :3 and %effdtcheck(pstreedefn b2, b, %currentdatein) and a.effdt = (select max(a2.effdt) from ps_tree_node_lang a2 where a2.language_cd = a.language_cd and a2.setid = a.setid and a2.tree_node = a.tree_node and a2.effdt <= b.effdt)", FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NODE.Value, FF_BALRES_AET.TREE_NAME.Value, &strDescrNodo);
+
+If None(&strDescrNodo) Then
+   SQLExec("select a.descr from ps_FF_TREE_NDE_TBL a, pstreedefn b where a.setid = :1 and a.tree_node = :2 and a.setid = b.setid and b.tree_name = :3 and %effdtcheck(pstreedefn b2, b, %currentdatein) and a.effdt = (select max(a2.effdt) from ps_FF_TREE_NDE_TBL a2 where a2.setid = a.setid and a2.tree_node = a.tree_node and a2.effdt <= b.effdt)", FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NODE.Value, FF_BALRES_AET.TREE_NAME.Value, &strDescrNodo);
+   
+   
+   rem   SQLExec("select a.descr from ps_FF_TREE_NDE_TBL a where a.setid = :1 and a.tree_node = :2 and a.effdt = (select max(a2.effdt) from ps_FF_TREE_NDE_TBL a2 where a2.setid = a.setid and a2.tree_node = a.tree_node)", FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NODE.Value, &strDescrNodo);
+End-If;
+
+
+If FF_BALRES_AET.TREE_NODE.Value = FF_BALRES_AET.CF_VALUE1.Value Then
+   If FF_BALRES_AET.LEDGER <> "NIIF" Then
+      SQLExec("select a.descr from ps_gl_account_lang a where a.language_cd = 'ESP' and a.setid = :1 and a.account = :2 and a.effdt = (select max(a2.effdt) from ps_gl_account_lang a2 where a2.language_cd = a.language_cd and a2.setid = a.setid and a2.account = a.account)", FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NODE.Value, &strDescrNodo);
+      If None(&strDescrNodo) Then
+         SQLExec("select a.descr from ps_gl_account_tbl a where a.setid = :1 and a.account = :2 and a.effdt = (select max(a2.effdt) from ps_gl_account_tbl a2 where a2.setid = a.setid and a2.account = a.account)", FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NODE.Value, &strDescrNodo);
+      End-If;
+   Else
+      SQLExec("select a.descr from ps_ALTACCT_tbl a where a.setid = :1 and a.aLTACCT = :2 and a.effdt = (select max(a2.effdt) from ps_ALTACCT_tbl a2 where a2.setid = a.setid and a2.aLTACCT = a.ALTACCT AND EFFDT<=SYSDATE)", FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NODE.Value, &strDescrNodo);
+      
+   End-If;
+End-If;
+
+/*Actualizo los valores en la tabla*/
+/*INICIO CHGA 003*/
+rem by chga 003 SQLExec("update PS_FF_BALRES_DET set MONETARY_AMOUNT_01 = :1, MONETARY_AMOUNT_02 = :2, MONETARY_AMOUNT_03 = :3, MONETARY_AMOUNT_04 = :4, MONETARY_AMOUNT_05 = :5, MONETARY_AMOUNT_06 = :6, DESCR1 = :11, DESCR100 = :12 WHERE PROCESS_INSTANCE = :7 and CF_VALUE1 = :8 AND CF_VALUE2 = :9 and TREE_NODE = :10", &nbrSaldoAntDeb, &nbrSaldoAntCred, &nbrMovDeb, &nbrMovCred, &nbrSaldoActDeb, &nbrSaldoActCred, FF_BALRES_AET.PROCESS_INSTANCE.Value, FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.CF_VALUE2.Value, FF_BALRES_AET.TREE_NODE.Value, &strDescrCC, &strDescrNodo);
+SQLExec("update %TABLE(FF_BAL3_DET) set MONETARY_AMOUNT_01 = :1, MONETARY_AMOUNT_02 = :2, MONETARY_AMOUNT_03 = :3, MONETARY_AMOUNT_04 = :4, MONETARY_AMOUNT_05 = :5, MONETARY_AMOUNT_06 = :6, DESCR1 = :11, DESCR100 = :12 WHERE PROCESS_INSTANCE = :7 and CF_VALUE1 = :8 AND CF_VALUE2 = :9 and TREE_NODE = :10", &nbrSaldoAntDeb, &nbrSaldoAntCred, &nbrMovDeb, &nbrMovCred, &nbrSaldoActDeb, &nbrSaldoActCred, FF_BALRES_AET.PROCESS_INSTANCE.Value, FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.CF_VALUE2.Value, FF_BALRES_AET.TREE_NODE.Value, &strDescrCC, &strDescrNodo);
+/*FIN CHGA 003*/
+
+/*Fin #001*/
+
+/*Inicio #002*/
+<*
+SQLExec("Select tree_level_num from ps_ff_treendeff_vw where setid = :1 and tree_name = :2 and tree_node = :3", FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, FF_BALRES_AET.TREE_NODE.Value, &num_nivel);
+
+If &num_nivel = FF_BALRES_AET.TREE_LEVEL_NUM.Value Then
+   
+   &strDet1 = "SELECT SUM(monetary_amount), CHARTFIELD3 from ps_ff_tre_jrn_vw where " | &fieldName | " = :1 and business_unit between :2 and :3 and journal_date >= %datein(:4) and journal_date < %datein(:5) and setid = :6 and tree_name = :7 and tree_node = :8 AND CHARTFIELD3 <> ' ' GROUP BY CHARTFIELD3";
+   &strDet1 = &strDet1 | &strChart;
+   &sqlDet = CreateSQL(&strDet1, &arrParam1);
+   While &sqlDet.Fetch(&MONETARY_AMOUNT, &CHARTFIELD3)
+      
+      SQLExec("SELECT NATIONAL_ID FROM PS_FF_TERCENID_VW2 WHERE A.CUST_ID = :1", &CHARTFIELD3, &national_id);
+      rem sacar descr de national;
+      If &MONETARY_AMOUNT < 0 Then
+         &nbrSaldoAntDeb = 0;
+         &nbrSaldoAntCred = Abs(&nbrSaldoAnt);
+      Else
+         &nbrSaldoAntDeb = &nbrSaldoAnt;
+         &nbrSaldoAntCred = 0;
+      End-If;
+      SQLExec("INSERT INTO PS_FF_BALDET_DET VALUES (:1, :2, :3, :4, :5,'',:6,:7,0,0,0,0)", FF_BALRES_AET.PROCESS_INSTANCE.Value, FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.TREE_NODE.Value, &CHARTFIELD3, &national_id, &nbrSaldoAntDeb, &nbrSaldoAntCred);
+   End-While;
+   
+End-If;
+*>
+/*Fin #002*/

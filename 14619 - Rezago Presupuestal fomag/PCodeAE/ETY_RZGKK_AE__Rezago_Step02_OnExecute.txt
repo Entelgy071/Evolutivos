@@ -1,0 +1,55 @@
+/*Inicio 001*/
+import PSXP_RPTDEFNMANAGER:*;
+
+Declare Function GetDirSeparator PeopleCode PSXPFUNCLIB.FUNCLIB FieldFormula;
+Local string &STR_variableReporte, &STR_DirSep;
+Local Record &RCD_QryPrompts;
+Local PSXP_RPTDEFNMANAGER:ReportDefn &oRptDefn;
+
+
+/* get report definition object */
+&STR_variableReporte = "ETY_REZAGOKK";
+
+&oRptDefn = create PSXP_RPTDEFNMANAGER:ReportDefn(&STR_variableReporte);
+&oRptDefn.Get();
+&STR_DirSep = GetDirSeparator();
+
+
+/* fill query runtime prompt record */
+&RCD_QryPrompts = &oRptDefn.GetPSQueryPromptRecord();
+
+If Not &RCD_QryPrompts = Null Then
+   &RCD_QryPrompts.GetField(1).Value = Record.ETY_REZAGKK_AET.PROCESS_INSTANCE.Value;
+   
+   &oRptDefn.SetPSQueryPromptRecord(&RCD_QryPrompts);
+   
+End-If;
+
+
+&numOutFormat = %OutDestFormat;
+
+
+rem &ProcessInstance=ETY_REZAGKK_AET.PROCESS_INSTANCE;
+rem &oRptDefn.ProcessInstance = &ProcessInstance;
+rem &sOutFormat = &ReportImprimir.GetOutDestFormatString(%OutDestFormat);
+
+rem  %OutDestFormat = 2  PDF
+rem  %OutDestFormat = 5  html
+rem  %OutDestFormat = 8  xls
+rem  %OutDestFormat = 12 rtf;
+
+rem MessageBox(0, "", 0, 0, "&sOutFormat--->>>> " | &numOutFormat);
+
+If &numOutFormat <> 8 Then
+   &sOutFormat = "PDF";
+Else
+   &sOutFormat = "XLS";
+End-If;
+
+
+/* Generación del reporte */
+&oRptDefn.UseBurstValueAsOutputFileName = True;
+&oRptDefn.ProcessReport("ETY_REZAGOKK_1", %Language_User, %Date, &sOutFormat);
+&oRptDefn.Publish("", "", "General", Record.ETY_REZAGKK_AET.PROCESS_INSTANCE.Value);
+
+/*Fin 001*/

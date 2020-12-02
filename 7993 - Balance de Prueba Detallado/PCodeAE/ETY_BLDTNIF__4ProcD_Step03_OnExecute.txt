@@ -1,0 +1,32 @@
+/********************************************************************************************
+PROYECTO	: FF_GL_BALANCE_MV_001	
+FECHA		: 2012-Dic-28
+ACTIVIDAD	: 001
+RESPONSABLE	: QUANAM - Martin Varela
+DESCR		: Balance de Prueba Detallado - Se carga los detalles de los nodos de ultimo nivel
+*********************************************************************************************/
+
+/*Inicio #001*/
+/* En este peoplecode se actualizan todos los valores de monetary amount*/
+
+Local SQL &sqlChartfield1;
+Local string &strChart, &str_where;
+
+FF_BALRES_AET.FISCAL_YEAR3.Value = Year(FF_BALRES_AET.DATE_FROM.Value);
+FF_BALRES_AET.DATE1.Value = Date3(Year(FF_BALRES_AET.DATE_FROM.Value), 1, 1);
+
+&PA = FF_BALRES_AET.ACCOUNTING_PERIOD3.Value;
+&PER_AJU = 913 - &PA;
+
+&sqlChartfield1 = CreateSQL("SELECT FIELDNAME, CF_VALUE_FROM, CF_VALUE_TO FROM PS_FF_BALCC_RUN WHERE OPRID = :1 AND RUN_CNTL_ID = :2 AND PRIMARY_FLG <> 'Y' AND LC_INCLUIR_CC = 'Y' ", FF_BALRES_AET.OPRID.Value, FF_BALRES_AET.RUN_CNTL_ID.Value);
+&str_where = " ";
+While &sqlChartfield1.Fetch(&CHARTFIELD, &CF_VALUE_FROM, &CF_VALUE_TO)
+   If FF_BALRES_AET.LEDGER.Value = "NIIF" And
+         &CHARTFIELD = "ACCOUNT" Then
+   Else
+      &strChart = &strChart | " AND c." | &CHARTFIELD | " BETWEEN :1 AND :2 ";
+      &str_where = &str_where | ExpandSqlBinds(&strChart, &CF_VALUE_FROM, &CF_VALUE_TO);
+   End-If;
+End-While;
+
+FF_BALRES_AET.WHERE_CLAUSE.Value = &str_where;

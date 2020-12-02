@@ -1,0 +1,54 @@
+<* Incio 001 *>
+Declare Function EsParmCadCar PeopleCode FUNCLIB_FS.ALTACCT FieldFormula;
+<* Fin 001 *>
+Component string &insertando;
+
+
+&Parametrizado = EsParmCadCar(VOUCHER.BUSINESS_UNIT.Value);
+
+
+remark MessageBox(0, "", 0, 0, "%mode en RowInsert de la DISTRIB_LINE en el Componente VCHR_EXPRESS --------------> " | %Mode);
+rem MessageBox(0, "", 0, 0, "Es &Parametrizado  --------------> " | &Parametrizado);
+
+If All(DISTRIB_LINE.PO_ID) Then
+   If &Parametrizado And
+         %Mode = "U" Then
+      
+      remark MessageBox(0, "", 0, 0, " 1  Entré en RowInsert de la DISTRIB_LINE en el Componente VCHR_EXPRESS --------------> ");
+      
+      DISTRIB_LINE.BUSINESS_UNIT_GL.Enabled = False;
+      
+      DISTRIB_LINE.ACCOUNT.Enabled = True;
+      
+      DISTRIB_LINE.ALTACCT.Enabled = False;
+      DISTRIB_LINE.OPERATING_UNIT.Enabled = False;
+      DISTRIB_LINE.FUND_CODE.Enabled = False;
+      DISTRIB_LINE.DEPTID.Enabled = False;
+      DISTRIB_LINE.PROGRAM_CODE.Enabled = False;
+      DISTRIB_LINE.CLASS_FLD.Enabled = False;
+      DISTRIB_LINE.BUDGET_REF.Enabled = False;
+      DISTRIB_LINE.PRODUCT.Enabled = False;
+      DISTRIB_LINE.BUSINESS_UNIT_PC.Enabled = False;
+      DISTRIB_LINE.PROJECT_ID.Enabled = False;
+      DISTRIB_LINE.ACTIVITY_ID.Enabled = False;
+      DISTRIB_LINE.RESOURCE_TYPE.Enabled = False;
+      DISTRIB_LINE.RESOURCE_CATEGORY.Enabled = False;
+      DISTRIB_LINE.RESOURCE_SUB_CAT.Enabled = False;
+      DISTRIB_LINE.AFFILIATE.Enabled = False;
+      /* Se deja invisible porque otro proceso posterior lo habilita*/;
+      DISTRIB_LINE.AFFILIATE.Visible = False;
+      DISTRIB_LINE.AFFILIATE_INTRA1.Enabled = False;
+      DISTRIB_LINE.AFFILIATE_INTRA2.Enabled = False;
+      DISTRIB_LINE.CHARTFIELD2.Enabled = False;
+      DISTRIB_LINE.CHARTFIELD1.Enabled = False;
+      DISTRIB_LINE.CHARTFIELD3.Enabled = False;
+      DISTRIB_LINE.OPEN_ITEM_KEY.Enabled = False;
+      DISTRIB_LINE.ENTRY_EVENT.Enabled = False;
+      DISTRIB_LINE.BUDGET_DT.Enabled = False;
+      
+      &insertando = "I";
+      
+   End-If;
+   &insertando = "I";
+End-If;
+<* FIN 001 *>

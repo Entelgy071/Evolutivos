@@ -1,0 +1,26 @@
+/**************************************************************************
+PROYECTO	: FF_GL_INC_27386_000
+FECHA		: 2014-Oct-10
+ACTIVIDAD	: 002
+RESPONSABLE	: DATCO - César García
+DESCR		: Se cambian las tablas del reporte,  por las tablas temporales
+**************************************************************************/
+
+
+/*Borro los datos de los nodos correspondientes si la Flag PYG no esta activa*/
+If FF_BALRES_AET.FF_PYG.Value <> "Y" Then
+   If (FF_BALRES_AET.SETID.Value = "FIDUP" Or
+         FF_BALRES_AET.SETID.Value = "SHARE") Then
+      &strWhere = " in ('36', '59') ";
+   Else
+      If (FF_BALRES_AET.SETID.Value = "PAPEN") Then
+         &strWhere = " in ('57', '31051132', '31051133') ";
+      Else
+         &strWhere = " in ('') ";
+      End-If;
+   End-If;
+   /*INICIO CHGA 001*/
+   REM BY CHGA 001 SQLExec("Delete from PS_FF_BALRES_DET WHERE PROCESS_INSTANCE = :1 and TREE_NODE " | &strWhere, FF_BALRES_AET.PROCESS_INSTANCE.Value);
+   SQLExec("Delete from %TABLE(FF_BAL3_DET) WHERE PROCESS_INSTANCE = :1 and TREE_NODE " | &strWhere, FF_BALRES_AET.PROCESS_INSTANCE.Value);
+   /*FIN CHGA 001*/
+End-If;

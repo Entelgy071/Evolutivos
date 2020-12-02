@@ -1,0 +1,32 @@
+/********************************************************************************************************
+Proyecto	 		Ref			Fecha	 	Desarrollador	Descripción
+---------------------------------------------------------------------------------------------------------
+<ETY_SPRINT3_96748>	<001>	<27/09/2020>	 <MGG>			<Evita que se habilite el campo de fecha de 
+                                                             presupesto para UN que estan en Tabla de cadenas>
+*********************************************************************************************************/
+Declare Function KSEC_BUDT_OVER PeopleCode KSEC_FUNCLIB.KSECURITY_CHECK FieldFormula;
+<* Incio 001 *>
+Declare Function EsParmCadCar PeopleCode FUNCLIB_FS.ALTACCT FieldFormula;
+
+<* Fin 001 *>
+
+If None(DISTRIB_LINE.BUDGET_DT) Then
+   DISTRIB_LINE.BUDGET_DT = VOUCHER.ACCOUNTING_DT;
+End-If;
+
+/* Release 8.8 - In release 8.4 security setup was added to allow for override of budget date.  Check security to determine if an operator can override the budget date or not */
+
+&OPRID = %OperatorId;
+If INSTALLATION.COMMITMENT_CNTL_AP = "Y" And
+      VCHR_PANELS_WRK.VCHR_PROCESS_FLG = "Y" And
+      KSEC_BUDT_OVER(&OPRID, "AP") = "TRUE" Then
+   <* Incio 001 *>
+   REM MessageBox(0, "", 0, 0, "DISTRIB_LINE.BUSINESS_UNIT----> " | DISTRIB_LINE.BUSINESS_UNIT);
+   &Parametrizado = EsParmCadCar(DISTRIB_LINE.BUSINESS_UNIT);
+   If Not &Parametrizado Then
+      DISTRIB_LINE.BUDGET_DT.Enabled = True;
+   End-If;
+   <* Fin 001 *>
+Else
+   DISTRIB_LINE.BUDGET_DT.Enabled = False;
+End-If;

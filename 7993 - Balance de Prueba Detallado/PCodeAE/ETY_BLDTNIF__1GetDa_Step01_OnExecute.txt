@@ -1,0 +1,126 @@
+/**************************************************************************
+PROYECTO	: FF_GL_BALANCE_MV_001	
+FECHA		: 2012-Dic-06
+ACTIVIDAD	: 001
+RESPONSABLE	: QUANAM - Martin Varela
+DESCR		: Balance de Prueba Resumido - Se carga el Cabezal del Reporte
+**************************************************************************
+PROYECTO	: FF_GL_INC_27386_000
+FECHA		: 2014-Oct-10
+ACTIVIDAD	: 002
+RESPONSABLE	: DATCO - César García
+DESCR		: Se cambian las tablas del reporte,  por las tablas temporales
+**************************************************************************/
+
+
+/* Inicio #001 */
+Declare Function get_edit_by_index PeopleCode FUNCLIB_FS.EDITTABLE FieldFormula;
+
+Local Record &RecCab, &RecUN, &RecCF, &RecCtasMayores, &RecAuxiliares, &RecDocumentos;
+Local SQL &SQL_RecCF;
+Local string &Where;
+Local string &OrderBy;
+Local Rowset &rsReport, &rsDet;
+
+/*INICIO CHGA 002*/
+
+REM BY CHGA 002 &RecCab = CreateRecord(Record.FF_BALRES_CAB);
+&RecCab = CreateRecord(Record.FF_BAL_CAB);
+/*Este record es solo para probar, hay que crear otro nuevo igual que el CAB*/
+REM BY CHGA 002 &rsDet = CreateRowset(Record.FF_BALRES_DET);
+&rsDet = CreateRowset(Record.FF_BAL_DET);
+rem &RecFil = CreateRecord(Record.LC_CC_LMA_DTL);
+REM BY CHGA 002 &rsReport = CreateRowset(Record.FF_BALRES_CAB);
+&rsReport = CreateRowset(Record.FF_BAL_CAB);
+/*FIN CHGA 002*/
+
+/* Campos Cabecera */
+
+/*FILA3*/
+SQLExec("select descr from ps_bus_unit_gl_vw where business_unit = 'GLFID'", &str_DescrCab);
+
+/*FILA4*/
+&str_DescrTitulo = "BALANCE GENERAL";
+
+/*FILA5*/
+SQLExec("select LONGNAME from PS_FS_CF_ALL_L_VW CF where CF.LANGUAGE_CD = 'ESP' and FIELDNAME = :1", FF_BALRES_AET.FIELDNAME2, &str_CampoAgrup);
+
+&strDescrDesde = "";
+&strDescrHasta = "";
+
+/*Se cargan las descripciones de los campos Desde-Hasta seleccionados, dependiendo de la seleccion*/
+If FF_BALRES_AET.FIELDNAME2.Value = "BUSINESS_UNIT" Then
+   
+   /*INICIO JCR*/
+   REM SQLExec("select DESCR from ps_bus_unit_lang where language_cd = 'ESP' and business_unit = :1", FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, &strDescrDesde);
+   REM SQLExec("select DESCR from ps_bus_unit_lang where language_cd = 'ESP' and business_unit = :1", FF_BALRES_AET.BUSINESS_UNIT_TO.Value, &strDescrHasta);
+   SQLExec("SELECT FF_BI_NOMB_NEGOCIO FROM PS_FF_BI_NEGOC_TBL WHERE BUSINESS_UNIT = :1", FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, &strDescrDesde);
+   SQLExec("SELECT FF_BI_NOMB_NEGOCIO FROM PS_FF_BI_NEGOC_TBL WHERE BUSINESS_UNIT = :1", FF_BALRES_AET.BUSINESS_UNIT_TO.Value, &strDescrHasta);
+   /*FIN JCR*/
+Else
+   &EDITTABLE = get_edit_by_index(FF_BALRES_AET.FIELDNAME2.Value, &cPrompt_tbl_idx, "LC_LMA_MOV_V1");
+   &EDITTABLE = "RECORD." | &EDITTABLE;
+   &str_field = "FIELD." | FF_BALRES_AET.FIELDNAME2.Value;
+   Local Record &rec_descr = CreateRecord(@&EDITTABLE);
+   &rec_descr.SETID.Value = FF_BALRES_AET.SETID.Value;
+   &rec_descr.GetField(@&str_field).Value = FF_BALRES_AET.CF_VALUE3.Value;
+   
+   If &rec_descr.SelectByKey() Then
+      &strDescrDesde = &rec_descr.DESCR.Value;
+   End-If;
+   
+   &rec_descr.SETID.Value = FF_BALRES_AET.SETID.Value;
+   &rec_descr.GetField(@&str_field).Value = FF_BALRES_AET.CF_VALUE4.Value;
+   
+   If &rec_descr.SelectByKey() Then
+      &strDescrHasta = &rec_descr.DESCR.Value;
+   End-If;
+   
+End-If;
+
+/*cargo el campo desde hasta, dependiendo si se selecciono un Principal o NO*/
+If FF_BALRES_AET.FIELDNAME.Value = "BUSINESS_UNIT" Then
+   &str_DescrDesdeHasta = "Unidad de Negocio Desde: " | FF_BALRES_AET.BUSINESS_UNIT_FROM.Value | "-" | &strDescrDesde | " Hasta Unidad de Negocio: " | FF_BALRES_AET.BUSINESS_UNIT_TO | "-" | &strDescrHasta;
+   &str_CampoAgrup = "Unidad de Negocio";
+Else
+   &str_DescrDesdeHasta = &str_CampoAgrup | " Desde: " | FF_BALRES_AET.CF_VALUE3.Value | " " | &strDescrDesde | " Hasta " | &str_CampoAgrup | ": " | FF_BALRES_AET.CF_VALUE4 | " " | &strDescrHasta;
+End-If;
+
+/*Cargo la descripcion del arbol*/
+SQLExec("select a.descr from pstreedefn a where a.setid = :1 and a.tree_name = :2 and a.effdt = (select max(a2.effdt) from pstreedefn a2 where a2.eff_status = 'A' and a2.setid = a.setid and a2.tree_name = a.tree_name)", FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, &strDescrArbol);
+
+MessageBox(0, "", 0, 0, "Período de Ajuste-------------------------------------------------------->" | FF_BALRES_AET.ACCOUNTING_PERIOD3 | "<");
+
+/*INICIO CHGA 002*/
+&RecCab = &rsReport.GetRow(1).GetRecord(Record.FF_BAL_CAB);
+rem by chga 002&RecCab = &rsReport.GetRow(1).GetRecord(Record.FF_BALRES_CAB);
+/*FIN CHGA 002*/
+
+/*cargo los datos del Cabezal*/
+&RecCab.PROCESS_INSTANCE.Value = FF_BALRES_AET.PROCESS_INSTANCE.Value;
+&RecCab.NAME1.Value = &str_DescrCab;
+&RecCab.REPORT_TITLE.Value = &str_DescrTitulo;
+&RecCab.DESCR200.Value = &str_DescrDesdeHasta;
+&RecCab.DATE_FROM.Value = FF_BALRES_AET.DATE_FROM.Value;
+&RecCab.DATE_TO.Value = FF_BALRES_AET.DATE_TO.Value;
+&RecCab.DESCR.Value = &strDescrArbol;
+&RecCab.LONGNAME.Value = &str_CampoAgrup;
+&RecCab.PROCESS_DATE.Value = %Date;
+&RecCab.PROCESS_DTTM.Value = %Datetime;
+&RecCab.PROG_NAME.Value = "";
+If FF_BALRES_AET.FF_INCL_NRO_ADMIN.Value = "Y" Then
+   &RecCab.FF_NRO_ADMIN.Value = FF_BALRES_AET.FF_NRO_ADMIN.Value;
+End-If;
+Local number &nbr_FF_MAX_TREE_LEV;
+SQLExec("select max(length(a.tree_node)) from ps_et_treendeff_v2 a where a.setid = :1 and a.tree_name = :2 and tree_level_num = :3", FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, FF_BALRES_AET.TREE_LEVEL_NUM.Value, &nbr_FF_MAX_TREE_LEV);
+&RecCab.FF_MAX_TREE_LEV.Value = &nbr_FF_MAX_TREE_LEV;
+/*Inserta el registro Cabezal*/
+&RecCab.Insert();
+
+<*If All(FF_BALRES_AET.FIELDNAME) Then;
+   /* Si existe el campo principal entonces se realizará el agrupamiento por el registro principal */
+   &OrderBy = FF_BALRES_AET.FIELDNAME.Value;
+Else
+   /* Se realiza el agrupamiento por unidad de Negocio */
+   &OrderBy = "BUSINESS_UNIT";
+End-If;*>

@@ -1,0 +1,33 @@
+If ETY_RPRZGKK_AET.TREE_NODE.Value <> "TODAS" Then
+   
+   If ETY_REZAGKK_AET.TREE_LEVEL_NUM > 6 Then
+      ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value = " AND AC.TREE_NODE = '" | ETY_RPRZGKK_AET.TREE_NODE.Value | "')";
+      rem ETY_REZAGKK_AET.TREE_LEVEL_NUM = ETY_REZAGKK_AET.TREE_LEVEL_NUM + 1;
+      rem MessageBox(0, "", 0, 0, "CLAUSULA ADICIONAL para PAGOS en WHERE:->" | ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value);
+   Else
+      ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value = " AND AC.TREE_NODE like ('" | ETY_RPRZGKK_AET.TREE_NODE.Value | "%'))";
+      rem MessageBox(0, "", 0, 0, "CLAUSULA ADICIONAL para PAGOS en WHERE con LIKE:->" | ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value);
+   End-If;
+   
+   
+   
+   If All(ETY_REZAGKK_AET.DEPTID) And
+         ETY_REZAGKK_AET.DEPTID <> "TODOS" Then
+      If ETY_REZAGKK_AET.DEPTID = "SIN_DPTO" Then
+         ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value = " AND A.DEPTID = ''";
+      Else
+         ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value = " AND A.DEPTID = '" | ETY_REZAGKK_AET.DEPTID.Value | "%'";
+      End-If;
+   End-If;
+Else
+   ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value = " AND AC.TREE_NODE like ('0%'))";
+   
+End-If;
+<*
+   If All(ETY_REZAGKK_AET.DEPTID) Then
+      ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value = ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value | " AND A.DEPTID = '" | ETY_REZAGKK_AET.DEPTID.Value | "'";
+   End-If;
+Else
+   rem MessageBox(0, "", 0, 0, "CLAUSULA ADICIONAL WHERE PARA PAGOS VACIA:->" | ETY_RPRZGKK_AET.WHERE_CLAUSE1.Value);
+End-If;
+*>

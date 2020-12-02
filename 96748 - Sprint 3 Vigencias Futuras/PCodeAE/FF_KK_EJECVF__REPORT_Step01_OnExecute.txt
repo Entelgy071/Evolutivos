@@ -1,0 +1,110 @@
+/***********************************************************************************************************************************
+* Proyecto:	    FF_KK_INC_23345_00
+* Actividad:  	001
+* Responsable: 	Interservices ¿ César García
+* Fecha:		04-Sep-2014
+* Descripción:	Reporte de Presupuesto Ejecutado
+**************************************************************************************************************************/
+/*********************************************************************
+* Proyecto:	    ETY_ERP_PCH_FLP_EVO_96748
+* Actividad:  	002
+* Responsable: 	Entelgy ¿ David A. Suarez
+* Fecha:		18-11-2020
+* Descripción:	Peoplecode para poner los años en los nombres de las columnas. 
+*********************************************************************/
+/*Inicio #001*/
+import PSXP_RPTDEFNMANAGER:*;
+import PSXP_XMLGEN:*;
+
+Local Rowset &rsdatahijo, &rsdata, &REC2;
+Local SQL &sqldet;
+Local Record &REC1;
+Local number &I, &num_proceso;
+
+&rsdatahijo = CreateRowset(Record.FF_TMP_ESTR);
+&rsdata = CreateRowset(Record.FF_KK_EJC_HDR_W, &rsdatahijo);
+
+
+SQLExec("SELECT  TO_CHAR(SYSDATE, 'DD-MM-YYYY'), TO_CHAR(SYSDATE, 'HH:MM'), TO_CHAR(%DATEIN(:1), 'DD-MM-YYYY') FROM PS_INSTALLATION", FF_KK_EJEC_AET.ACCOUNTING_DT.Value, &rsdata(1).FF_KK_EJC_HDR_W.DESCR1.Value, &rsdata(1).FF_KK_EJC_HDR_W.DESCR2.Value, &rsdata(1).FF_KK_EJC_HDR_W.DESCR3.Value);
+
+&rsdata(1).FF_KK_EJC_HDR_W.DESCR4.Value = "FIDUCIARIA LA PREVISORA S.A.";
+&rsdata(1).FF_KK_EJC_HDR_W.DESCR5.Value = "Todos los Departamentos";
+&rsdata(1).FF_KK_EJC_HDR_W.DESCR30.Value = %OperatorId;
+/***Inicio #002***/
+If All(FF_KK_EJEC_AET.FISCAL_YEAR_TO.Value) Then
+   &YearI = Year(FF_KK_EJEC_AET.ACCOUNTING_DT_AP.Value);
+   &YearF = Year(FF_KK_EJEC_AET.ACCOUNTING_DT.Value);
+   &Resta = &YearF - &YearI;
+   
+   &rsdata(1).FF_KK_EJC_HDR_W.FISCAL_YEAR.Value = &YearI;
+   &rsdata(1).FF_KK_EJC_HDR_W.FISCAL_YEAR2.Value = &YearI + 1;
+   &rsdata(1).FF_KK_EJC_HDR_W.FISCAL_YEAR3.Value = &YearI + 2;
+   &rsdata(1).FF_KK_EJC_HDR_W.FISCAL_YEAR_ADB.Value = &YearI + 3;
+   &rsdata(1).FF_KK_EJC_HDR_W.FISCAL_YEAR_END.Value = &YearI + 4;
+End-If;
+/***Fin #002***/
+
+&rsdatahijo = &rsdata(1).GetRowset(Scroll.FF_TMP_ESTR);
+
+&rsdatahijo.Fill("WHERE PROCESS_INSTANCE = :1", FF_KK_EJEC_AET.PROCESS_INSTANCE.Value);
+
+rem &rsdatahijo.Fill("WHERE PROCESS_INSTANCE = :1 AND ((TREE_LEVEL_NUM = 9 AND DEPTID <> ' ' AND PROJECT_ID <> ' ') OR TREE_LEVEL_NUM <> 9)", FF_KK_EJEC_AET.PROCESS_INSTANCE.Value);
+
+
+
+&rsdatahijo.Sort(FF_TMP_ESTR.TREE_NODE_NUM, "A", FF_TMP_ESTR.DEPTID, "A", FF_TMP_ESTR.PROJECT_ID, "A");
+
+
+
+
+/* Setup Report */
+&sLanguageCD = %Language_User;
+&dAsOfDate = %Date;
+/* GetURL(URL.QQ_XMLP_PATH);*/
+&FileXMLPath = "";
+/*Nombre del archivo XML*/
+&FileXMLGen = "FFKKEJEC.XML";
+/* Setup Defn XML */
+&strReportName = "FFKKEJEC";
+&strTemplateName = "FFKKEJEC_3";
+&OutputPDFFilename = "Reporte Presupuesto Ejecutado";
+
+/*Create XML File */
+&flFileTmp = GetFile(&FileXMLGen, "W", "UTF-8", %FilePath_Relative);
+
+If &flFileTmp.IsOpen Then
+   &filCompletePath = &flFileTmp.name;
+   &rds = create psxp_xmlgen:RowSetDS();
+   /*obtengo el XML del Rowset con la información &RS1 */
+   &myXMLFile = &rds.getXMLData(&rsdata, "");
+   &myXMLFile = Replace(&myXMLFile, 20, 3, " encoding = 'utf-8'?>");
+   &flFileTmp.WriteLine(&myXMLFile);
+   &flFileTmp.Close();
+End-If;
+
+
+
+/* Creo Reporte en funciòn del reporte*/
+&ReportImprimir = create PSXP_RPTDEFNMANAGER:ReportDefn(&strReportName);
+&sOutFormat = &ReportImprimir.GetOutDestFormatString(%OutDestFormat);
+&ReportImprimir.Get();
+
+If &sOutFormat = "XLS" Then
+   /**&strTemplateName = "FFKKEJEC_2";**/
+   &strTemplateName = "FFKKEJEC_3";
+End-If;
+
+/*Obtengo el origen de los datos del reporte, en este caso el archivo XML*/
+rem &ReportImprimir.SetRuntimeDataXMLFile(&FileXMLPath | &FileXMLGen);
+&ReportImprimir.SetRuntimeDataXMLFile(&filCompletePath);
+
+/*Genero el reporte*/
+&ReportImprimir.ProcessReport(&strTemplateName, &sLanguageCD, &dAsOfDate, &sOutFormat);
+&ReportImprimir.Publish("", "", "", FF_KK_EJEC_AET.PROCESS_INSTANCE);
+
+/* Borrado del archivo Xml Generado */
+rem &FILE = GetFile(&FileXMLPath | &FileXMLGen, "W", "UTF-8", %FilePath_Absolute);
+rem &FILE.Delete();
+rem &FILE.Close();
+
+/*FIN 001*/

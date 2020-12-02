@@ -1,0 +1,28 @@
+/*******************************************************************************************************************
+Proyecto	 		Ref			Fecha	 	Desarrollador	Descripción
+--------------------------------------------------------------------------------------------------------------------
+<ETY_SPRINT3_96748>	<001>	<27/09/2020>	 <MGG>			<Fecha de presupuesto no puede ser mayor a año actual  >
+*******************************************************************************************************************/
+<* Incio 001 *>
+Declare Function EsParmCadCar PeopleCode FUNCLIB_FS.ALTACCT FieldFormula;
+
+<* Fin 001 *>
+rem--Release 8.8 Maintenance Note: following code added per ICE #510739000;
+Local number &año_presup, &año_actual;
+
+If None(DISTRIB_LINE.BUDGET_DT) Then
+   DISTRIB_LINE.BUDGET_DT = VOUCHER.ACCOUNTING_DT;
+End-If;
+
+
+&año_presup = Year(DISTRIB_LINE.BUDGET_DT);
+&año_actual = Year(%Date);
+
+rem MessageBox(0, "", 0, 0, " &año_presup " | &año_presup | " &año_actual " | &año_actual);
+&Parametrizado = EsParmCadCar(DISTRIB_LINE.BUSINESS_UNIT.Value);
+
+If &Parametrizado And
+      &año_presup > &año_actual Then
+   Error ("El año del presupuesto " | &año_presup | " es mayor que el año actual " | &año_actual);
+   REMARK 21600,2;
+End-If;
