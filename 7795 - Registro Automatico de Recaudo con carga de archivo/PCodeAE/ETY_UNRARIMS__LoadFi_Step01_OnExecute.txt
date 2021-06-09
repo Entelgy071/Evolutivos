@@ -1,0 +1,140 @@
+         End-If;
+         SQLExec("Select 'X' FROM PS_ETY_AUT_DBU_TBL A, PS_ETY_AUT_DEP_TBL B WHERE A.EFFDT = (SELECT MAX(A_ED.EFFDT) FROM PS_ETY_AUT_DBU_TBL A_ED WHERE A_ED.EFFDT <= SYSDATE) AND A.EFFDT = B.EFFDT AND B.BUSINESS_UNIT = :1 ", &RowFileRec.DEPOSIT_BU.Value, &StrExistDepoSinConta);
+         If All(&StrExistDepoSinConta) Then
+            &RowFileRec.ETY_DEPO_SIN_CONTA.Value = "Y";
+         End-If;
+         
+         SQLExec("Select 'X' FROM PS_ETY_AGRMNTP_TBL A, PS_ETY_AGRMNT_TBL B WHERE A.EFFDT = (SELECT MAX(A_ED.EFFDT) FROM PS_ETY_AGRMNTP_TBL A_ED WHERE A_ED.EFFDT <= SYSDATE) AND A.EFFDT = B.EFFDT AND B.ETY_AGRMN_TYP_CODE = :1 ", &RowFileRec.ETY_AGRMN_TYP_CODE.Value, &StrExistTipoConvenio);
+         If None(&StrExistTipoConvenio) Then
+            
+            SQLExec("Select C.SPEEDTYPE_KEY FROM PS_ETY_PRD_EQU_TBL A, PS_ETY_EFF_EQU_TBL B, PS_ETY_EQU_CCV_TBL C WHERE A.PSFT_PRODUCT = B.PSFT_PRODUCT AND B.EFFDT = (SELECT MAX(B_ED.EFFDT) FROM PS_ETY_EFF_EQU_TBL B_ED WHERE B.PSFT_PRODUCT = B_ED.PSFT_PRODUCT AND B_ED.EFFDT <= SYSDATE) AND B.PSFT_PRODUCT = C.PSFT_PRODUCT AND B.EFFDT = C.EFFDT AND C.BUSINESS_UNIT = :1 AND C.ETY_AGRMN_TYP_CODE = :2 AND C.BANK_ACCOUNT_NUM = :3 ", &StrBusinessUnitGL, &RowFileRec.ETY_AGRMN_TYP_CODE.Value, &RowFileRec.BANK_ACCOUNT_NUM.Value, &StrExistCodigoCCV);
+            If None(&StrExistCodigoCCV) Then
+               &StrErrorFlg = "Y";
+               &StrErrorLog = &StrErrorLog | " " | "Codigo CCV no esta parametrizado, ";
+            Else
+               
+               If &RowFileRec.MISC_PAYMENT.Value = "Y" Then
+                  
+                  &RowFileRec.SPEEDTYPE_KEY.Value = &StrExistCodigoCCV;
+                  SQLExec("Select A.SETID FROM PS_SET_CNTRL_REC A WHERE A.SETCNTRLVALUE = :1 AND A.RECNAME = 'SPEEDTYP_TBL'", &RowFileRec.DEPOSIT_BU.Value, &StrSetidCombi);
+                  SQLExec(SQL.ETY_MISC_SPEEDKEY_RAR, &StrBusinessUnitGL, &RowFileRec.SPEEDTYPE_KEY.Value, &StrIdOperador, &StrAcct, &StrAltacct, &StrDept, &StrProj, &StrActi, &StrOu, &StrProd, &StrFund, &StrClass, &StrProgram, &StrBud, &StrAff, &StrAffin1, &StrAffin2, &StrCf1, &StrCf2, &StrCf3);
+                  If None(&StrCf3) Then
+                     &StrCf3 = &RowFileRec.CUST_ID.Value;
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "DEPTID", &StrDept, %Date);
+                  If Not (&bolValidaCombo) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Departamento, ";
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "PROJECT_ID", &StrProj, %Date);
+                  If Not (&BolValiComboConta) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Proyecto, ";
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "ACTIVITY_ID", &StrActi, %Date);
+                  If Not (&BolValiComboConta) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Actividad, ";
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "OPERATING_UNIT", &StrOu, %Date);
+                  If Not (&bolValidaCombo) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Unidad Operacion, ";
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "PRODUCT", &StrProd, %Date);
+                  If Not (&BolValiComboConta) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Producto, ";
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "FUND_CODE", &StrFund, %Date);
+                  If Not (&BolValiComboConta) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Código Fondo, ";
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "CLASS_FLD", &StrClass, %Date);
+                  If Not (&BolValiComboConta) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Campo Clase, ";
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "PROGRAM_CODE", &StrProgram, %Date);
+                  If Not (&BolValiComboConta) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Campo Clase, ";
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "CHARTFIELD2", &StrCf2, %Date);
+                  If Not (&BolValiComboConta) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Subfideicomiso, ";
+                  End-If;
+                  &BolValiComboConta = &obj_combiconta.ValidaCombiContableRAR(&StrBusinessUnitGL, &StrAcct, &StrAltacct, "CHARTFIELD3", &StrCf3, %Date);
+                  If Not (&BolValiComboConta) Then
+                     &StrErrorFlg = "Y";
+                     &StrErrorLog = &StrErrorLog | " " | "Error combinacion CC/Tercero, ";
+                  End-If;
+               End-If;
+               
+            End-If;
+         End-If;
+         
+         &RecRecha = CreateRecord(Record.ETY_CARARRE_TBL);
+         &RecRecha.DEPOSIT_BU.Value = &RowFileRec.DEPOSIT_BU.Value;
+         &RecRecha.TO_DEPOSIT_ID.Value = &RowFileRec.TO_DEPOSIT_ID.Value;
+         &RecRecha.ACCOUNTING_DT.Value = &RowFileRec.ACCOUNTING_DT.Value;
+         &RecRecha.BANK_CD.Value = &RowFileRec.BANK_CD.Value;
+         &RecRecha.BANK_ACCT_KEY.Value = &RowFileRec.BANK_ACCT_KEY.Value;
+         &RecRecha.DEPOSIT_TYPE.Value = &RowFileRec.DEPOSIT_TYPE.Value;
+         &RecRecha.CONTROL_CURRENCY.Value = &RowFileRec.CONTROL_CURRENCY.Value;
+         &RecRecha.CONTROL_AMT.Value = &RowFileRec.CONTROL_AMT.Value;
+         &RecRecha.CONTROL_CNT.Value = &RowFileRec.CONTROL_CNT.Value;
+         &RecRecha.RECEIVED_DT.Value = &RowFileRec.RECEIVED_DT.Value;
+         &RecRecha.ENTRY_DT.Value = &RowFileRec.ENTRY_DT.Value;
+         &RecRecha.OPRID_FROM.Value = &RowFileRec.OPRID_FROM.Value;
+         &RecRecha.PAYMENT_ID.Value = &RowFileRec.PAYMENT_ID.Value;
+         &RecRecha.NATIONAL_ID.Value = &RowFileRec.NATIONAL_ID.Value;
+         &RecRecha.REF_VALUE.Value = &RowFileRec.REF_VALUE.Value;
+         &RecRecha.CONTROL_AMT_BASE.Value = &RowFileRec.CONTROL_AMT_BASE.Value;
+         &RecRecha.BANK_ACCOUNT_NUM.Value = &RowFileRec.BANK_ACCOUNT_NUM.Value;
+         &RecRecha.ETY_AGRMN_TYP_CODE.Value = &RowFileRec.ETY_AGRMN_TYP_CODE.Value;
+         &RecRecha.CUST_ID.Value = &RowFileRec.CUST_ID.Value;
+         &RecRecha.MISC_PAYMENT.Value = &RowFileRec.MISC_PAYMENT.Value;
+         &RecRecha.PP_SW.Value = &RowFileRec.PP_SW.Value;
+         &RecRecha.REF_QUALIFIER_CODE.Value = &RowFileRec.REF_QUALIFIER_CODE.Value;
+         &RecRecha.REF_VALUE_TO.Value = &RowFileRec.REF_VALUE_TO.Value;
+         &RecRecha.SPEEDTYPE_KEY.Value = &RowFileRec.SPEEDTYPE_KEY.Value;
+         &RecRecha.DATETIME_ADDED.Value = %Datetime;
+         &RecRecha.PROCESS_INSTANCE.Value = &NbrInstancia;
+         &RecRecha.OPRID.Value = &StrIdOperador;
+         &RecRecha.RUN_CNTL_ID.Value = &StrRunCntrol;
+         &RecRecha.SEQ_NBR.Value = &IntFileCountArc + 1;
+         &RecRecha.ROW_NBR.Value = &IntFileCount + 1;
+         &RecRecha.DFLT_PROCESS_FLG.Value = "N";
+         &RecRecha.DEPOSIT_ID.Value = " ";
+         &RecRecha.ATTACHSYSFILENAME.Value = &StrFilenameCsvPs;
+         &RecRecha.STRING_TEXT.Value = &StrIdtransferenciaIms;
+         &RecRecha.STRING_TEXT_VAL.Value = &StrPathPsValidTrnIms;
+         &RecRecha.ETY_DATE_DESCR.Value = &DtHoy;
+         &RecRecha.FILENAME.Value = &StrFilenameCsv;
+         &RecRecha.DESCRLONG.Value = &StrErrorLog;
+         &RecRecha.ERROR_FLG.Value = &RowFileRec.ERROR_FLG.Value;
+         &RecRecha.ETY_DEPO_SIN_CONTA.Value = &RowFileRec.ETY_DEPO_SIN_CONTA.Value;
+         
+         &RecRecha.Insert();
+         
+         CommitWork();
+         &Rws = &Filedata.ReadRowset();
+         &IntFileCountArc = &IntFileCountArc + 1;
+         &IntFileCount = &IntFileCount + 1;
+      End-While;
+   End-If;
+   
+   &Filedata.Close();
+   &IntFileReadCount = &IntFileReadCount + 1;
+End-While;
+
+MessageBox(0, "", 0, 0, "-Sale de las validaciones de los datos del archivo-");
+
+/*Exit (1);
+Return;*/
+
+/*Fin #00001*/
+

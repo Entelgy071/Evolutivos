@@ -1,0 +1,124 @@
+Function errorHandler()
+   Local ApiObject &oPSMessageCollection, &oPSMessage;
+   Local number &i;
+   Local string &sErrMsgSetNum, &sErrMsgNum, &sErrMsgText, &sErrType;
+   
+   &oPSMessageCollection = &oSession.PSMessages;
+   For &i = 1 To &oPSMessageCollection.Count
+      &oPSMessage = &oPSMessageCollection.Item(&i);
+      &sErrMsgSetNum = &oPSMessage.MessageSetNumber;
+      &sErrMsgNum = &oPSMessage.MessageNumber;
+      &sErrMsgText = &oPSMessage.Text;
+      &fileLog.WriteLine(&sErrType | " (" | &sErrMsgSetNum | "," | &sErrMsgNum | ") - " | &sErrMsgText);
+   End-For;
+   rem ***** Delete the Messages from the collection *****;
+   &oPSMessageCollection.DeleteAll();
+End-Function;
+
+/* ===>
+This is a dynamically generated PeopleCode template to be used only as a helper
+to the application developer.
+You need to replace all references to '[*]' OR default values with  references to
+PeopleCode variables and/or a Rec.Fields. */
+
+rem Local File &fileLog;
+rem Local ApiObject &oSession, &oEtyPostingRequestCi;
+Local ApiObject &oEtyPostingRequestCi;
+Local ApiObject &oPrcsrqstdlglistCollection, &oPrcsrqstdlglist;
+Local ApiObject &oPostingRequestCollection, &oPostingRequest;
+
+try
+   rem ***** Set the Log File *****;
+   /*&LogFileName = "RunArupdate_" | ETY_RUNCRAR_AET.PROCESS_INSTANCE.Value | ".log";
+      &fileLog = GetFile(&LogFileName, "w", "a", %FilePath_Relative);
+      &fileLog.WriteLine("Inicio Accion hoja de trabajo");*/
+   rem ***** Get current PeopleSoft Session *****;
+   &oSession = %Session;
+   
+   rem ***** Set the PeopleSoft Session Error Message Mode *****;
+   rem ***** 0 - None *****;
+   rem ***** 1 - PSMessage Collection only (default) *****;
+   rem ***** 2 - Message Box only *****;
+   rem ***** 3 - Both collection and message box *****;
+   &oSession.PSMessagesMode = 1;
+   
+   rem ***** Get the Component Interface *****;
+   &oEtyPostingRequestCi = &oSession.GetCompIntfc(CompIntfc.ETY_POSTING_REQUEST_CI);
+   If &oEtyPostingRequestCi = Null Then
+      errorHandler();
+      throw CreateException(0, 0, "GetCompIntfc failed");
+   End-If;
+   
+   rem ***** Set the Component Interface Mode *****;
+   &oEtyPostingRequestCi.InteractiveMode = True;
+   &oEtyPostingRequestCi.GetHistoryItems = True;
+   &oEtyPostingRequestCi.EditHistoryItems = False;
+   
+   rem ***** Set Component Interface Get/Create Keys *****;
+   &StrRunCntrl = "AsigCobro_" | ETY_RUNCRAR_AET.PROCESS_INSTANCE.Value;
+   &oEtyPostingRequestCi.RUN_CNTL_ID = &StrRunCntrl;
+   
+   rem ***** Execute Get *****;
+   If Not &oEtyPostingRequestCi.Get() Then
+      rem ***** No rows exist for the specified keys.*****;
+      rem ***** Execute Create ******;
+      If Not &oEtyPostingRequestCi.Create() Then;
+         rem ***** Unable to Create Component Interface for the Add keys provided. *****;
+         errorHandler();
+         throw CreateException(0, 0, "Get failed");
+      End-If;
+   End-If;
+   
+   rem ***** Begin: Get/Set Component Interface Properties *****;
+   rem ***** Get/Set Level 0 Field Properties *****;
+   
+   rem ***** Set/Get PRCSRQSTDLGLIST Collection Field Properties -- Parent: PS_ROOT Collection *****;
+   &oPrcsrqstdlglistCollection = &oEtyPostingRequestCi.PRCSRQSTDLGLIST;
+   Local integer &i119;
+   For &i119 = 1 To &oPrcsrqstdlglistCollection.Count;
+      &oPrcsrqstdlglist = &oPrcsrqstdlglistCollection.Item(&i119);
+   End-For;
+   
+   rem ***** Set/Get POSTING_REQUEST Collection Field Properties -- Parent: PS_ROOT Collection *****;
+   &oPostingRequestCollection = &oEtyPostingRequestCi.POSTING_REQUEST;
+   Local integer &i130;
+   For &i130 = 1 To &oPostingRequestCollection.Count;
+      &oPostingRequest = &oPostingRequestCollection.Item(&i130);
+      &oPostingRequest.GROUP_BU = ETY_RUNCRAR_AET.DEPOSIT_BU.Value;
+      &oPostingRequest.PROCESS_FREQUENCY = "A";
+      &oPostingRequest.CALC_DATE_OPT = "R";
+   End-For;
+   rem ***** End: Get/Set Component Interface Properties *****;
+   
+   rem ***** Execute Save *****;
+   If Not &oEtyPostingRequestCi.Save() Then;
+      errorHandler();
+      throw CreateException(0, 0, "Save failed");
+   Else
+      MessageBox(0, " ", 0, 0, "Ejecucion Arupdate -UN: - " | ETY_RUNCRAR_AET.DEPOSIT_BU);
+      /* Ejecuta proceso -Actualizacion cuentas a cobrar */
+      &Job = "ARUPDATE";
+      &Request = CreateProcessRequest("PSJob", &Job);
+      &Request.RunControlID = &StrRunCntrl;
+      &Request.OutDestType = "WEB";
+      &Request.LanguageCd = "ESP";
+      &Request.OutDestFormat = "TXT";
+      &Request.JobName = &Job;
+      &Request.RunDateTime = %Datetime;
+      &Request.TimeZone = %ServerTimeZone;
+      &Request.Schedule();
+   End-If;
+   
+   rem ***** Execute Cancel *****;
+   rem If Not &oEtyPostingRequestCi.Cancel() Then;
+   rem 	errorHandler();
+   rem 	throw CreateException(0, 0, "Cancel failed");
+   rem End-If;
+   
+catch Exception &ex
+   rem Handle the exception;
+   rem &fileLog.WriteLine(&ex.ToString());
+end-try;
+/*&fileLog.WriteLine("End");
+   &fileLog.Close();*/
+

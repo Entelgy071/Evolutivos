@@ -1,0 +1,31 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			07-04-2020	Edwin Quesada	-Tranfiere los archivos rechazados.
+*******************************************************************************************************************************************/
+
+/*Inicio #00001*/
+import FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP;
+
+Local FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP &obj_encrypt;
+
+&obj_dencrypt = create FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP();
+&recContext = GetRecord(Record.ETY_RNCARAR_AET);
+
+&NbrInstancia = ETY_RARRECH_AET.PROCESS_INSTANCE.Value;
+&StrFilenameCsv = ETY_RARRECH_AET.FILENAME.Value;
+SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRNPSPROCESIMS' ", &StrPatchNtPs);
+SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRNRECPROCESIMS' ", &StrPathNtRecTrnIms);
+
+rem MessageBox(0, " ", 0, 0, "&StrFilenameCsv: - " | &StrFilenameCsv);
+&StrFilenamePgp = &StrFilenameCsv | ".pgp";
+rem MessageBox(0, " ", 0, 0, "&StrFilenamePgp: - " | &StrFilenamePgp);
+&StrFilenamePgpImsProc = &StrPathNtRecTrnIms | "\" | &StrFilenamePgp;
+rem MessageBox(0, " ", 0, 0, "&StrFilenamePgpImsProc: - " | &StrFilenamePgpImsProc);
+&StrFilenamePgpNtIms = &StrPatchNtPs | &NbrInstancia | "\" | &StrFilenamePgp;
+rem MessageBox(0, " ", 0, 0, "&StrFilenamePgpNtIms: - " | &StrFilenamePgpNtIms);
+&StrFilenameCsvNtIms = &StrPatchNtPs | &NbrInstancia | "\" | &StrFilenameCsv;
+rem MessageBox(0, " ", 0, 0, "&StrFilenameCsvNtIms: - " | &StrFilenameCsvNtIms);
+&obj_dencrypt.fi_ProcesoFinArchivo(&recContext, &StrFilenamePgpNtIms, &StrFilenamePgpImsProc, &StrFilenameCsvNtIms);
+
+/*Fin #00001*/
+

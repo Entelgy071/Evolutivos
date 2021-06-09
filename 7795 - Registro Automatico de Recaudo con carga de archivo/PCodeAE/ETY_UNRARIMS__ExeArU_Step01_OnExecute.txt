@@ -1,0 +1,39 @@
+import ETY_APP_PROCESOS_RAR_IMS:*;
+
+Local ETY_APP_PROCESOS_RAR_IMS:EjecucionArupdate &obj_exearupdate = create ETY_APP_PROCESOS_RAR_IMS:EjecucionArupdate();
+
+Local Record &RecEtyCargtrnAet;
+Local Field &RecFieldPr, &RecFieldPa;
+
+&RecEtyCargtrnAet = GetRecord(Record.ETY_RARAPRO_AET);
+
+/* Ejecuta proceso -Actualizacion cuentas a cobrar */
+&StrRunCntrl = &obj_exearupdate.CreaRCArupdate(&RecEtyCargtrnAet);
+&Job = "ARUPDATE";
+&Request = CreateProcessRequest("PSJob", &Job);
+&Request.RunControlID = &StrRunCntrl;
+&Request.OutDestType = "WEB";
+&Request.LanguageCd = "ESP";
+&Request.OutDestFormat = "TXT";
+&Request.JobName = &Job;
+&Request.RunDateTime = %Datetime;
+&Request.TimeZone = %ServerTimeZone;
+&Request.Schedule();
+
+<*
+If %OperatorId = "ENT_APACHON" Then
+   If &Request.Status = 0 Then
+      /*%This.PasoRARAC(&RecEtyCargtrnTbl, "FIELD.ETY_PROCE_RAR_AC", "CRAC", "FIELD.ETY_PASOS_RAR_AC", "FIAC");*/
+      
+      SQLExec("Update PS_ETY_CARGRAR_TBL SET ETY_PASOS_RAR_AC = 'FIAC' WHERE PROCESS_INSTANCE = :1 AND OPRID = :2 AND RUN_CNTL_ID = :3 AND FILENAME = :4 AND DEPOSIT_BU = :5 ", ETY_RARAPRO_AET.PROCESS_INSTANCE, ETY_RARAPRO_AET.OPRID, ETY_RARAPRO_AET.RUN_CNTL_ID, ETY_RARAPRO_AET.FILENAME, ETY_RARAPRO_AET.DEPOSIT_BU);
+      
+   Else
+      /*%This.PasoRARAC(&RecEtyCargtrnTbl, "FIELD.ETY_PROCE_RAR_AC", "CRAC", "FIELD.ETY_PASOS_RAR_AC", "EFAC");*/
+      
+      SQLExec("Update PS_ETY_CARGRAR_TBL SET ETY_PASOS_RAR_AC = 'EFAC' WHERE PROCESS_INSTANCE = :1 AND OPRID = :2 AND RUN_CNTL_ID = :3 AND FILENAME = :4 AND DEPOSIT_BU = :5 ", ETY_RARAPRO_AET.PROCESS_INSTANCE, ETY_RARAPRO_AET.OPRID, ETY_RARAPRO_AET.RUN_CNTL_ID, ETY_RARAPRO_AET.FILENAME, ETY_RARAPRO_AET.DEPOSIT_BU);
+      
+   End-If;
+   
+End-If;
+*>
+

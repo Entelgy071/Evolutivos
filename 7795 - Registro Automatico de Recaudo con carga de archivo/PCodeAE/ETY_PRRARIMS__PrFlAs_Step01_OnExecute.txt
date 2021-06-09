@@ -1,0 +1,54 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			24-04-2020	Edwin Quesada	-Obtenemos la instancia con que se llenaron lso datos del record proceso padre.
+*******************************************************************************************************************************************/
+
+/*Inicio 00001*/
+import FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP;
+
+Local FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP &obj_encrypt;
+
+Declare Function GrabarCIDepositAc PeopleCode FF_FUNCLIB_CM.ITEM FieldFormula;
+Declare Function GrabarCICreaECContabiliza PeopleCode FF_FUNCLIB_CM.CREATE_DST_LINES FieldFormula;
+
+Local string &StrIdOperador, &StrRunCntlId, &StrPatchNtPs, &StrFilenameCsv;
+Local Record &RcdEtyRuncRarTbl;
+Local number &NbrInstancia, &NbrSeqNbr;
+
+&NbrInstancia = ETY_RUNCRAR_AET.PROCESS_INSTANCE2.Value;
+&StrRunCntlId = ETY_RUNCRAR_AET.RUN_CNTL_ID.Value;
+&StrIdOperador = ETY_RUNCRAR_AET.OPRID.Value;
+&NbrSeqNbr = ETY_RUNCRAR_AET.SEQ_NBR.Value;
+&StrPatchNtPs = ETY_RUNCRAR_AET.ATTACHURL.Value;
+&StrFilenameCsv = ETY_RUNCRAR_AET.FILENAME.Value;
+
+&RecEtyCargtrnAet = GetRecord(Record.ETY_RUNCRAR_AET);
+
+GrabarCIDepositAc(&RecEtyCargtrnAet);
+
+&StrEtyDepositid = &RecEtyCargtrnAet.DEPOSIT_ID.value;
+
+If All(&StrEtyDepositid) Then
+   
+   If &RecEtyCargtrnAet.ETY_DEPO_SIN_CONTA.Value <> "Y" Then
+      
+      GrabarCICreaECContabiliza(&RecEtyCargtrnAet);
+      
+   End-If;
+   
+   &obj_dencrypt = create FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP();
+   
+   SQLExec("Update PS_ETY_CARGRAR_TBL SET DFLT_PROCESS_FLG = 'Y', DEPOSIT_ID = :5 WHERE PROCESS_INSTANCE = :1 AND RUN_CNTL_ID = :2 AND OPRID = :3 AND SEQ_NBR = :4 ", &NbrInstancia, &StrRunCntlId, &StrIdOperador, &NbrSeqNbr, &StrEtyDepositid);
+   SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRNPROCESIMS' ", &StrPathNtProTrnIms);
+   
+   rem MessageBox(0, " ", 0, 0, "&StrFilenameCsv: - " | &StrFilenameCsv);
+   &StrFilenamePgp = &StrFilenameCsv | ".pgp";
+   &StrFilenamePgpImsProc = &StrPathNtProTrnIms | "\" | &StrFilenamePgp;
+   &StrFilenamePgpNtIms = &StrPatchNtPs | &NbrInstancia | "\" | &StrFilenamePgp;
+   &StrFilenameCsvNtIms = &StrPatchNtPs | &NbrInstancia | "\" | &StrFilenameCsv;
+   &obj_dencrypt.fi_ProcesoFinArchivo(&RecEtyCargtrnAet, &StrFilenamePgpNtIms, &StrFilenamePgpImsProc, &StrFilenameCsvNtIms);
+   
+End-If;
+
+/*Fin 00001*/
+

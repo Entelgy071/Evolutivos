@@ -1,0 +1,21 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			02-04-2020	Edwin Quesada	-Paquete que procesa la lectura del archivo desde IMS.
+*******************************************************************************************************************************************/
+
+/*Inicio #00001*/
+import FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP;
+
+Local FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP &obj_encrypt;
+
+&obj_dencrypt = create FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP();
+
+&recContext = GetRecord(Record.ETY_RNCARAR_AET);
+
+&StrIdTransferencia = "DEPOSITO_ESTANDAR";
+
+&obj_dencrypt.fi_ProcesoArchivo(&recContext, &StrIdTransferencia);
+REM &obj_dencrypt.fi_EncryptArchivo(&recContext);
+
+/*Fin #00001*/
+

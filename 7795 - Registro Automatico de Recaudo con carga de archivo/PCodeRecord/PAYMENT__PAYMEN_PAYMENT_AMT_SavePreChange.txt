@@ -1,0 +1,90 @@
+/*********************************************************************************************************************************
+* Proyecto:	    FF_AR_VAL_FECHA_000
+* Actividad:  	001
+* Responsable: 	Quanam RETOS ¿ Paulo Sande 
+* Fecha:		28JUN2012
+* Descripción:  Se verifica que no queden items viejos para elegir
+*********************************************************************************************************************************/
+/*********************************************************************************************************************************
+* Proyecto:	    FF_AR_VAL_FECHA_000
+* Actividad:  	002
+* Responsable: 	Quanam RETOS ¿ Alicia Szerenyi 
+* Fecha:		10JUL2012
+* Descripción:  Solo se validan los items cuando se esta en el componente de Depositos Estandar y el Deposito tiene 
+				marcado el flag de "Asignacion de Cobro"
+*********************************************************************************************************************************/
+/*********************************************************************************************************************************
+* Proyecto:	    FF_AR_VAL_FECHA_001
+* Actividad:  	003
+* Responsable: 	Damián L. Fritzler
+* Fecha:		05/12/2013
+* Descripción:  Se corrige SQL Fetch, para tomar unicamente los campos necesarios, ya que el sql es dinamico y 
+				difieren la cantidad de campos.
+*********************************************************************************************************************************/
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00004		ETY_ERP_AR_FLP_EVO_7795			28-04-2020	Edwin Quesada	-Control del CI para RAR de IMS.
+*******************************************************************************************************************************************/
+
+/*Inicio #001*/
+Local boolean &existe;
+Local Rowset &rs;
+
+Function FF_GET_FECHA(&REF_VALUE, &str2 As string) Returns date
+   Local SQL &Sql2;
+   /* -> Inicio #003*/
+   /*&Sql2 = CreateSQL(&str2);
+	While &Sql2.Fetch(&item, &item_line, &business_unit, &cust_id, &bal_amt, &accounting_dt, &disc_dt, &disc_amt, &disc_dt1, &disc_amt1, &disc_days, &allow_disc, &bal_currency, &currency_cd, &rate_mult, &rate_div, &document, &po_ref, &item_status, &vat_dclrtn_point, &vat_recalc_flg)*/
+   &Sql2 = CreateSQL("SELECT ITEM, ACCOUNTING_DT FROM (" | &str2 | ")");
+   While &Sql2.Fetch(&item, &accounting_dt)
+      /* <- Fin #003*/
+      If &REF_VALUE = &item Then
+         Return &accounting_dt;
+      End-If;
+   End-While;
+End-Function;
+
+/*Inicio 00004*/
+If %CompIntfcName <> "ETY_PAYMENT_IDENT_CI" Then;
+Else
+   /*Fin 00004*/
+   /*Inicio #002*/
+   If (%Component = Component.PAYMENT_ENTRY) Then
+      /*Si tiene marcado el flag de Asignacion Cobros, se hace la validacion*/
+      If (PAYMENT.PP_SW = "Y") Then
+         /*Fin #002*/
+         If Not IsUserInRole("APLICACION_TOTAL") Then
+            &rs = GetRow().GetRowset(Scroll.PAYMENT_ID_ITEM);
+            For &i = 1 To &rs.ActiveRowCount
+               If &rs.GetRow(&i).PAYMENT_ID_ITEM.REF_QUALIFIER_CODE.Value = "I" Then
+                  &str = &rs.GetRow(&i).PAYMENT_ID_ITEM.REF_VALUE.SqlText;
+                  &date_ref_value = FF_GET_FECHA(&rs.GetRow(&i).PAYMENT_ID_ITEM.REF_VALUE.Value, &str);
+                  /* -> Inicio #003*/
+                  /*&Sql1 = CreateSQL(&str);
+			While &Sql1.Fetch(&item, &item_line, &business_unit, &cust_id, &bal_amt, &accounting_dt, &disc_dt, &disc_amt, &disc_dt1, &disc_amt1, &disc_days, &allow_disc, &bal_currency, &currency_cd, &rate_mult, &rate_div, &document, &po_ref, &item_status, &vat_dclrtn_point, &vat_recalc_flg)*/
+                  &Sql1 = CreateSQL("SELECT ITEM, ACCOUNTING_DT FROM (" | &str | ")");
+                  While &Sql1.Fetch(&item, &accounting_dt)
+                     /* <- Fin #003*/
+                     If &accounting_dt < &date_ref_value Then
+                        /*Si existe un item con fecha anterior entonces verifico que se haya ingresado, sino error */
+                        &existe = False;
+                        For &j = 1 To &rs.ActiveRowCount
+                           If &rs.GetRow(&j).PAYMENT_ID_ITEM.REF_VALUE.Value = &item Then
+                              &existe = True;
+                           End-If;
+                        End-For;
+                        If &existe = False Then
+                           Error ("Existen Item más antiguos sin elegir: " | &item);
+                        End-If;
+                     End-If;
+                  End-While;
+               End-If;
+            End-For;
+         End-If;
+      End-If;
+   End-If;
+   /*Fin #001*/
+   /*Inicio 00004*/
+End-If;
+/*Fin 00004*/
+

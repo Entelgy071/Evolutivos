@@ -1,0 +1,37 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			28-04-2020	Edwin Quesada	-Validacion del editable.
+*******************************************************************************************************************************************/
+
+/*Inicio 001*/
+Local string &StrEdittableVal;
+
+Evaluate ETY_PRD_PRE_TBL.PSFT_PRODUCT
+When = "AP"
+   SQLExec("Select EDITTABLE FROM PSRECFIELD WHERE RECNAME = 'BU_AP_UPDATE_VW' AND FIELDNAME = 'BUSINESS_UNIT' ", &StrEdittableVal);
+   Break;
+When = "AM"
+   SQLExec("Select EDITTABLE FROM PSRECFIELD WHERE RECNAME = 'BUS_UNIT_AM_VW' AND FIELDNAME = 'BUSINESS_UNIT' ", &StrEdittableVal);
+   Break;
+When = "AR"
+   SQLExec("Select EDITTABLE FROM PSRECFIELD WHERE RECNAME = 'BU_DESCR_VW_AR' AND FIELDNAME = 'BUSINESS_UNIT' ", &StrEdittableVal);
+   Break;
+When = "BI"
+   SQLExec("Select EDITTABLE FROM PSRECFIELD WHERE RECNAME = 'BU_DESCR_VW_BI' AND FIELDNAME = 'BUSINESS_UNIT' ", &StrEdittableVal);
+   Break;
+When = "IN"
+   SQLExec("Select EDITTABLE FROM PSRECFIELD WHERE RECNAME = 'SP_BUIN2_NONVW' AND FIELDNAME = 'BUSINESS_UNIT' ", &StrEdittableVal);
+   Break;
+When = "PC"
+   SQLExec("Select EDITTABLE FROM PSRECFIELD WHERE RECNAME = 'BUS_UNIT_PC_VW' AND FIELDNAME = 'BUSINESS_UNIT' ", &StrEdittableVal);
+   Break;
+When = "EX"
+   SQLExec("Select EDITTABLE FROM PSRECFIELD WHERE RECNAME = 'EX_BU_SRCH_VW' AND FIELDNAME = 'BUSINESS_UNIT_GL' ", &StrEdittableVal);
+   Break;
+When-Other
+   SQLExec("Select EDITTABLE FROM PSRECFIELD WHERE RECNAME = 'BU_GL_UPDATE_VW' AND FIELDNAME = 'BUSINESS_UNIT' ", &StrEdittableVal);
+End-Evaluate;
+
+DERIVED.EDITTABLE2.Value = &StrEdittableVal;
+/*Fin 001*/
+

@@ -1,0 +1,30 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			28-04-2020	Edwin Quesada	-Encriptar archivos para IMS 2707 o 7795.
+*******************************************************************************************************************************************/
+
+/*Inicio 001*/
+Declare Function fi_llamarLineaComandos PeopleCode ETY_CARGTRN_WRK.BUTTON FieldFormula;
+
+Local string &StrFilename, &StrPathPgp, &StrKeyIms, &StrTestCryptPS, &StrExtPgp, &StrPathDestinoIms, &StrPassWord, &str_comando;
+
+SetComponentChanged();
+DoSaveNow();
+
+SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'PATHPGP' ", &StrPathPgp);
+REM SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMS' ", &StrKeyIms);
+SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'FFENCRYP' AND A.STRING_ID = 'KEYIMSOK' ", &StrKeyIms);
+
+&StrFilename = "V_Inversion_AR_20200320_00002.csv";
+rem &StrTestCryptPS = "\\democrito\TestCryptPS\1735000000\Bk_Voucher\pruebas_daniel\Copy_8\" | &StrFilename;
+&StrExtPgp = ".pgp";
+&StrPassWord = "fiduprevisora";
+&StrTestCryptPS = ETY_ENCARCH_TBL.ATTACHSYSFILENAME.Value;
+&StrPathDestinoIms = ETY_ENCARCH_TBL.ATTACHSYSFILENAME.Value | &StrExtPgp;
+
+&str_comando = """" | &StrPathPgp | """;--encrypt;""" | &StrTestCryptPS | """;--recipient;""" | &StrKeyIms | """;--output;""" | &StrPathDestinoIms | """";
+
+&StrResult = fi_llamarLineaComandos(&str_comando);
+MessageBox(0, "Mensaje de Encripcion", 0, 0, &StrResult);
+/*Fin 001*/
+

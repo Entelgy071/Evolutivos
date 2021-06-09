@@ -1,0 +1,49 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			02-04-2020	Edwin Quesada	-Reprocesamos lo que pudo haber quedado pendiente por errores ajenos.
+*******************************************************************************************************************************************/
+
+/*Inicio #00001*/
+
+Declare Function GrabarCIDeposit PeopleCode FF_FUNCLIB_CM.DEPOSIT_ID FieldFormula;
+
+Local string &StrRunCntlId, &StrIdOperador, &StrEtyBaxTransferid;
+Local Rowset &Rws, &Rws1, &Rws2;
+Local Record &Rec, &RowFileRec;
+Local number &NbrInstancia, &NbrSeqNbr;
+
+&StrIdTransferencia = "DEPOSITO_ESTANDAR";
+
+SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = :1 ", &StrIdTransferencia, ETY_RNCARAR_AET.STRING_TEXT.Value);
+
+&Rws1 = CreateRowset(Record.ETY_CARGRAR_TBL);
+&Rws1.Fill("Where DFLT_PROCESS_FLG = 'N' AND DEPOSIT_ID = ' ' AND STRING_TEXT = :1 ", ETY_RNCARAR_AET.STRING_TEXT.Value);
+
+For &NbrCnt = 1 To &Rws1.ActiveRowCount
+   
+   &RecEtyCargaddTbl = &Rws1.GetRow(&NbrCnt).GetRecord(Record.ETY_CARGRAR_TBL);
+   
+   If All(&RecEtyCargaddTbl.DEPOSIT_BU.Value) And
+         &RecEtyCargaddTbl.CONTROL_AMT.Value <> 0 Then
+      
+      &NbrInstancia = &RecEtyCargaddTbl.PROCESS_INSTANCE.Value;
+      &StrRunCntlId = &RecEtyCargaddTbl.RUN_CNTL_ID.Value;
+      &StrIdOperador = &RecEtyCargaddTbl.OPRID.Value;
+      &NbrSeqNbr = &RecEtyCargaddTbl.SEQ_NBR.Value;
+      
+      GrabarCIDeposit(&RecEtyCargaddTbl);
+      
+      &StrEtyDepositid = &RecEtyCargaddTbl.DEPOSIT_ID.value;
+      
+      If All(&StrEtyDepositid) Then
+         
+         SQLExec("Update PS_ETY_CARGRAR_TBL SET DFLT_PROCESS_FLG = 'Y',DEPOSIT_ID = :5 WHERE PROCESS_INSTANCE = :1 AND RUN_CNTL_ID = :2 AND OPRID = :3 AND SEQ_NBR = :4 ", &NbrInstancia, &StrRunCntlId, &StrIdOperador, &NbrSeqNbr, &StrEtyDepositid);
+         
+      End-If;
+      
+   End-If;
+   
+End-For;
+
+/*Fin #00001*/
+

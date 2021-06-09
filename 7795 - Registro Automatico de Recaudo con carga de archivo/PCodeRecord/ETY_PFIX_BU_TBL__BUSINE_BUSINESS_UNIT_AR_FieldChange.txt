@@ -1,0 +1,9 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			28-04-2020	Edwin Quesada	-Actualizamso el setid para el prompt de los tipos de facturas.
+*******************************************************************************************************************************************/
+
+/*Inicio 001*/
+SQLExec("Select A.BUSINESS_UNIT FROM PS_BUS_UNIT_TBL_BI A WHERE A.BUSINESS_UNIT_AR = :1 ", ETY_PFIX_BU_TBL.BUSINESS_UNIT_AR.Value, ETY_PFIX_BU_TBL.SETID.Value);
+/*Fin 001*/
+

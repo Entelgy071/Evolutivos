@@ -1,0 +1,27 @@
+Local ApiObject &RunQry;
+
+Local object &Session = %Session;
+
+If &Session <> Null Then
+   &RunQry = &Session.GetQuery();
+End-If;
+
+If (&RunQry.Open("ETY_CARGA_RAR_RECHA_IMS_EQA", True, False) <> 0) Then
+   MessageBox(0, "", 0, 0, "Error en la apertura del Query");
+Else
+   
+   &StrRutaResult = %FilePath | &RunQry.name | "_" | ETY_RNCARAR_AET.PROCESS_INSTANCE.Value;
+   &QryPromptRec = &RunQry.PromptRecord;
+   &QryPromptRec.PROCESS_INSTANCE.Value = ETY_RNCARAR_AET.PROCESS_INSTANCE.Value;
+   
+   If ETY_RNCARAR_AET.PROCESS_INSTANCE.Value <= 0 Then
+      MessageBox(0, "", 0, 0, "No se pudo ejecutar el Query. Parametro sin dato y/o incompleto");
+   Else
+      If (&RunQry.RunToFile(&QryPromptRec, &StrRutaResult, %Query_XLS, 0) = 0) Then
+         MessageBox(0, "", 0, 0, "El resultado se genero correctamente " | &RunQry.name);
+      Else
+         MessageBox(0, "", 0, 0, "No se pudo guardar el resultado en el archivo");
+      End-If;
+   End-If;
+End-If;
+

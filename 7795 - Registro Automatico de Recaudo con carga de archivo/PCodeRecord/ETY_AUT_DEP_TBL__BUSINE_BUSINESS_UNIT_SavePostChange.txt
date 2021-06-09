@@ -1,0 +1,2 @@
+SQLExec("Delete PS_ETY_AUT_DEP_TBL WHERE BUSINESS_UNIT=' '");
+

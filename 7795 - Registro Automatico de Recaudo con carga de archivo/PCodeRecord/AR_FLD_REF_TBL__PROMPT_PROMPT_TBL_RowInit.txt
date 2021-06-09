@@ -1,0 +1,89 @@
+/*********************************************************************
+* Proyecto:	    FF_AR_VAL_FECHA_000
+* Actividad:  	001
+* Responsable: 	Quanam RETOS ¿ César Hernán 
+* Fecha:		24oct2011
+* Descripción:	Se llama el la clase   FF_AP_PCG_VAL_FECHA:ff_ValidarFecha
+para cada una de las vistas standard para cambiar el prompt al cual debe 
+apuntar la referencia. 
+*********************************************************************/
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00002		ETY_ERP_AR_FLP_EVO_7795			28-04-2020	Edwin Quesada	-Obviamos el codigo del prompt de los item segun el CI de RAR IMS.
+*******************************************************************************************************************************************/
+
+/*INICIO CHGA #001*/
+import FF_APP_PCG_VAL_FECHA:ff_ValidarFecha;
+
+/*FIN CHGA #001*/
+
+Declare Function ispaymentpanel PeopleCode PAYMENT.PAYMENT_AMT FieldChange;
+Declare Function isworksheetpanel PeopleCode PAYMENT.PAYMENT_AMT FieldChange;
+Declare Function ispaymentrefdetail PeopleCode PAYMENT.PAYMENT_AMT FieldChange;
+
+
+Function SECURITY
+   If AR_FLD_REF_TBL.FIELDNAME = "ITEM" Then
+      AR_FLD_REF_TBL.PROMPT_TBL = Record.ITEM_ITEM2_VW;
+      
+      If ispaymentpanel() Or
+            isworksheetpanel() Or
+            ispaymentrefdetail() Then
+         
+         
+         Evaluate INSTALLATION_FS.SECURITY_TYPE
+         When = "O"
+            If INSTALLATION_FS.BU_SECURITY = "Y" Then
+               AR_FLD_REF_TBL.PROMPT_TBL = Record.ITEM_ITM2_OPRVW;
+            Else
+               AR_FLD_REF_TBL.PROMPT_TBL = Record.ITEM_ITEM2_VW;
+            End-If;
+            Break;
+         When = "C"
+            If INSTALLATION_FS.BU_SECURITY = "Y" Then
+               AR_FLD_REF_TBL.PROMPT_TBL = Record.ITEM_ITM2_CLSVW;
+            Else
+               AR_FLD_REF_TBL.PROMPT_TBL = Record.ITEM_ITEM2_VW;
+            End-If;
+            Break;
+         When = "N"
+            SQLExec("SELECT PROMPT_TBL FROM PS_AR_FLD_REF_TBL WHERE FIELDNAME =:1", AR_FLD_REF_TBL.FIELDNAME, AR_FLD_REF_TBL.PROMPT_TBL);
+            Break;
+         End-Evaluate;
+         /*Inicio 00001*/
+         If %CompIntfcName <> "ETY_PAYMENT_IDENT_CI" Then;
+         Else
+            /*Fin 00001*/
+            /*INICIO CHGA #001*/
+            
+            Local FF_APP_PCG_VAL_FECHA:ff_ValidarFecha &obj_valFecha = create FF_APP_PCG_VAL_FECHA:ff_ValidarFecha();
+            &obj_valFecha.ff_ActualizarPrompt(AR_FLD_REF_TBL.PROMPT_TBL.Value, GetRow(), GetRow().ParentRowset.ParentRow.GetRowset(Scroll.PAYMENT_ID_CUST));
+            
+            /*FIN CHGA #001*/
+            /*Inicio 00001*/
+         End-If;
+         /*Fin 00001*/
+      Else
+         Evaluate INSTALLATION_FS.SECURITY_TYPE
+         When = "O"
+            If INSTALLATION_FS.BU_SECURITY = "Y" Then
+               AR_FLD_REF_TBL.PROMPT_TBL = Record.ITEM_ITEM_OPRVW;
+            Else
+               AR_FLD_REF_TBL.PROMPT_TBL = Record.ITEM_ITEM_VW;
+            End-If;
+            Break;
+         When = "C"
+            If INSTALLATION_FS.BU_SECURITY = "Y" Then
+               AR_FLD_REF_TBL.PROMPT_TBL = Record.ITEM_ITEM_CLSVW;
+            Else
+               AR_FLD_REF_TBL.PROMPT_TBL = Record.ITEM_ITEM_VW;
+            End-If;
+            Break;
+         End-Evaluate
+      End-If;
+      
+   End-If;
+   
+End-Function;
+
+

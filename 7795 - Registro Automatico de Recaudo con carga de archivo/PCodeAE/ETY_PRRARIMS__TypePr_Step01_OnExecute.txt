@@ -1,0 +1,20 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			24-04-2020	Edwin Quesada	-Valida si es asiento directo o asignacion de cobro.
+*******************************************************************************************************************************************/
+
+/*Inicio #00001*/
+If ETY_RUNCRAR_AET.MISC_PAYMENT.Value = "Y" Then
+   ETY_RUNCRAR_AET.AE_APPLID = "ETY_PRRARIMS";
+   ETY_RUNCRAR_AET.AE_SECTION = "PrFlAsDi";
+End-If;
+If ETY_RUNCRAR_AET.PP_SW.Value = "Y" And
+      All(ETY_RUNCRAR_AET.REF_VALUE_TO.Value) Then
+   ETY_RUNCRAR_AET.AE_APPLID = "ETY_PRRARIMS";
+   ETY_RUNCRAR_AET.AE_SECTION = "PrFlAsCo";
+End-If;
+
+MessageBox(0, "", 0, 0, "-Sale del tipo de procedimiento-");
+
+/*Fin #00001*/
+

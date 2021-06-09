@@ -1,0 +1,16 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			28-04-2020	Edwin Quesada	-Control de flag IMS.
+*******************************************************************************************************************************************/
+
+/*Inicio 001*/
+If ETY_PFIX_BU_TBL.ETY_FLAG_IMS.Value = "Y" Then
+   ETY_PFIX_BU_TBL.REFINEMENT_TMPL_ID.DisplayOnly = False;
+   ETY_PFIX_BU_TBL.LENGTH_MAX.DisplayOnly = False;
+Else
+   ETY_PFIX_BU_TBL.REFINEMENT_TMPL_ID.DisplayOnly = True;
+   ETY_PFIX_BU_TBL.LENGTH_MAX.DisplayOnly = True;
+   REM ETY_PFIX_BU_TBL.ETY_FLAG_IMS.DisplayOnly = True;
+End-If;
+/*Fin 001*/
+

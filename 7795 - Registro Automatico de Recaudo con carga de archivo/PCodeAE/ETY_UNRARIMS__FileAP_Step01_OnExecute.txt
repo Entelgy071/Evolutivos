@@ -1,0 +1,61 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			07-04-2020	Edwin Quesada	-Control y carga de los archivos de IMS aprobados.
+*******************************************************************************************************************************************/
+
+/*Inicio #00001*/
+import FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP;
+
+Local FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP &obj_dencrypt = create FF_AP_DENCRYP_ARCHI:FF_CALL_DENCRYP_PGP();
+
+Local string &StrIdOperador, &StrRunCntrol, &StrInterbancariaIms, &StrPathPsValidTrnIms, &StrPatchNtPs, &StrFilenameCsv;
+Local number &NbrInstancia, &NbrFillCount;
+Local SQL &SqlInsCargrar, &SqlDelCargarre;
+Local Rowset &RwsEtyCargaRarTbl;
+Local Record &RcdEtyCargaRarTbl;
+
+&NbrInstancia = ETY_RNCARAR_AET.PROCESS_INSTANCE.Value;
+&StrIdOperador = ETY_RNCARAR_AET.OPRID.Value;
+&StrRunCntrol = ETY_RNCARAR_AET.RUN_CNTL_ID.Value;
+&StrInterbancariaIms = ETY_RNCARAR_AET.STRING_TEXT.Value;
+&StrPathPsValidTrnIms = ETY_RNCARAR_AET.STRING_TEXT_VAL.Value;
+&StrPatchNtPs = ETY_RNCARAR_AET.ATTACHURL.Value;
+rem &StrFilenameCsv = ETY_RNCARAR_AET.FILENAME.Value;
+
+&SqlInsCargrar = GetSQL(SQL.ETY_INSERT_CARGRAR_SQL);
+&SqlInsCargrar.Execute(&NbrInstancia, &StrPatchNtPs);
+&SqlInsCargrar.Close();
+
+&SqlDelCargarre = GetSQL(SQL.ETY_DELETE_RECTBL_SQL);
+&SqlDelCargarre.Execute(&NbrInstancia);
+&SqlDelCargarre.Close();
+
+REM SQLExec("Select 'X' FROM PS_ETY_CARGRAR_TBL WHERE PROCESS_INSTANCE = :1 AND ERROR_FLG <> 'Y' ", &NbrInstancia, &StrTodosError);
+&RwsEtyCargaRarTbl = CreateRowset(Record.ETY_CARGRAR_VW);
+&NbrFillCount = &RwsEtyCargaRarTbl.Fill("WHERE PROCESS_INSTANCE = :1 ", &NbrInstancia);
+
+For &i = 1 To &NbrFillCount
+   &RcdEtyCargaRarTbl = &RwsEtyCargaRarTbl(&i).GetRecord(Record.ETY_CARGRAR_VW);
+   &StrFilenameCsv = &RcdEtyCargaRarTbl.FILENAME.Value;
+   REM MessageBox(0, " ", 0, 0, "&StrFilenameCsv: - " | &StrFilenameCsv);
+   SQLExec("Select FILENAME FROM PS_ETY_CARGRAR_TBL WHERE PROCESS_INSTANCE = :1 AND ERROR_FLG <> 'Y' AND FILENAME = :2 GROUP BY FILENAME ", &NbrInstancia, &StrFilenameCsv, &StrTodosRegError);
+   
+   If None(&StrTodosRegError) Then;
+      &recContext = GetRecord(Record.ETY_RNCARAR_AET);
+      SQLExec("Select A.STRING_TEXT FROM PS_STRINGS_TBL A WHERE A.PROGRAM_ID = 'TRAN_IMS' AND A.STRING_ID = 'TRNPROCESIMS' ", &StrPathNtProTrnIms);
+      
+      &StrFilenamePgp = &StrFilenameCsv | ".pgp";
+      &StrFilenamePgpImsProc = &StrPathNtProTrnIms | "\" | &StrFilenamePgp;
+      &StrFilenamePgpNtIms = &StrPatchNtPs | &NbrInstancia | "\" | &StrFilenamePgp;
+      &StrFilenameCsvNtIms = &StrPatchNtPs | &NbrInstancia | "\" | &StrFilenameCsv;
+      &obj_dencrypt.fi_ProcesoFinArchivo(&recContext, &StrFilenamePgpNtIms, &StrFilenamePgpImsProc, &StrFilenameCsvNtIms);
+   End-If;
+End-For;
+
+MessageBox(0, "", 0, 0, "-Sale Sql de los datos aprobados-");
+
+/*Exit (1);
+Return;*/
+
+/*Fin #00001*/
+

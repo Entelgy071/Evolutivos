@@ -1,0 +1,71 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			28-04-2020	Edwin Quesada	-Encriptar archivos para IMS 2707 o 7795.
+*******************************************************************************************************************************************/
+
+/*Inicio 001*/
+import FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS;
+import FI_IAA_CODE_MAPPING:fi_valCodes;
+import FI_IAA_CODE_MAPPING:fi_mappingGroup;
+
+Function fi_llamarLineaComandos(&str_comando As string) Returns string;
+   
+   Local string &str_GroupId, &StrConErrorDescr;
+   Local FI_IAA_CODE_MAPPING:fi_mappingGroup &obj_mapping;
+   Local number &nbr_conta, &nbr_seqno;
+   Local Record &rcd_id;
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_parametros;
+   Local FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS &obj_Utils = create FI_IAA_029_INF_COBROS:Utilidades:fi_UtilsWS("Y");
+   Local string &str_errNum, &str_errDescr, &str_errDescr2;
+   Local string &str_MapaId;
+   
+   &obj_mapping = create FI_IAA_CODE_MAPPING:fi_mappingGroup(&obj_Utils.GroupId, False);
+   
+   Local string &str_nombreDestino, &str_nombreCampo, &str_Valor;
+   Local SQL &sql_param = CreateSQL("SELECT MAPPING_FIELD_NAME, FI_NOMBRE_DESTINO,FI_NOMBRE_PARAMETR FROM PS_FI_PARAM_WS WHERE FI_CALLING_WS = 'Y' AND FI_TIPO_PARAMETRO = 'S'");
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_codes;
+   Local FI_IAA_CODE_MAPPING:fi_valCodes &obj_codes;
+   While &sql_param.Fetch(&str_MapaId, &str_nombreDestino, &str_nombreCampo)
+      Evaluate &str_nombreCampo
+      When "COMANDOPGP"
+         /*Extrae el path del pgp*/
+         &str_Valor = &str_comando;
+         Break;
+      End-Evaluate;
+      &obj_codes = create FI_IAA_CODE_MAPPING:fi_valCodes(&str_nombreDestino, &str_Valor);
+      If &arr_parametros = Null Then
+         &arr_parametros = CreateArrayRept(&obj_codes, 1);
+      Else
+         &arr_parametros.Push(&obj_codes);
+      End-If;
+   End-While;
+   
+   Local array of FI_IAA_CODE_MAPPING:fi_valCodes &arr_respuesta;
+   &arr_respuesta = &obj_Utils.fi_ConsumirWebService(&arr_parametros);
+   If &arr_respuesta = Null Then
+      rem      Error MsgGet(29000, 23, "Mensaje no Encontrado: El servicio web no generó respuesta");
+      &str_errNum = "1";
+      &str_errDescr = "Mensaje no Encontrado: El servicio web no generó respuesta";
+   Else
+      &str_errNum = "0";
+      For &nbr_conta = 1 To &arr_respuesta.Len
+         Evaluate &arr_respuesta [&nbr_conta].NombreCampo
+         When "RETURN"
+            &str_errDescr2 = &arr_respuesta [&nbr_conta].ValorCampo;
+            Break;
+         End-Evaluate;
+      End-For;
+   End-If;
+   If &str_errNum = "1" Then
+      rem &ContextRecord.ERROR_CODE.Value = &str_errNum;
+      &StrConErrorDescr = &str_errDescr;
+   Else
+      &StrConErrorDescr = &str_errDescr2;
+   End-If;
+   
+   Return &StrConErrorDescr;
+   
+End-Function;
+
+/*Fin 001*/
+

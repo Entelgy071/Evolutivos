@@ -1,0 +1,11 @@
+/******************************************************************************************************************************************
+Actividad	Proyecto						Fecha	  	Autor			Descripción
+#00001		ETY_ERP_AR_FLP_EVO_7795			28-04-2020	Edwin Quesada	-Control de flag IMS.
+*******************************************************************************************************************************************/
+
+/*Inicio 001*/
+If All(ETY_PFIX_BU_TBL.BILL_TYPE_ID.Value) Then
+   ETY_PFIX_BU_TBL.ETY_FLAG_IMS.DisplayOnly = False;
+End-If;
+/*Fin 001*/
+
