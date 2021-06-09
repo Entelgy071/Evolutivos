@@ -1,0 +1,184 @@
+/***********************************************************************************************************************************
+* Proyecto:	    FF_GL_BALANCEOS_000
+* Actividad:  	001
+* Responsable: 	Quanam ¿ Guillermo Docampo 
+* Fecha:		07Dic2012
+* Descripción:	Se genera el Reporte Balance de Prueba Detallado
+**************************************************************************************************************************/
+/***********************************************************************************************************************************
+* Proyecto:	    FF_GL_INC_18019_000
+* Actividad:  	002
+* Responsable: 	Datco ¿ Cesar Garcia 
+* Fecha:		30Mar2014
+* Descripción:	Se agrega ordenamiento por el campo TREE_NODE_NUM
+                Se comentario el codigo que genera los XML.
+**************************************************************************************************************************/
+/**************************************************************************
+PROYECTO	: FF_GL_INC_27386_000
+FECHA		: 2014-Oct-10
+ACTIVIDAD	: 003
+RESPONSABLE	: DATCO - César García
+DESCR		: Se cambian las tablas del reporte,  por las tablas temporales
+**************************************************************************/
+/*Inicio #001*/
+import PSXP_RPTDEFNMANAGER:*;
+import PSXP_XMLGEN:*;
+
+Local Rowset &rsdatanieto, &rsdatahijo, &rsdata;
+Local SQL &sqldet, &sqldet2;
+Local Record &REC1, &REC2, &REC3;
+Local number &I, &J, &num_proceso, &num_nivel;
+
+&rsdatanieto = CreateRowset(Record.FF_BALDET_DET);
+&rsdatahijo = CreateRowset(Record.FF_BALRES_DET, &rsdatanieto);
+&rsdata = CreateRowset(Record.FF_BALRES_CAB, &rsdatahijo);
+
+&num_proceso = FF_BALRES_AET.PROCESS_INSTANCE.Value;
+
+&REC1 = CreateRecord(Record.FF_BALRES_CAB);
+/*INICIO CHGA 003*/
+REM BY CHGA 003 SQLExec("SELECT * FROM FF_BALRES_CAB WHERE PROCESS_INSTANCE = :1", &num_proceso, &REC1);
+SQLExec("SELECT * FROM %TABLE(FF_BAL_CAB) WHERE PROCESS_INSTANCE = :1", &num_proceso, &REC1);
+/*FIN CHGA 003*/
+
+/*CARGO LOS DATOS DE LA CABEZERA*/
+
+&rsdata.GetRow(1).FF_BALRES_CAB.PROCESS_INSTANCE.Value = &REC1.PROCESS_INSTANCE.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.NAME1.Value = &REC1.NAME1.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.REPORT_TITLE.Value = &REC1.REPORT_TITLE.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.DESCR200.Value = &REC1.DESCR200.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.DATE_FROM.Value = &REC1.DATE_FROM.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.DATE_TO.Value = &REC1.DATE_TO.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.DESCR.Value = &REC1.DESCR.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.LONGNAME.Value = &REC1.LONGNAME.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.PROCESS_DATE.Value = &REC1.PROCESS_DATE.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.PROCESS_DTTM.Value = &REC1.PROCESS_DTTM.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.PROG_NAME.Value = &REC1.PROG_NAME.Value;
+&rsdata.GetRow(1).FF_BALRES_CAB.FF_NRO_ADMIN.Value = &REC1.FF_NRO_ADMIN.Value;
+If &REC1.FF_NRO_ADMIN.Value <> 0 Then
+   &rsdata.GetRow(1).FF_BALRES_CAB.FF_NBR_ADMIN_CHR.Value = String(&REC1.FF_NRO_ADMIN.Value);
+End-If;
+&rsdata.GetRow(1).FF_BALRES_CAB.FF_MAX_TREE_LEV.Value = &REC1.FF_MAX_TREE_LEV.Value;
+
+
+/*CARGO LOS DATOS DETALLES*/
+
+REM &sqldet = CreateSQL("SELECT PROCESS_INSTANCE, CF_VALUE2, ' ', DESCR1, TREE_NODE, DESCR100, TREE_LEVEL_NUM, SUM(MONETARY_AMOUNT_01) , SUM(MONETARY_AMOUNT_02), SUM(MONETARY_AMOUNT_03), SUM(MONETARY_AMOUNT_04), SUM(MONETARY_AMOUNT_05), SUM(MONETARY_AMOUNT_06) FROM PS_FF_BALRES_DET WHERE PROCESS_INSTANCE = :1 GROUP BY PROCESS_INSTANCE, CF_VALUE2, TREE_NODE, DESCR1, TREE_LEVEL_NUM, DESCR100 ORDER BY  CF_VALUE2, TREE_NODE", &num_proceso);
+/* Inicio 002 */
+rem by 002 &sqldet = CreateSQL("SELECT PROCESS_INSTANCE, CF_VALUE2, ' ', DESCR1, TREE_NODE, DESCR100, TREE_LEVEL_NUM, CASE WHEN SUM(MONETARY_AMOUNT_01) - SUM(MONETARY_AMOUNT_02) > 0 THEN SUM(MONETARY_AMOUNT_01) - SUM(MONETARY_AMOUNT_02) ELSE 0 END, CASE WHEN SUM(MONETARY_AMOUNT_01) - SUM(MONETARY_AMOUNT_02) < 0 THEN SUM(MONETARY_AMOUNT_02) - SUM(MONETARY_AMOUNT_01) ELSE 0 END, SUM(MONETARY_AMOUNT_03), SUM(MONETARY_AMOUNT_04), CASE WHEN SUM(MONETARY_AMOUNT_05) - SUM(MONETARY_AMOUNT_06) > 0 THEN SUM(MONETARY_AMOUNT_05) - SUM(MONETARY_AMOUNT_06) ELSE 0 END, CASE WHEN SUM(MONETARY_AMOUNT_05) - SUM(MONETARY_AMOUNT_06) < 0 THEN SUM(MONETARY_AMOUNT_06) - SUM(MONETARY_AMOUNT_05) ELSE 0 END FROM PS_FF_BALRES_DET WHERE PROCESS_INSTANCE = :1 GROUP BY PROCESS_INSTANCE, CF_VALUE2, TREE_NODE, DESCR1, TREE_LEVEL_NUM, DESCR100 ORDER BY  CF_VALUE2, TREE_NODE", &num_proceso);
+/*INICIO CHGA 003*/
+REM BY 003&sqldet = CreateSQL("SELECT PROCESS_INSTANCE, CF_VALUE2, ' ', DESCR1, TREE_NODE, DESCR100, TREE_LEVEL_NUM, TREE_NODE_NUM, CASE WHEN SUM(MONETARY_AMOUNT_01) - SUM(MONETARY_AMOUNT_02) > 0 THEN SUM(MONETARY_AMOUNT_01) - SUM(MONETARY_AMOUNT_02) ELSE 0 END, CASE WHEN SUM(MONETARY_AMOUNT_01) - SUM(MONETARY_AMOUNT_02) < 0 THEN SUM(MONETARY_AMOUNT_02) - SUM(MONETARY_AMOUNT_01) ELSE 0 END, SUM(MONETARY_AMOUNT_03), SUM(MONETARY_AMOUNT_04), CASE WHEN SUM(MONETARY_AMOUNT_05) - SUM(MONETARY_AMOUNT_06) > 0 THEN SUM(MONETARY_AMOUNT_05) - SUM(MONETARY_AMOUNT_06) ELSE 0 END, CASE WHEN SUM(MONETARY_AMOUNT_05) - SUM(MONETARY_AMOUNT_06) < 0 THEN SUM(MONETARY_AMOUNT_06) - SUM(MONETARY_AMOUNT_05) ELSE 0 END FROM PS_FF_BALRES_DET WHERE PROCESS_INSTANCE = :1 GROUP BY PROCESS_INSTANCE, CF_VALUE2, TREE_NODE_NUM, TREE_NODE, DESCR1, TREE_LEVEL_NUM, DESCR100 ORDER BY CF_VALUE2, TREE_NODE_NUM", &num_proceso);
+&sqldet = CreateSQL("SELECT PROCESS_INSTANCE, CF_VALUE2, ' ', DESCR1, TREE_NODE, DESCR100, TREE_LEVEL_NUM, TREE_NODE_NUM, CASE WHEN SUM(MONETARY_AMOUNT_01) - SUM(MONETARY_AMOUNT_02) > 0 THEN SUM(MONETARY_AMOUNT_01) - SUM(MONETARY_AMOUNT_02) ELSE 0 END, CASE WHEN SUM(MONETARY_AMOUNT_01) - SUM(MONETARY_AMOUNT_02) < 0 THEN SUM(MONETARY_AMOUNT_02) - SUM(MONETARY_AMOUNT_01) ELSE 0 END, SUM(MONETARY_AMOUNT_03), SUM(MONETARY_AMOUNT_04), CASE WHEN SUM(MONETARY_AMOUNT_05) - SUM(MONETARY_AMOUNT_06) > 0 THEN SUM(MONETARY_AMOUNT_05) - SUM(MONETARY_AMOUNT_06) ELSE 0 END, CASE WHEN SUM(MONETARY_AMOUNT_05) - SUM(MONETARY_AMOUNT_06) < 0 THEN SUM(MONETARY_AMOUNT_06) - SUM(MONETARY_AMOUNT_05) ELSE 0 END FROM %TABLE(FF_BAL3_DET) WHERE PROCESS_INSTANCE = :1 GROUP BY PROCESS_INSTANCE, CF_VALUE2, TREE_NODE_NUM, TREE_NODE, DESCR1, TREE_LEVEL_NUM, DESCR100 ORDER BY CF_VALUE2, TREE_NODE_NUM", &num_proceso);
+/*FIN CHGA 003*/
+/* Fin 002 */
+
+&rsdatahijo = &rsdata(1).GetRowset(Scroll.FF_BALRES_DET);
+&REC2 = CreateRecord(Record.FF_BALRES_DET);
+&I = 1;
+
+While &sqldet.Fetch(&REC2)
+   
+   If &I <> 1 Then
+      &rsdatahijo.InsertRow(&I - 1);
+   End-If;
+   
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.CF_VALUE1.Value = &REC2.CF_VALUE1.Value;
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.CF_VALUE2.Value = &REC2.CF_VALUE2.Value;
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.DESCR1.Value = &REC2.DESCR1.Value;
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.TREE_NODE.Value = &REC2.TREE_NODE.Value;
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.TREE_LEVEL_NUM.Value = &REC2.TREE_LEVEL_NUM.Value;
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.DESCR100.Value = &REC2.DESCR100.Value;
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.MONETARY_AMOUNT_01.Value = Round(&REC2.MONETARY_AMOUNT_01.Value, 2);
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.MONETARY_AMOUNT_02.Value = Round(&REC2.MONETARY_AMOUNT_02.Value, 2);
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.MONETARY_AMOUNT_03.Value = Round(&REC2.MONETARY_AMOUNT_03.Value, 2);
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.MONETARY_AMOUNT_04.Value = Round(&REC2.MONETARY_AMOUNT_04.Value, 2);
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.MONETARY_AMOUNT_05.Value = Round(&REC2.MONETARY_AMOUNT_05.Value, 2);
+   &rsdatahijo.GetRow(&I).FF_BALRES_DET.MONETARY_AMOUNT_06.Value = Round(&REC2.MONETARY_AMOUNT_06.Value, 2);
+   
+   If &REC2.TREE_LEVEL_NUM.Value = FF_BALRES_AET.TREE_LEVEL_NUM.Value Then
+      
+      /*INICIO CHGA 003*/
+      
+      REM BY CHGA 003 &sqldet2 = CreateSQL("SELECT PROCESS_INSTANCE, CF_VALUE2, ' ', TREE_NODE, CHARTFIELD3, NATIONAL_ID, DESCR1, DESCR100, SUM(MONETARY_AMOUNT_01), SUM(MONETARY_AMOUNT_02), SUM(MONETARY_AMOUNT_03), SUM(MONETARY_AMOUNT_04), SUM(MONETARY_AMOUNT_05), SUM(MONETARY_AMOUNT_06) FROM PS_FF_BALDET_DET WHERE PROCESS_INSTANCE = :1 AND CF_VALUE2 = :2 AND TREE_NODE = :3 GROUP BY PROCESS_INSTANCE, CF_VALUE2, ' ', TREE_NODE, CHARTFIELD3, NATIONAL_ID, DESCR1, DESCR100", &REC2.PROCESS_INSTANCE.Value, &REC2.CF_VALUE2.Value, &REC2.TREE_NODE.Value);
+      &sqldet2 = CreateSQL("SELECT PROCESS_INSTANCE, CF_VALUE2, ' ', TREE_NODE, CHARTFIELD3, NATIONAL_ID, DESCR1, DESCR100, SUM(MONETARY_AMOUNT_01), SUM(MONETARY_AMOUNT_02), SUM(MONETARY_AMOUNT_03), SUM(MONETARY_AMOUNT_04), SUM(MONETARY_AMOUNT_05), SUM(MONETARY_AMOUNT_06) FROM %TABLE(FF_BAL3_DE2) WHERE PROCESS_INSTANCE = :1 AND CF_VALUE2 = :2 AND TREE_NODE = :3 GROUP BY PROCESS_INSTANCE, CF_VALUE2, ' ', TREE_NODE, CHARTFIELD3, NATIONAL_ID, DESCR1, DESCR100", &REC2.PROCESS_INSTANCE.Value, &REC2.CF_VALUE2.Value, &REC2.TREE_NODE.Value);
+      /*FIND CHGA 003*/
+      &rsdatanieto = &rsdatahijo(&I).GetRowset(Scroll.FF_BALDET_DET);
+      &REC3 = CreateRecord(Record.FF_BALDET_DET);
+      &J = 1;
+      While &sqldet2.Fetch(&REC3)
+         
+         If &J <> 1 Then
+            &rsdatanieto.InsertRow(&J - 1);
+         End-If;
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.CF_VALUE1.Value = &REC3.CF_VALUE2.Value;
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.CF_VALUE2.Value = &REC3.CF_VALUE2.Value;
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.TREE_NODE.Value = &REC3.TREE_NODE.Value;
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.CHARTFIELD3.Value = &REC3.CHARTFIELD3.Value;
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.NATIONAL_ID.Value = &REC3.NATIONAL_ID.Value;
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.DESCR1.Value = &REC3.DESCR1.Value;
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.DESCR100.Value = &REC3.DESCR100.Value;
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.MONETARY_AMOUNT_01.Value = Round(&REC3.MONETARY_AMOUNT_01.Value, 2);
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.MONETARY_AMOUNT_02.Value = Round(&REC3.MONETARY_AMOUNT_02.Value, 2);
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.MONETARY_AMOUNT_03.Value = Round(&REC3.MONETARY_AMOUNT_03.Value, 2);
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.MONETARY_AMOUNT_04.Value = Round(&REC3.MONETARY_AMOUNT_04.Value, 2);
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.MONETARY_AMOUNT_05.Value = Round(&REC3.MONETARY_AMOUNT_05.Value, 2);
+         &rsdatanieto.GetRow(&J).FF_BALDET_DET.MONETARY_AMOUNT_06.Value = Round(&REC3.MONETARY_AMOUNT_06.Value, 2);
+         
+         &J = &J + 1;
+      End-While;
+      
+   End-If;
+   &I = &I + 1;
+   
+End-While;
+
+<* Inicio 002 
+/*Create XSD Se ejecuta una sola vez */
+&rds = create psxp_xmlgen:RowSetDS();
+&myschema = &rds.getXSDSchema(&rsdata);
+&myschema = Replace(&myschema, 20, 3, " encoding = 'utf-8'?>");
+&fl = GetFile("FF_BAL_DETALLADO.xsd", "W", "UTF-8", %FilePath_Relative);
+&fl.WriteLine(&myschema);
+&fl.Close();
+Fin 002 *>
+
+/* Setup Report */
+Local string &sLanguageCD = %Language_User;
+Local date &dAsOfDate = %Date;
+/* GetURL(URL.QQ_XMLP_PATH);*/
+Local string &FileXMLPath = %FilePath;
+/*Nombre del archivo XML*/
+Local string &FileXMLGen = "FF_BAL_DETALLADO.XML";
+/* Setup Defn XML */
+Local string &strReportName = "FF_BAL_DETAL";
+Local string &strTemplateName = "FF_BAL_DETAL_1";
+Local string &OutputPDFFilename = "BalanceDetallado";
+
+
+/*Create XML File */
+&flFileTmp = GetFile(&FileXMLPath | &FileXMLGen, "W", "UTF-8", %FilePath_Absolute);
+If &flFileTmp.IsOpen Then
+   &rds = create psxp_xmlgen:RowSetDS();
+   /*obtengo el XML del Rowset con la información &RS1 */
+   &myXMLFile = &rds.getXMLData(&rsdata, "");
+   &myXMLFile = Replace(&myXMLFile, 20, 3, " encoding = 'utf-8'?>");
+   &flFileTmp.WriteLine(&myXMLFile);
+   &flFileTmp.Close();
+End-If;
+
+
+/* Creo Reporte en funciòn del reporte*/
+Local PSXP_RPTDEFNMANAGER:ReportDefn &ReportImprimir = create PSXP_RPTDEFNMANAGER:ReportDefn(&strReportName);
+rem &sOutFormat = &ReportImprimir.GetOutDestFormatString(%OutDestFormat);
+&ReportImprimir.Get();
+/*Obtengo el origen de los datos del reporte, en este caso el archivo XML*/
+&ReportImprimir.SetRuntimeDataXMLFile(&FileXMLPath | &FileXMLGen);
+/*Genero el reporte*/
+&ReportImprimir.ProcessReport(&strTemplateName, &sLanguageCD, &dAsOfDate, &ReportImprimir.GetOutDestFormatString(%OutDestFormat));
+&ReportImprimir.Publish("", "", "", FF_BALRES_AET.PROCESS_INSTANCE);
+/* Borrado del archivo Xml Generado */
+/*&FILE = GetFile(&FileXMLPath | &FileXMLGen, "W", "UTF-8", %FilePath_Absolute);
+&FILE.Delete();
+&FILE.Close();
+*/
+/*FIN 001*/

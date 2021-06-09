@@ -1,0 +1,231 @@
+import PSXP_RPTDEFNMANAGER:*;
+import PSXP_XMLGEN:*;
+
+Local Rowset &rst_Datos, &rst_LineasImp;
+Local Record &rec_Datos, &rec_LineasImp;
+Local string &Año_Per_from, &Año_Per_to;
+
+Global number &Saldo;
+
+REM MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.PROCESS_INSTANCE  " | ETY_CXPXR_H_AET.PROCESS_INSTANCE);
+
+REM MESSAGEBOX(0,"",0,0,""|);
+
+&strSQL = "WHERE FILL.PROCESS_INSTANCE = '" | ETY_CXPXR_H_AET.PROCESS_INSTANCE | "'";
+
+&rst_Lineas = CreateRowset(Record.ETY_CXPXRDT_TBL);
+&rst_Header = CreateRowset(Record.ETY_CXPXRHD_TBL, &rst_Lineas);
+
+&rst_Datos = CreateRowset(Record.ETY_CXPXR_H_TBL);
+&rst_Datos.Fill(&strSQL);
+
+&rst_LineasImp = CreateRowset(Record.ETY_CXPXRUBR_VW);
+
+&str_BU = &rst_Datos(1).ETY_CXPXR_H_TBL.BUSINESS_UNIT.Value;
+&str_ID = &rst_Datos(1).ETY_CXPXR_H_TBL.VOUCHER_ID.Value;
+
+For &i = 1 To &rst_Datos.ActiveRowCount
+   
+   &rst_Lineas.DeleteRow(1);
+   
+   &rec_Datos = &rst_Datos(&i).GetRecord(Record.ETY_CXPXR_H_TBL);
+   /************************************************/
+   /******************* HEADER *********************/
+   /*************************************************/
+   &rst_Header.InsertRow(&rst_Header.ActiveRowCount);
+   &row_Header = &rst_Header.GetRow(&rst_Header.ActiveRowCount);
+   
+   &rec_Datos.CopyFieldsTo(&row_Header.ETY_CXPXRHD_TBL);
+   rem &rec_Datos.CopyFieldsTo(&row_Header.ETY_CXPXR_H_TBL);
+   
+   REM MessageBox(0, "", 0, 0, "  " | );
+   
+   &row_Header.ETY_CXPXRHD_TBL.PROCESS_INSTANCE.Value = &rec_Datos.PROCESS_INSTANCE.Value;
+   &row_Header.ETY_CXPXRHD_TBL.BUSINESS_UNIT.Value = &rec_Datos.BUSINESS_UNIT.Value;
+   &row_Header.ETY_CXPXRHD_TBL.VOUCHER_ID.Value = &rec_Datos.VOUCHER_ID.Value;
+   &row_Header.ETY_CXPXRHD_TBL.DESCR.Value = &rec_Datos.DESCR.Value;
+   &row_Header.ETY_CXPXRHD_TBL.INVOICE_ID.Value = &rec_Datos.INVOICE_ID.Value;
+   &row_Header.ETY_CXPXRHD_TBL.INVOICE_DT.Value = &rec_Datos.INVOICE_DT.Value;
+   &row_Header.ETY_CXPXRHD_TBL.MONETARY_AMOUNT.Value = &rec_Datos.MONETARY_AMOUNT_01.Value;
+   
+   &Año_Per_from = ETY_CXPXRUB_AET.BUDGET_PERIOD_FROM.Value | ETY_CXPXRUB_AET.ACCOUNTING_PERIOD.Value;
+   &Año_Per_to = ETY_CXPXRUB_AET.BUDGET_PERIOD_TO.Value | ETY_CXPXRUB_AET.ACCOUNTING_PERIOD2.Value;
+   
+   
+   MessageBox(0, "", 0, 0, "&Año_Per_from :>" | &Año_Per_from);
+   MessageBox(0, "", 0, 0, "&Año_Per_hasta:>" | &Año_Per_to);
+   
+   If &Año_Per_from = &Año_Per_to Then
+      
+      &row_Header.ETY_CXPXRHD_TBL.PAGE_TITLE.Value = "Periodo: ";
+      &row_Header.ETY_CXPXRHD_TBL.PAGE_TITLE30.Value = ETY_CXPXRUB_AET.LBL_DATE1;
+      
+      <*
+      &row_Header.ETY_CXPXRHD_TBL.DATE_BATCH.Value = "Periodo:";
+      &row_Header.ETY_CXPXRHD_TBL.LBL_DATE1.Value = ETY_CXPXRUB_AET.LBL_DATE1;
+      &row_Header.ETY_CXPXRHD_TBL.LBL_DATE2.Value = "";
+      &row_Header.ETY_CXPXRHD_TBL.CALENDAR_ID_TO.Value = "";
+*>
+   Else
+      
+      &desde = "De: " | ETY_CXPXRUB_AET.LBL_DATE1;
+      &hasta = " A: " | ETY_CXPXRUB_AET.LBL_DATE2;
+      &row_Header.ETY_CXPXRHD_TBL.PAGE_TITLE.Value = &desde;
+      &row_Header.ETY_CXPXRHD_TBL.PAGE_TITLE30.Value = &hasta;
+      <*
+      &row_Header.ETY_CXPXRHD_TBL.DATE_BATCH.Value = "De:";
+      &row_Header.ETY_CXPXRHD_TBL.LBL_DATE1.Value = ETY_CXPXRUB_AET.LBL_DATE1;
+      &row_Header.ETY_CXPXRHD_TBL.CALENDAR_ID_TO.Value = "A:";
+      &row_Header.ETY_CXPXRHD_TBL.LBL_DATE2.Value = ETY_CXPXRUB_AET.LBL_DATE2;
+      *>
+   End-If;
+   
+   /*************************************************/
+   /******************* LINEAS *********************/
+   /*************************************************/
+   /*Siempre tengo que insertar una linea nueva, lo que cambia es el padre de la linea*/
+   &rst_Lineas = &rst_Header.GetRow(&rst_Header.ActiveRowCount).GetRowset(Scroll.ETY_CXPXRDT_TBL);
+   &rst_Lineas.InsertRow(&rst_Lineas.ActiveRowCount);
+   &row_Lineas = &rst_Lineas.GetRow(&rst_Lineas.ActiveRowCount);
+   &rec_Datos.CopyFieldsTo(&row_Lineas.ETY_CXPXRDT_TBL);
+   
+   REM &strSQL_line = "WHERE PROCESS_INSTANCE = :1 AND BUSINESS_UNIT =:2 AND VOUCHER_ID =:3 AND ACCOUNT = :4";
+   &strSQL_line = "WHERE PROCESS_INSTANCE = :1 AND BUSINESS_UNIT =:2 AND VOUCHER_ID =:3 AND TREE_NODE = :4";
+   REM &rst_LineasImp.Fill(&strSQL_line, &rec_Datos.PROCESS_INSTANCE.Value, &rec_Datos.BUSINESS_UNIT.Value, &rec_Datos.VOUCHER_ID.Value, &rec_Datos.ACCOUNT.Value);
+   &rst_LineasImp.Fill(&strSQL_line, &rec_Datos.PROCESS_INSTANCE.Value, &rec_Datos.BUSINESS_UNIT.Value, &rec_Datos.VOUCHER_ID.Value, &rec_Datos.TREE_NODE.Value);
+   REM &rst_LineasImp.Fill(&strSQL_line, &rst_Datos(&i).&rec_Datos.PROCESS_INSTANCE.Value, &rst_Datos(&i).&rec_Datos.BUSINESS_UNIT.Value, &rst_Datos(&i).&rec_Datos.VOUCHER_ID.Value, &rst_Datos(&i).&rec_Datos.ACCOUNT.Value);
+   
+   For &k = 1 To &rst_LineasImp.ActiveRowCount
+      &rec_LineasImp = &rst_LineasImp(&k).GetRecord(Record.ETY_CXPXRUBR_VW);
+      &rst_Lineas2 = &rst_Header.GetRow(&rst_Header.ActiveRowCount).GetRowset(Scroll.ETY_CXPXRDT_TBL);
+      
+      &rst_Lineas2.InsertRow(&rst_Lineas2.ActiveRowCount);
+      &row_Lineas = &rst_Lineas.GetRow(&rst_Lineas2.ActiveRowCount);
+      &rec_LineasImp.CopyFieldsTo(&row_Lineas.ETY_CXPXRDT_TBL);
+      
+      &row_Lineas.ETY_CXPXRDT_TBL.PROCESS_INSTANCE.Value = &rec_LineasImp.PROCESS_INSTANCE.Value;
+      &row_Lineas.ETY_CXPXRDT_TBL.BUSINESS_UNIT.Value = &rec_LineasImp.BUSINESS_UNIT.Value;
+      &row_Lineas.ETY_CXPXRDT_TBL.VOUCHER_ID.Value = &rec_LineasImp.VOUCHER_ID.Value;
+      &row_Lineas.ETY_CXPXRDT_TBL.PYMNT_ID_REF.Value = &rec_LineasImp.PYMNT_ID_REF.Value;
+      &row_Lineas.ETY_CXPXRDT_TBL.PYMNT_DT.Value = &rec_LineasImp.PYMNT_DT.Value;
+      &row_Lineas.ETY_CXPXRDT_TBL.MONETARY_AMOUNT_01.Value = &rec_LineasImp.MONETARY_AMOUNT_01.Value;
+      
+      
+      <*      
+      MessageBox(0, "", 0, 0, "&rec_LineasImp.FIRST_ITEM_LINE.Value  " | &rec_LineasImp.FIRST_ITEM_LINE.Value);
+      MessageBox(0, "", 0, 0, "&Saldo " | &Saldo);
+      If &rec_LineasImp.FIRST_ITEM_LINE.Value = 1 Then
+         &Saldo = &rec_Datos.MONETARY_AMOUNT_01.Value - &rec_LineasImp.MONETARY_AMOUNT_01.Value;
+      Else
+         &Saldo = &Saldo - &rec_LineasImp.MONETARY_AMOUNT_01.Value;
+      End-If;
+      
+      &row_Lineas.ETY_CXPXRDT_TBL.MONETARY_AMOUNT_02.Value = &Saldo;
+      MessageBox(0, "", 0, 0, "------------------------------------------------------------------------");
+      MessageBox(0, "", 0, 0, "&rec_LineasImp.VOUCHER_ID.Value;         " | &rec_LineasImp.VOUCHER_ID.Value);
+      MessageBox(0, "", 0, 0, "&rec_LineasImp.PYMNT_ID_REF.Value;       " | &rec_LineasImp.PYMNT_ID_REF.Value);
+      MessageBox(0, "", 0, 0, "&rec_LineasImp.PYMNT_DT.Value;           " | &rec_LineasImp.PYMNT_DT.Value);
+      MessageBox(0, "", 0, 0, "&rec_LineasImp.MONETARY_AMOUNT_01.Value  " | &rec_LineasImp.MONETARY_AMOUNT_01.Value);
+      MessageBox(0, "", 0, 0, "&rec_LineasImp.MONETARY_AMOUNT_02.Value  " | &rec_LineasImp.MONETARY_AMOUNT_02.Value);
+      MessageBox(0, "", 0, 0, "------------------------------------------------------------------------");
+      MessageBox(0, "", 0, 0, "&row_Lineas.ETY_CXPXRDT_TBL.VOUCHER_ID.Value         -------->" | &row_Lineas.ETY_CXPXRDT_TBL.VOUCHER_ID.Value);
+      MessageBox(0, "", 0, 0, "&row_Lineas.ETY_CXPXRDT_TBL.PYMNT_ID_REF.Value       -------->" | &row_Lineas.ETY_CXPXRDT_TBL.PYMNT_ID_REF.Value);
+      MessageBox(0, "", 0, 0, "&row_Lineas.ETY_CXPXRDT_TBL.PYMNT_DT.Value           -------->" | &row_Lineas.ETY_CXPXRDT_TBL.PYMNT_DT.Value);
+      MessageBox(0, "", 0, 0, "&row_Lineas.ETY_CXPXRDT_TBL.MONETARY_AMOUNT_01.Value -------->" | &row_Lineas.ETY_CXPXRDT_TBL.MONETARY_AMOUNT_01.Value);
+      MessageBox(0, "", 0, 0, "---------------------------------------------------------------------------------------------------------------");
+*>
+   End-For;
+   /*Elimino la primer fila del ultimo rowset del DETALLE que quedó vacia*/
+   &rst_Lineas2.DeleteRow(1);
+   
+End-For;
+&rst_Header.DeleteRow(1);
+/*Elimino la primer fila del ultimo rowset de header que quedo vacia*/
+&rst_Header.GetRow(&rst_Header.ActiveRowCount).GetRowset(Scroll.ETY_CXPXRDT_TBL).DeleteRow(1);
+
+/*************************************************/
+/******************* REPORTE *********************/
+/*************************************************/
+/*Create XSD Se ejecuta una sola vez */
+/*
+&rds = create psxp_xmlgen:RowSetDS();
+&myschema = &rds.getXSDSchema(&rst_Header);
+&myschema = Replace(&myschema, 20, 3, " encoding = 'utf-8'?>");
+&fl = GetFile("ETY_CXPXRUB.xsd", "W", "UTF-8", %FilePath_Relative);
+&fl.WriteLine(&myschema);
+&fl.Close();
+*/
+
+
+/* Setup Report */
+rem  %OutDestFormat = 2  PDF
+rem  %OutDestFormat = 5  html
+rem  %OutDestFormat = 8  xls
+rem  %OutDestFormat = 12 rtf;
+
+&numOutFormat = %OutDestFormat;
+If &numOutFormat <> 8 Then
+   &sOutFormat = "PDF";
+Else
+   &sOutFormat = "XLS";
+End-If;
+
+&dAsOfDate = %Date;
+&sLanguageCD = "";
+&PATH = GetURL(URL.FF_AP_PATH_REPORTES); /* E:\temp\ */
+
+/*Nombre del archivo XML*/
+&FileXMLGen = "ETY_CXPXRUBRO_" | ETY_CXPXR_H_AET.PROCESS_INSTANCE.Value | ".xml";
+
+
+/*Create XML File */
+REM &flFileTmp = GetFile(&PATH | &FileXMLGen, "W", "UTF-8", %FilePath_Absolute);
+&flFileTmp = GetFile(&FileXMLGen, "W", "UTF-8", %FilePath_Relative);
+
+If &flFileTmp.IsOpen Then
+   &rds = create psxp_xmlgen:RowSetDS();
+   /*obtengo el XML del Rowset con la información &RS1 */
+   &myXMLFile = &rds.getXMLData(&rst_Header, "");
+   &myXMLFile = Replace(&myXMLFile, 20, 3, " encoding = 'utf-8'?>");
+   &flFileTmp.WriteLine(&myXMLFile);
+   Local string &XMLFileName = &flFileTmp.Name;
+   &flFileTmp.Close();
+End-If;
+
+/*3 Crear esquema XSD */
+&rds = create PSXP_XMLGEN:RowSetDS(); /*package method */
+&mySchema = &rds.GetXSDSchema(&rst_Header);
+&Str_SchemaFile = &RptOutputDir | "KK_CXPXRUBRO.xsd";
+&Fl_SchemaFile = GetFile(&Str_SchemaFile, "W", %FilePath_Absolute);
+&Fl_SchemaFile.WriteLine(&mySchema);
+&Fl_SchemaFile.Close();
+
+/*4 Con el esquema crear XML */
+&myXMLFile = &rds.GetXMLData(&rst_Header, &Str_SchemaFile);
+&Str_ReportFileXML = &RptOutputDir | &FileXMLGen;
+&Fl_ReportFileXML = GetFile(&Str_ReportFileXML, "W", "UTF8", %FilePath_Absolute);
+&Fl_ReportFileXML.WriteLine(&myXMLFile);
+&Fl_ReportFileXML.Close();
+
+/* Setup Defn XML */
+&strReportName = "KK_CXPXRUBRO";
+&strTemplateName = "KK_CXPXRUBRO_1";
+
+/* Creo Reporte en funcion de la definicion del mismo */
+&ReportImprimir = create PSXP_RPTDEFNMANAGER:ReportDefn(&strReportName);
+&ReportImprimir.Get();
+
+/*Obtengo el origen de los datos del reporte, en este caso el archivo XML*/
+rem &ReportImprimir.SetRuntimeDataXMLFile(&PATH | &FileXMLGen);
+&ReportImprimir.SetRuntimeDataXMLFile(&FileXMLGen);
+&ReportImprimir.SetRuntimeDataXMLFile(&XMLFileName);
+
+/*Genero el reporte*/
+&ReportImprimir.ProcessReport(&strTemplateName, &sLanguageCD, &dAsOfDate, &sOutFormat);
+&ReportImprimir.Publish("", "", "", ETY_CXPXR_H_AET.PROCESS_INSTANCE.Value);
+
+/* Borrado del archivo Xml Generado */
+&File = GetFile(&FileXMLGen, "W", "UTF-8", %FilePath_Relative);
+/***** Borra el XML generado ******/
+&File.Delete();
+&File.Close();

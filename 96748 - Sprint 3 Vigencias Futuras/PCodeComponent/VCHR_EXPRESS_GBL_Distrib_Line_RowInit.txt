@@ -1,0 +1,79 @@
+Component array of Field &afERROR_FIELDS;
+
+Local Record &rREC = GetRow().GetRowset(Scroll.ACCTLN_ERR_VW3).GetRow(1).GetRecord(Record.ACCTLN_ERR_VW3);
+
+/* ---------- Beginning of Main Program ---------- */
+If All(&rREC.TSE_EDIT_TYPE.Value) Then
+   VCHR_PANELS_WK2.GOTO_ERR_CORRECT.Visible = True;
+   &afERROR_FIELDS.Push(GetRow().VCHR_PANELS_WK2.GetField(Field.GOTO_ERR_CORRECT));
+Else
+   VCHR_PANELS_WK2.GOTO_ERR_CORRECT.Visible = False;
+End-If;
+
+GetRow().PC_CH_WRK.BUSINESS_UNIT_GL.Value = DISTRIB_LINE.BUSINESS_UNIT_GL;
+
+rem -- moved this pcode from record peoplecode;
+rem -- DISTRIB_LINE.BUS_UNIT_PC RIn           ;
+rem -- May not be needed                      ;
+/*If INSTALLATION.PC = "Y" Then
+   SQLExec("SELECT CATEGORY_EDIT, SUBCATEGORY_EDIT FROM PS_INSTALLATION_PC", &CAT_EDIT_TMP, &SUBCAT_EDIT_TMP);
+   SQLExec("SELECT SECURITY_TYPE, BU_SECURITY FROM PS_INSTALLATION_FS", &SECURITY_TYPE, &BU_SECURITY);
+   If &SECURITY_TYPE = "C" And
+         &BU_SECURITY = "Y" Then
+      DERIVED.EDIT_BU_PC = "SP_BU_PC_CLSVW";
+   Else
+      If &SECURITY_TYPE = "O" And
+            &BU_SECURITY = "Y" Then
+         DERIVED.EDIT_BU_PC = "SP_BU_PC_OPRVW";
+      Else
+         DERIVED.EDIT_BU_PC = "SP_BU_PC_NONVW";
+      End-If;
+   End-If;
+   
+   DERIVED.EDIT_ACTIVITY = "PROJ_ACT_FS";
+   DERIVED.EDIT_ANALYSIS = "PROJ_ANTYPE_FS";
+   DERIVED.EDIT_RESOURCE = "PROJ_RESTYPE_FS";
+   DERIVED.EDIT_RES_CAT = &CAT_EDIT_TMP;
+   DERIVED.EDIT_RES_SUB = &SUBCAT_EDIT_TMP;
+End-If;
+*/
+
+
+remark  MessageBox(0, "", 0, 0, "&insertando en COMPONENT Distrib_Line RowInit >-> " | &insertando | " - %Mode en DL.account RowInit -> " | %Mode);
+If &Parametrizado And
+      &insertando = "I" And
+      %Mode = "A" Then
+   
+   remark MessageBox(0, "", 0, 0, "  0  &insertando en COMPONENT Distrib_Line RowInit");
+   
+   
+   DISTRIB_LINE.BUSINESS_UNIT_GL.Enabled = False;
+   
+   DISTRIB_LINE.ACCOUNT.Enabled = True;
+   
+   DISTRIB_LINE.ALTACCT.Enabled = False;
+   DISTRIB_LINE.OPERATING_UNIT.Enabled = False;
+   DISTRIB_LINE.FUND_CODE.Enabled = False;
+   DISTRIB_LINE.DEPTID.Enabled = False;
+   DISTRIB_LINE.PROGRAM_CODE.Enabled = False;
+   DISTRIB_LINE.CLASS_FLD.Enabled = False;
+   DISTRIB_LINE.BUDGET_REF.Enabled = False;
+   DISTRIB_LINE.PRODUCT.Enabled = False;
+   DISTRIB_LINE.BUSINESS_UNIT_PC.Enabled = False;
+   DISTRIB_LINE.PROJECT_ID.Enabled = False;
+   DISTRIB_LINE.ACTIVITY_ID.Enabled = False;
+   DISTRIB_LINE.RESOURCE_TYPE.Enabled = False;
+   DISTRIB_LINE.RESOURCE_CATEGORY.Enabled = False;
+   DISTRIB_LINE.RESOURCE_SUB_CAT.Enabled = False;
+   DISTRIB_LINE.AFFILIATE.Enabled = False;
+   /* Se deja invisible porque otro proceso posterior lo habilita*/;
+   REM DISTRIB_LINE.AFFILIATE.VISIBLE = False;
+   DISTRIB_LINE.AFFILIATE_INTRA1.Enabled = False;
+   DISTRIB_LINE.AFFILIATE_INTRA2.Enabled = False;
+   DISTRIB_LINE.CHARTFIELD2.Enabled = False;
+   DISTRIB_LINE.CHARTFIELD1.Enabled = False;
+   DISTRIB_LINE.CHARTFIELD3.Enabled = False;
+   DISTRIB_LINE.OPEN_ITEM_KEY.Enabled = False;
+   DISTRIB_LINE.ENTRY_EVENT.Enabled = False;
+   DISTRIB_LINE.BUDGET_DT.Enabled = False;
+End-If;

@@ -1,0 +1,261 @@
+/********************************************************************************************************
+Proyecto	 		Ref			Fecha	 	Desarrollador	Descripción
+---------------------------------------------------------------------------------------------------------
+<ETY_SPRINT3_96748>	<001>	<27/09/2020>	 <MGG>			<Grisa Claves contables en copia de recepción>
+*********************************************************************************************************/
+import AP:Voucher:Defaulting:VoucherDefaultHierarchy;
+import GL_COMMON:BuildSQL:FieldExists;
+
+Declare Function chk_pnlgrp_type PeopleCode FUNCLIB_AP.VCHR_PNLGRP_TYPE FieldFormula;
+Declare Function set_iu_vndr_dflt_affil PeopleCode FUNCLIB_AP.ACCOUNT FieldFormula;
+/*---------- Invoice Registration -------------------*/
+Declare Function Get_Inv_Registration_CF PeopleCode VCHR_PNL_WRK_LC.ACCOUNT FieldFormula;
+Declare Function Account_Xref_FC PeopleCode FUNCLIB_FS.ALTACCT FieldFormula;
+/*---------- Rel 8.4 ChartFields ----------*/
+Declare Function Get_CFs PeopleCode FUNCLIB_CF_FS.CF_FUNCTIONS FieldFormula;
+Declare Function openitem_dsply PeopleCode FUNCLIB_AP.ACCOUNT FieldFormula;
+
+Declare Function copy_edit_table PeopleCode DISTRIB_LINE.ACCOUNT FieldFormula;
+<* Incio 001 *>
+Declare Function EsParmCadCar PeopleCode FUNCLIB_FS.ALTACCT FieldFormula;
+
+Component string &insertando;
+<* Fin 001 *>
+
+Component AP:Voucher:Defaulting:VoucherDefaultHierarchy &VchDfltHier;
+Component Record &BU_LVL_DFHI_REC;
+Component array of string &CF_ARRAY;
+Local Record &DST_REC, &VDS_REC;
+Local SQL &DST_SQL;
+Component Record &rVndr_Loc;
+Local GL_COMMON:BuildSQL:FieldExists &nFieldExists = create GL_COMMON:BuildSQL:FieldExists();
+
+
+
+/*==================== Main Line Program ====================*/
+If All(DISTRIB_LINE.ACCOUNT) Then
+   &NEW_VCHR_LN_FLG = "N";
+Else
+   &NEW_VCHR_LN_FLG = "Y";
+End-If;
+UpdateValue(VCHR_PANELS_WRK.NEW_VCHR_LN_FLG, CurrentRowNumber(1), &NEW_VCHR_LN_FLG);
+
+rem--(Rel 8.4: InterUnit Vendor)--if voucher header Vndr Affiliate default has been set, populate new distrib lines with this value (and disable Affiliate chartfield for further entry);
+rem--(Maintenance Note: function checks to make sure Affiliate is operative chartfield);
+set_iu_vndr_dflt_affil(GetRecord());
+
+
+/*----------------- Invoice Registration -------------------*/
+/* Get the default Chart fields for this voucher's template */
+If %Mode = "A" And
+      VOUCHER.VOUCHER_STYLE = "RGTR" And
+      VOUCHER_LINE.VOUCHER_LINE_NUM = 1 Then
+   Get_Inv_Registration_CF();
+End-If;
+If All(DISTRIB_LINE.ACCOUNT) Then
+   If None(VCHR_PANELS_WK2.STATISTICS_ACCOUNT) Then
+      VCHR_PANELS_WK2.STATISTICS_ACCOUNT = GL_ACCOUNT_TBL.STATISTICS_ACCOUNT;
+   End-If;
+   If None(VCHR_PANELS_WK2.STAT_ACCT_UOM) Then
+      VCHR_PANELS_WK2.STAT_ACCT_UOM = GL_ACCOUNT_TBL.UNIT_OF_MEASURE;
+   End-If;
+   If VCHR_PANELS_WK2.STATISTICS_ACCOUNT <> "N" Then
+      VCHR_PANELS_WRK.UNIT_MEASURE_STD = VCHR_PANELS_WK2.STAT_ACCT_UOM;
+      VCHR_PANELS_WRK.UNIT_OF_MEASURE = VCHR_PANELS_WK2.STAT_ACCT_UOM;
+   End-If;
+End-If;
+
+/* for third party vouchers default in the rounding suspense account */
+chk_pnlgrp_type("THIRD", &PNLGRP_RESULT);
+If &PNLGRP_RESULT = "Y" Then
+   If None(DISTRIB_LINE.ACCOUNT, DISTRIB_LINE.FOREIGN_AMOUNT) Then
+      If All(VOUCHER.INVOICE_DT) Then
+         &USE_DATE = VOUCHER.INVOICE_DT;
+      Else
+         &USE_DATE = %Date;
+      End-If;
+      
+      &DST_REC = CreateRecord(Record.DST_DETL_CNTRL);
+      &DST_SETID = GetSetId("BUSINESS_UNIT", DISTRIB_LINE.BUSINESS_UNIT, "DST_CNTRL_TBL", "");
+      &VDS_REC = GetRecord(Record.DISTRIB_LINE);
+      
+      If &VchDfltHier <> Null And
+            &BU_LVL_DFHI_REC <> Null Then
+         REM--FUTURE--USE GET-LEVEL METHOD IN PLACE OF DIRECT REF TO GLOBAL REC;
+         &DST_CNTRL_ID = &BU_LVL_DFHI_REC.DST_CNTRL_ID.Value;
+      Else
+         &DST_CNTRL_ID = VCHR_BUPNLS_WRK.DST_CNTRL_ID;
+      End-If;
+      &DST_SQL = CreateSQL("%SelectAll(:1 A),  PS_DST_CNTRL_TBL B WHERE A.SETID = :2 AND A.DST_CNTRL_ID = :3 AND A.DST_ACCT_TYPE = 'TPS' AND B.SETID = A.SETID AND B.DST_CNTRL_ID = A.DST_CNTRL_ID AND B.EFFDT = (SELECT MAX(I.EFFDT) FROM PS_DST_CNTRL_TBL I WHERE I.SETID = B.SETID AND I.DST_CNTRL_ID = B.DST_CNTRL_ID AND I.EFFDT <= %DateIn(:4))", &DST_REC, &DST_SETID, &DST_CNTRL_ID, &USE_DATE);
+      
+      If &DST_SQL.Fetch(&DST_REC) Then
+         rem--Build array only once;
+         If &CF_ARRAY = Null Then
+            If Not Get_CFs(&DST_REC.Name, "", "") Then
+               REM--Display ERROR MESSAGE;
+            End-If;
+         End-If;
+         For &I = 1 To &VDS_REC.FieldCount;
+            If &CF_ARRAY.Find(&VDS_REC.GetField(&I).Name) <> 0 Then
+               &FLD = "FIELD." | &VDS_REC.GetField(&I).Name;
+               rem PC Chartfield Enhancement - Evaluate if CF exists in record;
+               If &nFieldExists.InRec(&VDS_REC.GetField(&I).Name, &DST_REC.Name) Then
+                  &VDS_REC.GetField(&I).Value = &DST_REC.GetField(@&FLD).Value;
+               End-If;
+            End-If;
+         End-For;
+      End-If;
+      
+   End-If;
+End-If;
+
+
+/* Prepayments */
+If VOUCHER.VOUCHER_STYLE = "PPAY" And
+      %Mode = "A" Then
+   If None(DISTRIB_LINE.LEDGER_GROUP) Then
+      SQLExec("SELECT LEDGER_GROUP, LEDGER FROM PS_BU_LED_AP_VW WHERE BUSINESS_UNIT = :1 AND PRIMARY_LEDGER = 'Y'", VOUCHER.BUSINESS_UNIT_GL, DISTRIB_LINE.LEDGER_GROUP, DISTRIB_LINE.LEDGER);
+   End-If;
+   &ALTACCT = Account_Xref_FC(Record.DISTRIB_LINE, DISTRIB_LINE.BUSINESS_UNIT_GL, DISTRIB_LINE.LEDGER_GROUP, Record.GL_ACCT_BUGL_VW, Record.ALTACCT_BUGL_VW, "");
+End-If;
+
+/* Open Item Account */
+rem--Set prompt table and/or field display characteristics for OpenItem reference field;
+If DISTRIB_LINE.BUSINESS_UNIT_GL = VOUCHER.BUSINESS_UNIT_GL Then
+   &found = "Y"
+Else
+   SQLExec("select 'Y' from PS_SP_BUPRCR_NONVW where BUSINESS_UNIT_GL = :1", DISTRIB_LINE.BUSINESS_UNIT_GL, &found);
+End-If;
+If All(&found) Or
+      VOUCHER.ENTRY_STATUS <> "R" Then
+   openitem_dsply(GetRecord());
+End-If;
+
+If All(DISTRIB_LINE.STATISTICS_CODE) Then
+   If None(VCHR_PANELS_WK2.STAT_CODE_UOM) Then
+      VCHR_PANELS_WK2.STAT_CODE_UOM = STAT_TBL.UNIT_OF_MEASURE;
+   End-If;
+   VCHR_PANELS_WRK.UNIT_OF_MEASURE = VCHR_PANELS_WK2.STAT_CODE_UOM;
+End-If;
+
+<* INICIO 001 *>
+
+REM MessageBox(0, "", 0, 0, "DISTRIB_LINE.PO_ID >>>>>>>>>" | DISTRIB_LINE.PO_ID.Value);
+REM MessageBox(0, "", 0, 0, "BUSINESS_UNIT voucher --------------> " | VOUCHER.BUSINESS_UNIT.Value);
+&Parametrizado = EsParmCadCar(VOUCHER.BUSINESS_UNIT.Value);
+
+
+remark MessageBox(0, "", 0, 0, "&insertando en DL.account RowInit >-> " | &insertando | " - %Mode en DL.account RowInit -> " | %Mode);
+
+If All(DISTRIB_LINE.PO_ID) Then
+   If &Parametrizado And
+         &insertando <> "I" And
+         %Mode = "U" Then
+      
+      remark MessageBox(0, "", 0, 0, "  2  Entré en RowInsert en Distrib_Line.account RowInit &insertando <> I And %Mode = U ");
+      
+      
+      DISTRIB_LINE.BUSINESS_UNIT_GL.Enabled = False;
+      DISTRIB_LINE.ACCOUNT.Enabled = False;
+      DISTRIB_LINE.ALTACCT.Enabled = False;
+      DISTRIB_LINE.OPERATING_UNIT.Enabled = False;
+      DISTRIB_LINE.FUND_CODE.Enabled = False;
+      DISTRIB_LINE.DEPTID.Enabled = False;
+      DISTRIB_LINE.PROGRAM_CODE.Enabled = False;
+      DISTRIB_LINE.CLASS_FLD.Enabled = False;
+      DISTRIB_LINE.BUDGET_REF.Enabled = False;
+      DISTRIB_LINE.PRODUCT.Enabled = False;
+      DISTRIB_LINE.BUSINESS_UNIT_PC.Enabled = False;
+      DISTRIB_LINE.PROJECT_ID.Enabled = False;
+      DISTRIB_LINE.ACTIVITY_ID.Enabled = False;
+      DISTRIB_LINE.RESOURCE_TYPE.Enabled = False;
+      DISTRIB_LINE.RESOURCE_CATEGORY.Enabled = False;
+      DISTRIB_LINE.RESOURCE_SUB_CAT.Enabled = False;
+      DISTRIB_LINE.AFFILIATE.Enabled = False;
+      /* Se deja invisible porque otro proceso posterior lo habilita*/;
+      REM DISTRIB_LINE.AFFILIATE.VISIBLE = False;
+      DISTRIB_LINE.AFFILIATE_INTRA1.Enabled = False;
+      DISTRIB_LINE.AFFILIATE_INTRA2.Enabled = False;
+      DISTRIB_LINE.CHARTFIELD2.Enabled = False;
+      DISTRIB_LINE.CHARTFIELD1.Enabled = False;
+      DISTRIB_LINE.CHARTFIELD3.Enabled = False;
+      DISTRIB_LINE.OPEN_ITEM_KEY.Enabled = False;
+      DISTRIB_LINE.ENTRY_EVENT.Enabled = False;
+      DISTRIB_LINE.BUDGET_DT.Enabled = False;
+   End-If;
+   
+   If &Parametrizado And
+         &insertando = "I" And
+         %Mode = "A" Then
+      
+      remark MessageBox(0, "", 0, 0, " 3  Entré en RowInsert en Distrib_Line.account RowInit &insertando <> I And %Mode = A ");
+      
+      
+      DISTRIB_LINE.BUSINESS_UNIT_GL.Enabled = False;
+      
+      DISTRIB_LINE.ACCOUNT.Enabled = True;
+      
+      DISTRIB_LINE.ALTACCT.Enabled = False;
+      DISTRIB_LINE.OPERATING_UNIT.Enabled = False;
+      DISTRIB_LINE.FUND_CODE.Enabled = False;
+      DISTRIB_LINE.DEPTID.Enabled = False;
+      DISTRIB_LINE.PROGRAM_CODE.Enabled = False;
+      DISTRIB_LINE.CLASS_FLD.Enabled = False;
+      DISTRIB_LINE.BUDGET_REF.Enabled = False;
+      DISTRIB_LINE.PRODUCT.Enabled = False;
+      DISTRIB_LINE.BUSINESS_UNIT_PC.Enabled = False;
+      DISTRIB_LINE.PROJECT_ID.Enabled = False;
+      DISTRIB_LINE.ACTIVITY_ID.Enabled = False;
+      DISTRIB_LINE.RESOURCE_TYPE.Enabled = False;
+      DISTRIB_LINE.RESOURCE_CATEGORY.Enabled = False;
+      DISTRIB_LINE.RESOURCE_SUB_CAT.Enabled = False;
+      DISTRIB_LINE.AFFILIATE.Enabled = False;
+      /* Se deja invisible porque otro proceso posterior lo habilita*/;
+      REM DISTRIB_LINE.AFFILIATE.VISIBLE = False;
+      DISTRIB_LINE.AFFILIATE_INTRA1.Enabled = False;
+      DISTRIB_LINE.AFFILIATE_INTRA2.Enabled = False;
+      DISTRIB_LINE.CHARTFIELD2.Enabled = False;
+      DISTRIB_LINE.CHARTFIELD1.Enabled = False;
+      DISTRIB_LINE.CHARTFIELD3.Enabled = False;
+      DISTRIB_LINE.OPEN_ITEM_KEY.Enabled = False;
+      DISTRIB_LINE.ENTRY_EVENT.Enabled = False;
+      DISTRIB_LINE.BUDGET_DT.Enabled = False;
+   End-If;
+   
+   
+   
+   
+End-If;
+<* FIN 001 *>
+
+If %Component = "VCHR_EXPRESS" Or
+      %Component = "VCHR_CMPL_UNPST_LC" Then
+   copy_edit_table();
+End-If;
+
+rem following code is commented out to resolve the ICE 1321698000.  As we do not maitain chartfield defaults at the vendor location level, we need not pull the CF data from vendor location.;
+
+/*If %Mode = "A" Then
+   Evaluate VOUCHER.VOUCHER_STYLE
+   When = "REG"
+   When = "JRNL"
+   When = "ADJ"
+   When = "TMPL"
+      &rDstln = GetRecord();
+      If &CF_ARRAY = Null Then
+         If Not Get_CFs(&DST_REC.Name, "", "") Then
+            REM--Display ERROR MESSAGE;
+         End-If;
+      End-If;
+      For &I = 1 To &rDstln.FieldCount;
+         If &CF_ARRAY.Find(&rDstln.GetField(&I).Name) <> 0 Then
+            &FLD = "FIELD." | &rDstln.GetField(&I).Name;
+            rem PC Chartfield Enhancement - Evaluate if CF exists in Vendor Location component record;
+            If &nFieldExists.InRec(&rDstln.GetField(&I).Name, &rVndr_Loc.Name) Then
+               &rDstln.GetField(&I).Value = &rVndr_Loc.GetField(@&FLD).Value;
+            End-If;
+         End-If;
+      End-For;
+   End-Evaluate;
+End-If;
+*/

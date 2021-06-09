@@ -1,0 +1,95 @@
+/********************************************************************************************
+PROYECTO	: FF_GL_BALANCE_MV_001	
+FECHA		: 2012-Dic-28
+ACTIVIDAD	: 001
+RESPONSABLE	: QUANAM - Martin Varela
+DESCR		: Balance de Prueba Detallado - Se carga los detalles de los nodos de ultimo nivel
+*********************************************************************************************/
+
+/*Inicio #001*/
+/* En este peoplecode se actualizan todos los valores de monetary amount*/
+
+Local string &strChartfield1;
+Local SQL &sqlChartfield1;
+Local array &arrParam1 = CreateArrayAny();
+Local array &arrParam2 = CreateArrayAny();
+Local number &num_nivel, &nbr_year;
+
+&nbr_year = Year(FF_BALRES_AET.DATE_FROM.Value);
+&FrstDayYear = Date3(Year(FF_BALRES_AET.DATE_FROM.Value), 1, 1);
+
+
+&fieldName = FF_BALRES_AET.FIELDNAME.Value;
+&fieldName2 = FF_BALRES_AET.FIELDNAME2.Value;
+
+REM BY GPB &strSQL1 = "select sum(monetary_amount) from ps_ff_tre_jrn_vw where " | &fieldName | " = :1 and " | &fieldName2 | " = :2 and business_unit between :3 and :4 and ((journal_date >= %datein(:5) and journal_date < %datein(:6)) or (fiscal_year = :7 and accounting_period = 0)) and setid = :8 and tree_name = :9 and tree_node = :10 and chartfield3 = :11";
+Local string &str_valor;
+If FF_BALRES_AET.LEDGER <> "NIIF" Then
+   &str_valor = " select ROUND(sum(c.monetary_amount),2) FROM %Table(FF_TRLEA3) a INNER JOIN %Table(FF_TRNDE3) b ON (a.setid = b.setid AND a.tree_name = b.tree_name AND a.lc_tree_node_num BETWEEN b.lc_tree_node_num AND b.lc_tree_nod_nm_end) INNER JOIN ps_jrnl_ln c ON (c.account BETWEEN a.range_from AND a.range_to) INNER JOIN ps_jrnl_header d ON (d.business_unit = c.business_unit AND d.journal_id = c.journal_id AND d.journal_date = c.journal_date AND d.unpost_seq = c.unpost_seq ) wHERE c.ledger ='" | FF_BALRES_AET.LEDGER | "' AND d.jrnl_hdr_status IN ('P','U') ";
+Else
+   &str_valor = " select ROUND(sum(c.monetary_amount),2) FROM %Table(FF_TRLEA3) a INNER JOIN %Table(FF_TRNDE3) b ON (a.setid = b.setid AND a.tree_name = b.tree_name AND a.lc_tree_node_num BETWEEN b.lc_tree_node_num AND b.lc_tree_nod_nm_end) INNER JOIN ps_jrnl_ln c ON (c.ALTACCT BETWEEN a.range_from AND a.range_to) INNER JOIN ps_jrnl_header d ON (d.business_unit = c.business_unit AND d.journal_id = c.journal_id AND d.journal_date = c.journal_date AND d.unpost_seq = c.unpost_seq ) wHERE c.ledger ='" | FF_BALRES_AET.LEDGER | "' AND d.jrnl_hdr_status IN ('P','U') ";
+End-If;
+&strSQL1 = &str_valor | " and c." | &fieldName | " = :1 and c." | &fieldName2 | "  = :2 and d.business_unit between :3 and :4 and a.setid = :5 and a.tree_name = :6 and b.tree_node = :7 and ((d.journal_date >= %datein(:8) and d.journal_date < %datein(:9)) or (d.fiscal_year = :10 and d.accounting_period = 0)) and c.chartfield3 = :11";
+&arrParam1.Push(FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.CF_VALUE2.Value, FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, FF_BALRES_AET.BUSINESS_UNIT_TO.Value, FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, FF_BALRES_AET.TREE_NODE.Value, &FrstDayYear, FF_BALRES_AET.DATE_FROM.Value, &nbr_year, FF_BALRES_AET.CHARTFIELD3.Value);
+
+/*Selecciono los chartfields que aplican para este grupo contable*/
+&sqlChartfield1 = CreateSQL("SELECT FIELDNAME, CF_VALUE_FROM, CF_VALUE_TO FROM PS_FF_BALCC_RUN WHERE OPRID = :1 AND RUN_CNTL_ID = :2 AND PRIMARY_FLG <> 'Y' AND LC_INCLUIR_CC = 'Y' ", FF_BALRES_AET.OPRID.Value, FF_BALRES_AET.RUN_CNTL_ID.Value);
+
+rem by gpb &strSQL2 = "select sum(monetary_amount) from ps_ff_tre_jrn_vw where " | &fieldName | " = :1 and " | &fieldName2 | " = :2 and business_unit between :3 and :4 and journal_date between %datein(:5) and  %datein(:6) and accounting_period not in (0, 999) and setid = :7 and tree_name = :8 and tree_node = :9 and monetary_amount > 0 and chartfield3 = :10 ";
+&strSQL2 = &str_valor | " and c." | &fieldName | " = :1 and c." | &fieldName2 | "  = :2 and d.business_unit between :3 and :4 and a.setid = :5 and a.tree_name = :6 and b.tree_node = :7 and d.journal_date between %datein(:8) and %datein(:9) and d.accounting_period <> 0 and d.accounting_period <> 999 and c.monetary_amount > 0 and c.chartfield3 = :10 ";
+&arrParam2.Push(FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.CF_VALUE2.Value, FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, FF_BALRES_AET.BUSINESS_UNIT_TO.Value, FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, FF_BALRES_AET.TREE_NODE.Value, FF_BALRES_AET.DATE_FROM.Value, FF_BALRES_AET.DATE_TO.Value, FF_BALRES_AET.CHARTFIELD3.Value);
+
+rem by gpb &strSQL3 = "select sum(monetary_amount) from ps_ff_tre_jrn_vw where " | &fieldName | " = :1 and " | &fieldName2 | " = :2 and business_unit between :3 and :4 and journal_date between %datein(:5) and  %datein(:6) and accounting_period not in (0, 999) and setid = :7 and tree_name = :8 and tree_node = :9 and monetary_amount < 0 and chartfield3 = :10 ";
+&strSQL3 = &str_valor | " and c." | &fieldName | " = :1 and c." | &fieldName2 | "  = :2 and d.business_unit between :3 and :4 and a.setid = :5 and a.tree_name = :6 and b.tree_node = :7 and d.journal_date between %datein(:8) and %datein(:9) and (d.accounting_period <> 0 and d.accounting_period <> 999) and c.monetary_amount < 0 and c.chartfield3 = :10 ";
+
+&strChart = " ";
+&strChart1 = " ";
+While &sqlChartfield1.Fetch(&CHARTFIELD, &CF_VALUE_FROM, &CF_VALUE_TO)
+   &strChart = &strChart | " AND c." | &CHARTFIELD | " BETWEEN :" | (&arrParam1.Len + 1) | " AND :" | (&arrParam1.Len + 2);
+   &strChart1 = &strChart1 | " AND c." | &CHARTFIELD | " BETWEEN :" | (&arrParam2.Len + 1) | " AND :" | (&arrParam2.Len + 2);
+   &arrParam1.Push(&CF_VALUE_FROM, &CF_VALUE_TO);
+   &arrParam2.Push(&CF_VALUE_FROM, &CF_VALUE_TO);
+End-While;
+
+&strSQL1 = &strSQL1 | &strChart;
+&strSQL2 = &strSQL2 | &strChart1;
+&strSQL3 = &strSQL3 | &strChart1;
+
+SQLExec(&strSQL1, &arrParam1, &nbrSaldoAnt);
+
+If &nbrSaldoAnt < 0 Then
+   &nbrSaldoAntDeb = 0;
+   &nbrSaldoAntCred = Abs(&nbrSaldoAnt);
+Else
+   &nbrSaldoAntDeb = &nbrSaldoAnt;
+   &nbrSaldoAntCred = 0;
+End-If;
+
+SQLExec(&strSQL2, &arrParam2, &nbrMovDeb);
+
+SQLExec(&strSQL3, &arrParam2, &nbrMovCred);
+
+&nbrMovCred = Abs(&nbrMovCred);
+
+/*Actualizo ultimas 2 columnas*/
+&nbrSaldoAct = &nbrSaldoAntDeb - &nbrSaldoAntCred + &nbrMovDeb - &nbrMovCred;
+
+If &nbrSaldoAct < 0 Then
+   &nbrSaldoActDeb = 0;
+   &nbrSaldoActCred = Abs(&nbrSaldoAct);
+Else
+   &nbrSaldoActDeb = &nbrSaldoAct;
+   &nbrSaldoActCred = 0;
+End-If;
+
+/*cargo el national id */
+SQLExec("SELECT N.national_id   FROM ps_lc_tercero T   , ps_lc_tercero_nid N  WHERE T.lc_tercero_id = N.lc_tercero_id    AND N.primary_nid = 'Y'   and T.lc_tercero_id = :1", FF_BALRES_AET.CHARTFIELD3.Value, &nat_id);
+
+/* cargo la descripcion del national id*/
+SQLExec("select descr from ps_chartfield3_tbl where setid = 'SHARE' AND chartfield3 = :1 ", FF_BALRES_AET.CHARTFIELD3.Value, &descrNatId);
+
+/*Actualizo los valores en la tabla*/
+SQLExec("update %TABLE(FF_BAL3_DE2) set MONETARY_AMOUNT_01 = :1, MONETARY_AMOUNT_02 = :2, MONETARY_AMOUNT_03 = :3, MONETARY_AMOUNT_04 = :4, MONETARY_AMOUNT_05 = :5, MONETARY_AMOUNT_06 = :6, NATIONAL_ID = :7, DESCR1 = :8, DESCR100 = :8 WHERE PROCESS_INSTANCE = :9 and CF_VALUE1 = :10 and CF_VALUE2 = :11 and TREE_NODE = :12 and CHARTFIELD3 = :13", &nbrSaldoAntDeb, &nbrSaldoAntCred, &nbrMovDeb, &nbrMovCred, &nbrSaldoActDeb, &nbrSaldoActCred, &nat_id, &descrNatId, FF_BALRES_AET.PROCESS_INSTANCE.Value, FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.CF_VALUE2.Value, FF_BALRES_AET.TREE_NODE.Value, FF_BALRES_AET.CHARTFIELD3.Value);
+
+
+/*Fin #001*/

@@ -1,0 +1,247 @@
+         @(Record.DERIVED | "." | Field.EDIT_ACCOUNT | &SUFFIX) = Record.ALTX_ACCT_R_VW2;
+         @(Record.DERIVED | "." | Field.EDIT_ALTACCT | &SUFFIX) = &ALTVW;
+      End-If;
+   End-If;
+   
+   If &SUFFIX = "_U" Then
+      If None(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX)) And
+            None(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX)) Then
+         
+         @(Record.DERIVED | "." | Field.EDIT_ACCOUNT | &SUFFIX) = &ACCTVW;
+         @(Record.DERIVED | "." | Field.EDIT_ALTACCT | &SUFFIX) = &ALTVW;
+      End-If;
+      If All(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX)) And
+            All(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX)) Then
+         @(Record.DERIVED | "." | Field.EDIT_ACCOUNT | &SUFFIX) = Record.ALTX_ACCT_U_VW2;
+         @(Record.DERIVED | "." | Field.EDIT_ALTACCT | &SUFFIX) = Record.ALTX_ALT_U_VW2;
+      End-If;
+      If All(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX)) And
+            None(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX)) Then
+         
+         @(Record.DERIVED | "." | Field.EDIT_ACCOUNT | &SUFFIX) = &ACCTVW;
+         @(Record.DERIVED | "." | Field.EDIT_ALTACCT | &SUFFIX) = Record.ALTX_ALT_U_VW2
+      End-If;
+      If None(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX)) And
+            All(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX)) Then
+         @(Record.DERIVED | "." | Field.EDIT_ACCOUNT | &SUFFIX) = Record.ALTX_ACCT_U_VW2;
+         @(Record.DERIVED | "." | Field.EDIT_ALTACCT | &SUFFIX) = &ALTVW;
+      End-If;
+   End-If;
+   
+   If &SUFFIX = "_X" Then
+      If None(@(&RECNAME | "." | Field.ACCOUNT)) And
+            None(@(&RECNAME | "." | Field.ALTACCT)) Then
+         
+         @(Record.DERIVED | "." | Field.EDIT_ACCOUNT | &SUFFIX) = &ACCTVW;
+         @(Record.DERIVED | "." | Field.EDIT_ALTACCT | &SUFFIX) = &ALTVW;
+      End-If;
+      If All(@(&RECNAME | "." | Field.ACCOUNT)) And
+            All(@(&RECNAME | "." | Field.ALTACCT)) Then
+         @(Record.DERIVED | "." | Field.EDIT_ACCOUNT | &SUFFIX) = Record.ALTX_ACCT_VW2;
+         @(Record.DERIVED | "." | Field.EDIT_ALTACCT | &SUFFIX) = Record.ALTX_ALT_VW2;
+      End-If;
+      If All(@(&RECNAME | "." | Field.ACCOUNT)) And
+            None(@(&RECNAME | "." | Field.ALTACCT)) Then
+         @(Record.DERIVED | "." | Field.EDIT_ACCOUNT | &SUFFIX) = &ACCTVW;
+         @(Record.DERIVED | "." | Field.EDIT_ALTACCT | &SUFFIX) = Record.ALTX_ALT_VW2
+      End-If;
+      If None(@(&RECNAME | "." | Field.ACCOUNT)) And
+            All(@(&RECNAME | "." | Field.ALTACCT)) Then
+         @(Record.DERIVED | "." | Field.EDIT_ACCOUNT | &SUFFIX) = Record.ALTX_ACCT_VW2;
+         @(Record.DERIVED | "." | Field.EDIT_ALTACCT | &SUFFIX) = &ALTVW;
+      End-If;
+   End-If;
+   /*** GLBU should have a value. If none, skip getting setids ***/
+   If &GLBUSINESSUNIT <> "" And
+         &GLBUSINESSUNIT <> " " Then
+      ALTACCT_WRK.ALTACCT_SETID = GetSetId(Field.BUSINESS_UNIT, &GLBUSINESSUNIT, Record.ALTACCT_TBL, "");
+      ALTACCT_WRK.ACCOUNT_SETID = GetSetId(Field.BUSINESS_UNIT, &GLBUSINESSUNIT, Record.GL_ACCOUNT_TBL, "");
+   End-If;
+End-Function;
+
+Function Account_Xref_FC(&RECNAME, &GLBUSINESSUNIT, &LEDERGROUP, &PREFACCTVW, &PREFALTVW, &SUFFIX) Returns boolean;
+   /*** Main Account procedure FieldChange***/
+   If &SUFFIX = "_X" Then
+      &AA_OPTN = AA_Optn(&RECNAME, &GLBUSINESSUNIT, &LEDERGROUP, "");
+      If &AA_OPTN = "Y" Then
+         SetDefault(@(&RECNAME | "." | Field.ALTACCT));
+         AltAcct_Dflt(&RECNAME, &GLBUSINESSUNIT, "");
+         Set_Alt_Prompt(&RECNAME, &PREFACCTVW, &PREFALTVW, &SUFFIX, &GLBUSINESSUNIT);
+         Return True;
+      Else
+         Return False;
+      End-If;
+   Else
+      &AA_OPTN = AA_Optn(&RECNAME, &GLBUSINESSUNIT, &LEDERGROUP, &SUFFIX);
+      If &AA_OPTN = "Y" Then
+         SetDefault(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX));
+         AltAcct_Dflt(&RECNAME, &GLBUSINESSUNIT, &SUFFIX);
+         Set_Alt_Prompt(&RECNAME, &PREFACCTVW, &PREFALTVW, &SUFFIX, &GLBUSINESSUNIT);
+         Return True;
+      Else
+         Return False;
+      End-If;
+   End-If;
+End-Function;
+
+Function AltAcct_Xref_FC(&RECNAME, &GLBUSINESSUNIT, &LEDERGROUP, &PREFACCTVW, &PREFALTVW, &SUFFIX) Returns boolean;
+   /*** Main AltAcct procedure FieldChange***/
+   If &SUFFIX = "_X" Then
+      &AA_OPTN = AA_Optn(&RECNAME, &GLBUSINESSUNIT, &LEDERGROUP, "");
+      If &AA_OPTN = "Y" Then
+         SetDefault(@(&RECNAME | "." | Field.ACCOUNT));
+         AltAcct_Dflt(&RECNAME, &GLBUSINESSUNIT, "");
+         Set_Alt_Prompt(&RECNAME, &PREFACCTVW, &PREFALTVW, &SUFFIX, &GLBUSINESSUNIT);
+         Return True;
+      Else
+         Set_Alt_Prompt(&RECNAME, &PREFACCTVW, &PREFALTVW, &SUFFIX, &GLBUSINESSUNIT);
+         Return False;
+      End-If;
+   Else
+      &AA_OPTN = AA_Optn(&RECNAME, &GLBUSINESSUNIT, &LEDERGROUP, &SUFFIX);
+      If &AA_OPTN = "Y" Then
+         SetDefault(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX));
+         AltAcct_Dflt(&RECNAME, &GLBUSINESSUNIT, &SUFFIX);
+         Set_Alt_Prompt(&RECNAME, &PREFACCTVW, &PREFALTVW, &SUFFIX, &GLBUSINESSUNIT);
+         Return True;
+      Else
+         Set_Alt_Prompt(&RECNAME, &PREFACCTVW, &PREFALTVW, &SUFFIX, &GLBUSINESSUNIT);
+         Return False;
+      End-If;
+   End-If;
+End-Function;
+
+/*******************************************************
+*   The following functions are a copy of the
+*   ALTACCT fieldchange functions, that do not
+*   call the functions to check the BU/LG and Installation
+*   options for ALTACCT.
+********************************************************/
+Function Account_Xref_FC_2(&RECNAME, &GLBUSINESSUNIT, &PREFACCTVW, &PREFALTVW, &SUFFIX);
+   /*** Main Account procedure FieldChange***/
+   SetDefault(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX));
+   AltAcct_Dflt(&RECNAME, &GLBUSINESSUNIT, &SUFFIX);
+   Set_Alt_Prompt(&RECNAME, &PREFACCTVW, &PREFALTVW, &SUFFIX, &GLBUSINESSUNIT);
+End-Function;
+
+Function AltAcct_Xref_FC_2(&RECNAME, &GLBUSINESSUNIT, &PREFACCTVW, &PREFALTVW, &SUFFIX);
+   SetDefault(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX));
+   AltAcct_Dflt(&RECNAME, &GLBUSINESSUNIT, &SUFFIX);
+   Set_Alt_Prompt(&RECNAME, &PREFACCTVW, &PREFALTVW, &SUFFIX, &GLBUSINESSUNIT);
+End-Function;
+
+/*******************************************************
+*   The following function should be called from SaveEdit.
+*    It will perform the following edits
+*       -  If either the ALTACCT or ACCOUNT field is blank,
+*         the default mapping will be entered.
+*      -  Mark the line in Error if the ACCOUNT/ALTACCT
+*         mapping is not valid.
+*      -  Populate the account and altaccount field is
+*         the other two conditions are not satisfied
+********************************************************/
+
+Function AltAcct_Edit(&RECNAME, &GLBUSINESSUNIT, &LEDGERGROUP, &ERRFLGFIELD, &ERRSYMBOL, &ACCT_SETID, &ALT_SETID, &INSTOPTN, &BUOPTN, &EFF_DATE, &SUFFIX) Returns boolean;
+   /*** Check the Effective Date ***/
+   If None(&EFF_DATE) Then
+      &EFF_DATE = %Date;
+   End-If;
+   /*** Get  AltAcct Options ***/
+   &ERRFOUND = False;
+   If &INSTOPTN = " " Then
+      &INSTOPTN = "N";
+      &INSTALLRECFLD = "INSTALLATION.ALTACCT_OPTN";
+      &INSTOPTN = @(&INSTALLRECFLD);
+   End-If;
+   If &BUOPTN = " " Then
+      &BUOPTN = "N";
+      If &GLBUSINESSUNIT <> " " And
+            &LEDGERGROUP <> " " Then
+         SQLExec("Select altacct_optn, alt_acct_suspense, acct_alt_suspense from ps_bu_led_grp_tbl where business_unit = :1 and ledger_group = :2", &GLBUSINESSUNIT, &LEDGERGROUP, &BUOPTN, &ALTACCTSUSP, &ACCTALTSUSP);
+      End-If;
+   End-If;
+   /*** Default  if blank ***/
+   If &INSTOPTN = "Y" And
+         &BUOPTN = "Y" Then
+      If &ACCT_SETID = " " Or
+            &ALT_SETID = " " Then
+         &ACCT_SETID = GetSetId("BUSINESS_UNIT", &GLBUSINESSUNIT, "GL_ACCOUNT_TBL", "");
+         &ALT_SETID = GetSetId("BUSINESS_UNIT", &GLBUSINESSUNIT, "ALTACCT_TBL", "");
+      End-If;
+      
+      /***  Will only get the default Account/Altacct if it's in Active status ***/
+      /***  Account with no Alternate Account ***/
+      If All(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX)) And
+            None(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX)) Then
+         SQLExec("SELECT A.ACCT_ALTACCT_DFLT FROM PS_ALTACCT_XREF A, PS_ALTACCT_TBL B WHERE A.ACCOUNT=:1 AND A.SETID=:2 AND A.ALTACCT_SETID=:3", @(&RECNAME | "." | Field.ACCOUNT | &SUFFIX), &ACCT_SETID, &ALT_SETID, &ACCT_ALT_DFLT);
+         If All(&ACCT_ALT_DFLT) Then
+            SQLExec("SELECT A.ALTACCT FROM PS_ALTACCT_TBL A WHERE A.SETID = :1 AND A.ALTACCT = :2 AND A.EFFDT = (SELECT MAX (B.EFFDT) FROM PS_ALTACCT_TBL B WHERE B.SETID = A.SETID AND B.ALTACCT = A.ALTACCT AND B.EFFDT <=%DATEIN(:3) AND A.EFF_STATUS = 'A')", &ALT_SETID, &ACCT_ALT_DFLT, &EFF_DATE, @(&RECNAME | "." | Field.ALTACCT | &SUFFIX));
+         End-If;
+      End-If;
+      
+      /***~~~ Alternate with no Account ~~~***/
+      If None(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX)) And
+            All(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX)) Then
+         SQLExec("SELECT A.ALTACCT_ACCT_DFLT FROM PS_ALTACCT_XREF A, PS_GL_ACCOUNT_TBL B WHERE A.ALTACCT=:1 AND A.SETID=:2 AND A.ALTACCT_SETID=:3", @(&RECNAME | "." | Field.ALTACCT | &SUFFIX), &ACCT_SETID, &ALT_SETID, &ALT_ACCT_DFLT);
+         If All(&ALT_ACCT_DFLT) Then
+            SQLExec("SELECT A.ACCOUNT FROM PS_GL_ACCOUNT_TBL A WHERE A.SETID = :1 AND A.ACCOUNT = :2 AND A.EFFDT = (SELECT MAX (B.EFFDT) FROM PS_GL_ACCOUNT_TBL B WHERE B.SETID = A.SETID AND B.ACCOUNT = A.ACCOUNT AND B.EFFDT <=%DATEIN(:3) AND B.EFF_STATUS = 'A')", &ACCT_SETID, &ALT_ACCT_DFLT, &EFF_DATE, @(&RECNAME | "." | Field.ACCOUNT | &SUFFIX));
+         End-If;
+      End-If;
+      
+      /** if both account and altaccount are populated, verify if the mapping is correct **/
+      If All(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX)) And
+            All(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX)) Then
+         If ((@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX)) <> &ACCTALTSUSP) And
+               ((@(&RECNAME | "." | Field.ALTACCT | &SUFFIX)) <> &ALTACCTSUSP) Then
+            &MAPFOUND = " ";
+            &MAPVALID = " ";
+            SQLExec("SELECT 'X' FROM PS_ALTACCT_XREF WHERE ACCOUNT=:1 AND SETID=:2 AND ALTACCT_SETID=:3 AND ALTACCT = :4", @(&RECNAME | "." | Field.ACCOUNT | &SUFFIX), &ACCT_SETID, &ALT_SETID, @(&RECNAME | "." | Field.ALTACCT | &SUFFIX), &MAPFOUND);
+            
+            If &MAPFOUND = "X" Then
+               SQLExec("SELECT 'X' FROM PS_GL_ACCOUNT_TBL A WHERE A.SETID = :1 AND A.ACCOUNT = :2 AND A.EFFDT = (SELECT MAX (B.EFFDT) FROM PS_GL_ACCOUNT_TBL B WHERE B.SETID = A.SETID AND B.ACCOUNT = A.ACCOUNT AND B.EFFDT <=%DATEIN(:3) AND B.EFF_STATUS = 'A')", &ACCT_SETID, @(&RECNAME | "." | Field.ACCOUNT | &SUFFIX), &EFF_DATE, &MAPVALID);
+               If All(&MAPVALID) Then
+                  SQLExec("SELECT 'X' FROM PS_ALTACCT_TBL A WHERE A.SETID = :1 AND A.ALTACCT = :2 AND A.EFFDT = (SELECT MAX (B.EFFDT) FROM PS_ALTACCT_TBL B WHERE B.SETID = A.SETID AND B.ALTACCT = A.ALTACCT AND B.EFFDT <=%DATEIN(:3) AND B.EFF_STATUS = 'A')", &ALT_SETID, @(&RECNAME | "." | Field.ALTACCT | &SUFFIX), &EFF_DATE, &MAPVALID);
+               End-If;
+            End-If;
+            
+            If &MAPFOUND <> "X" Or
+                  &MAPVALID <> "X" Then
+               If &ERRFLGFIELD <> " " Then
+                  &ERRRECFLD = &RECNAME | "." | &ERRFLGFIELD;
+                  @(&ERRRECFLD) = &ERRSYMBOL;
+               End-If;
+               &ERRFOUND = True;
+            End-If;
+         End-If;
+      End-If;
+      /*** Populate Account with suspense account if account is blank ***/
+      If None(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX)) Then
+         SQLExec("Select alt_acct_suspense from ps_bu_led_grp_tbl where business_unit = :1 and        ledger_group = :2", &GLBUSINESSUNIT, &LEDGERGROUP, @(&RECNAME | "." | Field.ACCOUNT | &SUFFIX));
+      End-If;
+      /*** Populate AltAcct with suspense altaccount if altaccount is blank ***/
+      If None(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX)) Then
+         SQLExec("Select acct_alt_suspense from ps_bu_led_grp_tbl where business_unit = :1 and        ledger_group = :2", &GLBUSINESSUNIT, &LEDGERGROUP, @(&RECNAME | "." | Field.ALTACCT | &SUFFIX));
+      End-If;
+   End-If;
+   Return &ERRFOUND;
+End-Function;
+
+/*******************************************************
+*   The following functions are a copy of the
+*   ALTACCT fieldchange functions, that do not
+*   call the functions to check the BU/LG and Installation
+*   options for ALTACCT and Set_Alt_Prompt.
+********************************************************/
+Function Account_Xref_CA(&RECNAME, &GLBUSINESSUNIT, &SUFFIX);
+   /*** Main Account procedure FieldChange***/
+   SetDefault(@(&RECNAME | "." | Field.ALTACCT | &SUFFIX));
+   AltAcct_Dflt(&RECNAME, &GLBUSINESSUNIT, &SUFFIX);
+End-Function;
+
+Function AltAcct_Xref_CA(&RECNAME, &GLBUSINESSUNIT, &SUFFIX);
+   /*** Main Alternate Account procedure FieldChange***/
+   SetDefault(@(&RECNAME | "." | Field.ACCOUNT | &SUFFIX));
+   AltAcct_Dflt(&RECNAME, &GLBUSINESSUNIT, &SUFFIX);
+End-Function;
+
+/********************************************************/

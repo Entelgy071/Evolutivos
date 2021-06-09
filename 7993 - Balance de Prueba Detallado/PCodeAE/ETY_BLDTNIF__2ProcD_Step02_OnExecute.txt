@@ -1,0 +1,6 @@
+/* En este peoplecode se actualizan todos los valores de monetary amount*/
+
+&FrstDayYear = Date3(FF_BALRES_AET.DATE_FROM.Value, 1, 1);
+&str_FiltroPpal = FF_BALRES_AET.FIELDNAME.Value | " = " | FF_BALRES_AET.CF_VALUE1.Value;
+
+SQLExec("select sum(monetary_amount) from ps_ff_tre_jrn_vw where :1 = :2 and business_unit between :3 and :4 and journal_date >= :5 and journal_date < :6 and setid = :7 and tree_name = :8 and tree_node = :9", FF_BALRES_AET.FIELDNAME.Value, FF_BALRES_AET.CF_VALUE1.Value, FF_BALRES_AET.BUSINESS_UNIT_FROM.Value, FF_BALRES_AET.BUSINESS_UNIT_TO.Value, &FrstDayYear, FF_BALRES_AET.DATE_FROM.Value, FF_BALRES_AET.SETID.Value, FF_BALRES_AET.TREE_NAME.Value, "PONERVALOR");

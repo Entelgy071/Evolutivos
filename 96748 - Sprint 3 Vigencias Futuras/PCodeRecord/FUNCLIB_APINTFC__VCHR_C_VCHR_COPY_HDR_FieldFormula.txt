@@ -1,0 +1,339 @@
+      UpdateValue(VOUCHER.VCHR_TTL_LINES, CurrentRowNumber(), &VCHR_TTL_LINES);
+      set_mtch_apprvl(&MTCH_REQD, &MTCH_STATUS, &APPR_STATUS, &VCHR_TTL_LINES);
+      UpdateValue(VOUCHER.MATCH_ACTION, CurrentRowNumber(), &MTCH_REQD);
+      UpdateValue(VOUCHER.MATCH_STATUS_VCHR, CurrentRowNumber(), &MTCH_STATUS);
+      If VOUCHER.MATCH_STATUS_VCHR = "T" Or
+            VOUCHER.MATCH_STATUS_VCHR = "E" Then
+         UnGray(VOUCHER.UNMTCH_PAY_FLG);
+      Else
+         Gray(VOUCHER.UNMTCH_PAY_FLG);
+      End-If;
+      
+      If VOUCHER.MATCH_STATUS_VCHR = "T" Then
+         GetField(VOUCHER.MATCH_DUE_DT).Enabled = True;
+         GetField(VOUCHER.MATCH_DUE_DT).DisplayOnly = False;
+      End-If;
+      
+      If &VCHEXP_THIRD_FLG Then
+         VOUCHER.MEMO_AMT = VOUCHER.MEMO_AMT + &TOTAL_MERCH_AMT;
+         /*  JM - VOUCHER BALANCING
+         VCHR_PANELS_WRK.VCHR_BALANCE_AMT = VOUCHER.GROSS_AMT - VOUCHER.MEMO_AMT - VOUCHER.FREIGHT_AMT - VOUCHER.MISC_AMT - VOUCHER.SALETX_AMT - VOUCHER.VAT_ENTRD_AMT;
+         rem--Exclude Custom Duty amount to voucher balance work for India Third Party Voucher;
+         If &CSD_PTP_APPL = "Y" And
+               &CSD_VNDR_APPL = "Y" Then
+            VCHR_PANELS_WRK.VCHR_BALANCE_AMT = VCHR_PANELS_WRK.VCHR_BALANCE_AMT - VOUCHER.CSD_TAX_AMT;
+         End-If;
+*/
+      End-If;
+   End-Evaluate;
+   
+End-Function;
+
+Function flush_scrolls();
+   ScrollFlush(Record.VCHR_MTCH_WS1);
+End-Function;
+
+
+Function Enable_Goto_Recv_Copy(&BU_PO) Returns boolean;
+   
+   If All(&BU_PO) Then
+      &return = True;
+   Else
+      &return = False;
+   End-If;
+   Evaluate %Component
+   When = Component.VCHR_QUICK_PNL
+   When = Component.VCHR_SUMM_PNL
+      If VCHR_HDR_QV.MATCH_STATUS_VCHR = "T" Or
+            VCHR_HDR_QV.MATCH_STATUS_VCHR = "E" Then
+         &return = True;
+      Else
+         &return = False;
+      End-If;
+   When-Other
+      If VOUCHER.MATCH_STATUS_VCHR = "T" Or
+            VOUCHER.MATCH_STATUS_VCHR = "E" Then
+         &return = True;
+      Else
+         &return = False;
+      End-If;
+   End-Evaluate;
+   
+   Return &return;
+End-Function;
+
+
+Function set_goto_recv();
+   Evaluate %Component
+   When = Component.VCHR_QUICK_PNL
+   When = Component.VCHR_SUMM_PNL
+      Break;
+   When-Other
+      
+      
+      &V_LINE_RS = GetLevel0().GetRow(1).GetRowset(Scroll.VOUCHER_LINE);
+      &VCHR_LINES = &V_LINE_RS.ActiveRowCount;
+      For &VROW = 1 To &VCHR_LINES
+         &V_LINE_REC = &V_LINE_RS.GetRow(&VROW).GetRecord(Record.VOUCHER_LINE);
+         &VPW1_REC = &V_LINE_RS.GetRow(&VROW).GetRecord(Record.VCHR_PANELS_WK1);
+         &PO_BU = &V_LINE_REC.BUSINESS_UNIT_PO.Value;
+         &VPW1_REC.GOTO_RECV_COPY.Enabled = Enable_Goto_Recv_Copy(&PO_BU);
+      End-For;
+   End-Evaluate;
+   
+End-Function;
+
+
+Function copy_voucher();
+   Evaluate %Component
+   When = Component.VCHR_QUICK_PNL
+   When = Component.VCHR_SUMM_PNL
+      &SHRID = GetSetId("BUSINESS_UNIT", VCHR_HDR_QV.BUSINESS_UNIT, "VENDOR", "");
+      &BUSINESS_UNIT_VCHR = VCHR_HDR_QV.BUSINESS_UNIT;
+   When-Other
+      &SHRID = GetSetId("BUSINESS_UNIT", VOUCHER.BUSINESS_UNIT, "VENDOR", "");
+      &BUSINESS_UNIT_VCHR = VOUCHER.BUSINESS_UNIT;
+      
+      rem--If India Excise/Sales is applicable, set VOUCHER.TAX_EXEMPT = "Y";
+      If &EXD_PTP_APPL = "Y" Or
+            &STX_PTP_APPL = "Y" Or
+            &CSD_PTP_APPL = "Y" Then
+         VOUCHER.TAX_EXEMPT = "Y";
+      End-If;
+      
+   End-Evaluate;
+   
+   &PO_ID = VCHR_PANELS_WRK.PO_ID;
+   &RECEIVER_ID = VCHR_PANELS_WRK.RECEIVER_ID;
+   &BUSINESS_UNIT_PO = VCHR_PANELS_WRK.BUSINESS_UNIT_PO;
+   &BUSINESS_UNIT_RECV = VCHR_PANELS_WRK.BUSINESS_UNIT_RECV;
+   
+   get_vchr_info();
+   
+   If &MIS_MATCHED_CURR = "N" Then
+      get_vchr_ln_data();
+      loop_thru_lines();
+      updt_vchr();
+      
+      If &VCHEXP_ADJST_FLG Then
+         Setting_AdjPO_Label();
+      End-If;
+      set_goto_recv();
+      flush_scrolls();
+      Gray(VCHR_PANELS_WRK.VCHR_COPY_HDR);
+      Gray(VCHR_PANELS_WRK.VCHR_COPY_HDR_USE);
+      Gray(VCHR_PANELS_WRK.VCHR_COPY_HDR_OPT);
+      Hide(VCHR_PANELS_WRK.VCHR_TEMPLATE_USE);
+      Gray(VCHR_PANELS_WRK.PO_ID);
+      Gray(VCHR_PANELS_WRK.RECEIVER_ID);
+   Else
+      Evaluate %Component
+      When = Component.VCHR_QUICK_PNL
+      When = Component.VCHR_SUMM_PNL
+         If VCHR_PANELS_WRK.VCHR_COPY_HDR_OPT = "P" Then
+            WinMessage(MsgGet(7030, 183, "PO transaction currency, %1, is different from voucher transaction currency, %2.", &TXN_CURRENCY_CD, VCHR_HDR_QV.TXN_CURRENCY_CD));
+         Else
+            WinMessage(MsgGet(7030, 184, "Receiver transaction currency, %1, is different from voucher transaction currency, %2.", &TXN_CURRENCY_CD, VCHR_HDR_QV.TXN_CURRENCY_CD));
+         End-If;
+      When-Other
+         If VCHR_PANELS_WRK.VCHR_COPY_HDR_OPT = "P" Then
+            WinMessage(MsgGet(7030, 183, "PO transaction currency, %1, is different from voucher transaction currency, %2.", &TXN_CURRENCY_CD, VOUCHER.TXN_CURRENCY_CD));
+         Else
+            WinMessage(MsgGet(7030, 184, "Receiver transaction currency, %1, is different from voucher transaction currency, %2.", &TXN_CURRENCY_CD, VOUCHER.TXN_CURRENCY_CD));
+         End-If;
+      End-Evaluate;
+   End-If;
+End-Function;
+
+Function OPR_COPY_MATCHED(&OPRID) Returns boolean;
+   &SQL = "SELECT AUTH_CPY_MTCH_PO From PS_OPR_DEF_TBL_AP WHERE OPRID = :1";
+   SQLExec(&SQL, &OPRID, &MATCH_ALLOW);
+   If &MATCH_ALLOW = "Y" Then
+      &return = True;
+   Else
+      &return = False;
+   End-If;
+   Return &return;
+End-Function;
+
+Function BU_GROSS_AMT_COPY(&BU) Returns boolean;
+   &SQL = "SELECT COPYTO_GROSS_AMT From PS_BUS_UNIT_TBL_AP WHERE BUSINESS_UNIT = :1";
+   SQLExec(&SQL, &BU, &COPYTO_GROSS_AMT);
+   If &COPYTO_GROSS_AMT = "Y" Then
+      &return = True;
+   Else
+      &return = False;
+   End-If;
+   Return &return;
+End-Function;
+
+/*----------------------beginning of mainline----------------------*/
+Function copy_hdr()
+   &APGLACT = "N";
+   &OPR_MATCH = OPR_COPY_MATCHED(%OperatorId);
+   &assetdistsplit = False;
+   &EE_AP = EE_AP();
+   &MISC_CHG_CURR = " ";
+   &MULT_MISC_CURR = False;
+   &DIFF_MISC_CURR = False;
+   
+   /* Get installation options */
+   SQLExec("SELECT BUDG_DT_DFLT_OPT, WO FROM PS_INSTALLATION", &BUDG_DT_DFLT_OPT, &WO_INSTALLED);
+   SQLExec("SELECT AN_TYPE_AP FROM PS_INSTALLATION_PC", &AN_TYPE_AP);
+   
+   Evaluate %Component
+   When = Component.VCHR_QUICK_PNL
+      &COPY_GROSS = BU_GROSS_AMT_COPY(VCHR_HDR_QV.BUSINESS_UNIT);
+      &MISC_SETID = GetSetId("BUSINESS_UNIT", VCHR_HDR_QV.BUSINESS_UNIT, "CM_LC_COMPONENT", "");
+   When = Component.VCHR_SUMM_PNL
+      &COPY_GROSS = True;
+      &MISC_SETID = GetSetId("BUSINESS_UNIT", VCHR_HDR_QV.BUSINESS_UNIT, "CM_LC_COMPONENT", "");
+   When-Other
+      &COPY_GROSS = BU_GROSS_AMT_COPY(VOUCHER.BUSINESS_UNIT);
+      &MISC_SETID = GetSetId("BUSINESS_UNIT", VOUCHER.BUSINESS_UNIT, "CM_LC_COMPONENT", "");
+   End-Evaluate;
+   
+   Evaluate VCHR_PANELS_WRK.VCHR_COPY_HDR_OPT
+   When = "PW"
+   When = "RW"
+   When = "VW"
+      &WORKSHEET = "Y";
+      copy_voucher();
+      
+      If %Component <> Component.VCHR_QUICK_PNL Then
+         REM--**JR**vat_dsply();
+      End-If;
+      
+      ScrollFlush(Record.VCHR_MTCH_WS3);
+      ScrollFlush(Record.VCHR_MTCH_WS5);
+      Evaluate %Component
+      When = Component.VCHR_QUICK_PNL
+      When = Component.VCHR_SUMM_PNL
+         Break;
+      When-Other
+         
+         ScrollFlush(Record.VCHR_TP_WS1);
+      End-Evaluate;
+      Break;
+   When = "P"
+      If All(VCHR_PANELS_WRK.PO_ID) Then
+         copy_voucher();
+         
+         If %Component <> Component.VCHR_QUICK_PNL Then
+            REM--**JR**vat_dsply();
+         End-If;
+         
+      End-If;
+      Break;
+   When = "R"
+      If All(VCHR_PANELS_WRK.RECEIVER_ID) Then
+         copy_voucher();
+         
+         If %Component <> Component.VCHR_QUICK_PNL Then
+            REM--**JR**vat_dsply();
+         End-If;
+         
+      End-If;
+      Break;
+   End-Evaluate;
+   
+   If %Component <> Component.VCHR_QUICK_PNL And
+         %Component <> Component.VCHR_SUMM_PNL Then
+      &VENDOR_CHANGE = False;
+      iu_vndr_affiliate(&VENDOR_CHANGE);
+   End-If;
+   
+   If &first_line = "Y" Then
+      &first_line = "N";
+      Evaluate %Component
+      When = Component.VCHR_QUICK_PNL
+      When = Component.VCHR_SUMM_PNL
+         If Not &COPY_GROSS Then
+            VCHR_HDR_QV.GROSS_AMT = 0;
+         End-If;
+      When-Other
+         If Not &COPY_GROSS And
+               Not &VCHEXP_THIRD_FLG Then
+            /*  JM - VOUCHER BALANCING
+            VCHR_PANELS_WRK.VCHR_BALANCE_AMT = - 1.0 * VOUCHER.GROSS_AMT;
+*/
+            VOUCHER.GROSS_AMT = 0;
+         End-If;
+      End-Evaluate;
+   End-If;
+   
+   If &VCHEXP_ADJST_FLG Or
+         &VCHEXP_THIRD_FLG Then
+      Gray_Vendor_Flds();
+   End-If;
+   
+   rem--Enable/Disable Excise/Sales tax/Custom Duty hyperlink for India Business Units;
+   If &EXD_PTP_APPL = "Y" Or
+         &STX_PTP_APPL = "Y" Then
+      chk_exs_vndr_appl(VOUCHER.BUSINESS_UNIT, VOUCHER.VENDOR_ID, VOUCHER.VNDR_LOC);
+      &VCHRLN_RS = GetLevel0()(1).GetRowset(Scroll.VOUCHER_LINE);
+      If &EXS_VNDR_APPL Then
+         For &I = 1 To &VCHRLN_RS.ActiveRowCount
+            &VCHRLN_RS(&I).VCHR_PANELS_WK1.EXS_DTL_PB.Enabled = True;
+         End-For;
+      Else
+         For &I = 1 To &VCHRLN_RS.ActiveRowCount
+            &VCHRLN_RS(&I).VCHR_PANELS_WK1.EXS_DTL_PB.Enabled = False;
+         End-For;
+      End-If;
+   End-If;
+   
+   
+   Evaluate %Component
+   When = Component.VCHR_SUMM_PNL
+      
+      If None(VCHR_HDRQV_WRK.GROSS_AMT) And
+            VCHR_HDRQV_WRK.GROSS_AMT = 0 And
+            &COPY_GROSS Then
+         
+         
+         VCHR_HDRQV_WRK.GROSS_AMT = &GROSS_AMT + (VCHR_HDRQV_WRK.MERCHANDISE_AMT + VCHR_HDR_QV.SALETX_AMT + VCHR_HDRQV_WRK.FREIGHT_AMT + VCHR_HDRQV_WRK.MISC_CHRG_AMT + VCHR_HDR_QV.VAT_ENTRD_AMT);
+         
+         
+      End-If;
+   End-Evaluate;
+   
+   
+   Evaluate %Component
+   When = Component.VCHR_EXPRESS
+      
+      &vln_rs = GetLevel0()(1).GetRowset(Scroll.VOUCHER_LINE);
+      For &I = 1 To &vln_rs.ActiveRowCount
+         If &vln_rs(&I).VOUCHER_LINE.AMT_ONLY_FLG.Value = "Y" Then
+            &vln_rs(&I).VOUCHER_LINE.AMT_ONLY_FLG.Visible = True;
+         Else
+            &vln_rs(&I).VOUCHER_LINE.AMT_ONLY_FLG.Visible = False;
+         End-If;
+      End-For;
+   End-Evaluate;
+   
+   rem--Send warning message when Vendor isn't applicable for Custom Duty, and the PO/Receipt has Custom Duty information to be copied;
+   If &CSD_PTP_APPL = "Y" And
+         &WARNING_CSD = "Y" Then
+      Warning MsgGet(7460, 32, "The Custom Duty information will not be copied when the Vendor isn't applicable for Custom Duty.");
+   End-If;
+   
+   
+   
+   Evaluate %Component
+   When = Component.VCHR_QUICK_PNL
+   When = Component.VCHR_SUMM_PNL
+      Break;
+   When-Other
+      If &MULT_MISC_CURR Then
+         VOUCHER.PAY_AMT = VOUCHER.GROSS_AMT - VOUCHER.MEMO_AMT;
+      Else
+         Refresh_Button();
+         If VOUCHER.USETAX_AMT <> 0 Then
+            VOUCHER.USETAX_AMT = 0;
+         End-If;
+      End-If;
+   End-Evaluate;
+   &APGLACT = "Y";
+End-Function;
+

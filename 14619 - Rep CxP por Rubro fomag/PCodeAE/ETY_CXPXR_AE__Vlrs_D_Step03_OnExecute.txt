@@ -1,0 +1,86 @@
+Global string &voucher_old, &tree_node_old;
+Global number &Saldo, &valor;
+
+remark valida si la cabecera es nueva;
+
+MessageBox(0, "", 0, 0, "********************** HEADER - Vlrs_DTL ************************");
+MessageBox(0, "", 0, 0, "ETY_CXPXRUB_AET.BUSINESS_UNIT ->" | ETY_CXPXRUB_AET.BUSINESS_UNIT);
+MessageBox(0, "", 0, 0, "ETY_CXPXRUB_AET.TREE_NAME     ->" | ETY_CXPXRUB_AET.TREE_NAME);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.VOUCHER_ID    ->" | ETY_CXPXR_H_AET.VOUCHER_ID);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.ACCOUNT       ->" | ETY_CXPXR_H_AET.ACCOUNT);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.TREE_NODE     ->" | ETY_CXPXR_H_AET.TREE_NODE);
+
+MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.MONETARY_AMOUNT_01     ->" | ETY_CXPXR_H_AET.MONETARY_AMOUNT_01.Value);
+
+MessageBox(0, "", 0, 0, "*****************************************************************");
+rem MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.VOUCHER_ID_TMP --> " | ETY_CXPXR_H_AET.VOUCHER_ID_TMP);
+MessageBox(0, "", 0, 0, "&voucher_old                   --> " | &voucher_old);
+rem MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.TREE_NODE_WRK   ->" | ETY_CXPXR_H_AET.TREE_NODE_WRK);
+MessageBox(0, "", 0, 0, "tree_node_old                   ->" | &tree_node_old);
+MessageBox(0, "", 0, 0, "++++++++++++++++++++++++ Detalles ++++++++++++++++++++++++++++++++++++++++");
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.BUSINESS_UNIT      ->" | ETY_CXPXR_D_AET.BUSINESS_UNIT);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.VOUCHER_ID         ->" | ETY_CXPXR_D_AET.VOUCHER_ID);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.PYMNT_ID_REF       ->" | ETY_CXPXR_D_AET.PYMNT_ID_REF);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.PYMNT_DT           ->" | ETY_CXPXR_D_AET.PYMNT_DT);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.TREE_NODE          ->" | ETY_CXPXR_D_AET.TREE_NODE);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.DESCR              ->" | ETY_CXPXR_D_AET.DESCR);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.MONETARY_AMOUNT_01 ->" | ETY_CXPXR_D_AET.MONETARY_AMOUNT_01.Value);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.MONETARY_AMOUNT_02 ->" | ETY_CXPXR_D_AET.MONETARY_AMOUNT_02.Value);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.MONETARY_AMOUNT_03 ->" | ETY_CXPXR_D_AET.MONETARY_AMOUNT_03.Value);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.MONETARY_AMOUNT_04 ->" | ETY_CXPXR_D_AET.MONETARY_AMOUNT_04.Value);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.MONETARY_AMOUNT_05 ->" | ETY_CXPXR_D_AET.MONETARY_AMOUNT_05.Value);
+MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.ACCOUNT            ->" | ETY_CXPXR_D_AET.ACCOUNT);
+
+
+If ETY_CXPXR_D_AET.MONETARY_AMOUNT_05 > 0 Then
+   &valor = ETY_CXPXR_H_AET.MONETARY_AMOUNT_01 * (ETY_CXPXR_D_AET.MONETARY_AMOUNT_04 / ETY_CXPXR_D_AET.MONETARY_AMOUNT_05);
+End-If;
+
+rem MessageBox(0, "", 0, 0, "&valor            ->" | &valor);
+
+
+&voucher_old = ETY_CXPXR_H_AET.VOUCHER_ID.Value;
+&tree_node_old = ETY_CXPXR_H_AET.TREE_NODE.Value;
+
+/******* VALIDACIÓN SI EL ENCABEZADO ES EL PRIMERO DE LA GRILLA *******/
+If (ETY_CXPXR_H_AET.VOUCHER_ID_TMP = ETY_CXPXR_H_AET.VOUCHER_ID And
+      ETY_CXPXR_H_AET.TREE_NODE_WRK = ETY_CXPXR_H_AET.TREE_NODE) Or
+      (ETY_CXPXR_H_AET.VOUCHER_ID_TMP = "" And
+         ETY_CXPXR_H_AET.TREE_NODE_WRK = "") Then
+   
+   /****************************************** ENCABEZADO YA EXISTENTE *************************************/
+   ETY_CXPXR_D_AET.BALANCE = ETY_CXPXR_D_AET.BALANCE.Value - ETY_CXPXR_D_AET.MONETARY_AMOUNT_04.Value;
+   &Saldo = &Saldo - ETY_CXPXR_D_AET.MONETARY_AMOUNT_04.Value;
+   ETY_CXPXR_D_AET.FIRST_ITEM_LINE.Value = 0;
+   MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.BALANCE         ->" | ETY_CXPXR_D_AET.BALANCE);
+   MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.FIRST_ITEM_LINE ->" | ETY_CXPXR_D_AET.FIRST_ITEM_LINE);
+   MessageBox(0, "", 0, 0, "old ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+   Exit (1);
+   
+Else
+   /********************************************** ENCABEZADO NUEVO *******************************************/
+   
+   ETY_CXPXR_D_AET.BALANCE = 0;
+   &Saldo = 0;
+   
+   REM MessageBox(0, "", 0, 0, "ETY_CXPXR_H_AET.descr    DEBERA SALTAR LA CREACION DEL ENCABEZADO     ->" | ETY_CXPXR_H_AET.DESCR);
+   If None(ETY_CXPXR_H_AET.DESCR.Value) Then
+      Exit (1);
+   End-If;
+   
+   ETY_CXPXR_D_AET.BALANCE = ETY_CXPXR_H_AET.MONETARY_AMOUNT_01.Value - ETY_CXPXR_D_AET.MONETARY_AMOUNT_04.Value;
+   &Saldo = ETY_CXPXR_H_AET.MONETARY_AMOUNT_01.Value - ETY_CXPXR_D_AET.MONETARY_AMOUNT_04.Value;
+   ETY_CXPXR_D_AET.FIRST_ITEM_LINE.Value = 1;
+   MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.BALANCE         ->" | ETY_CXPXR_D_AET.BALANCE);
+   MessageBox(0, "", 0, 0, "ETY_CXPXR_D_AET.FIRST_ITEM_LINE ->" | ETY_CXPXR_D_AET.FIRST_ITEM_LINE);
+   MessageBox(0, "", 0, 0, "new ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+   
+End-If;
+
+
+ETY_CXPXR_H_AET.VOUCHER_ID_TMP = ETY_CXPXR_H_AET.VOUCHER_ID.Value;
+ETY_CXPXR_H_AET.TREE_NODE_WRK = ETY_CXPXR_H_AET.TREE_NODE.Value;
+
+
+/* Exit(0) ¿ Terminates the current PeopleCode Action in application engine.*/
+/* Exit(1) ¿ Terminates the current Step in application engine.  Exit(1) will exit the entire Step.*/
