@@ -1,0 +1,309 @@
+/************************************************************************************************************************************
+ Ref    PROYECTO:                      Autor:             Fecha:            Descripción:
+-------------------------------------------------------------------------------------------------------------------------------------
+ 001    ETY_ERP_AP_FLP_EVO_18324_KV    Kevin Vanegas      24 Ene 2021       Adición de consulta de pagos temporales cuando FF_TIPO_CONSULTA sea igual a 3
+************************************************************************************************************************************/
+/*Inicio 001*/
+import PS_PT:Integration:IRequestHandler;
+
+class EtyConsultaPagoDevRestSync implements PS_PT:Integration:IRequestHandler
+   method EtyConsultaPagoDevRestSync();
+   method OnRequest(&MSG As Message) Returns Message;
+end-class;
+
+/* constructor */
+method EtyConsultaPagoDevRestSync
+end-method;
+
+method OnRequest
+   /+ &MSG as Message +/
+   /+ Returns Message +/
+   /+ Extends/implements PS_PT:Integration:IRequestHandler.OnRequest +/
+   
+   
+   
+   Local Document &DOC1;
+   Local DocumentKey &DOCKEY;
+   Local any &COM, &COll_ITEMS, &COM_ITEM, &nRet;
+   
+   
+   Local Document &returnDoc;
+   Local Compound &returnCom, &returnCom2, &aComLn;
+   Local Primitive &pr;
+   Local Collection &returnColl;
+   Local boolean &ret;
+   Local Message &response;
+   
+   Local string &propValue, &value, &content, &propname;
+   Local JsonObject &jsonDetails;
+   Local integer &numCnt;
+   Local number &l;
+   Local JsonObject &jsonroot = CreateJsonObject();
+   Local JsonParser &parser;
+   Local integer &i;
+   /*Inicio #001*/
+   Local SQL &SQL_EXEC;
+   /*Fin #01*/
+   
+   &DOC1 = &MSG.GetDocument( True);
+   &content = &MSG.GetContentString();
+   &parser = CreateJsonParser();
+   &ret = &parser.Parse(&content);
+   &jsonroot = &parser.GetRootObject();
+   
+   
+   For &i = 1 To &jsonroot.GetChildCount()
+      /* for Response 1, following will get status tag and its value */
+      /* for Response 2, following will get import_set, staging_table and its values */
+      &propname = &jsonroot.GetPropertyNameAt(&i);
+      &propValue = &jsonroot.GetProperty(&propname);
+      If None(&propValue) Then
+         &propValue = " ";
+      End-If;
+      Evaluate &propname
+      When "ACCOUNTING_DT"
+         Local string &Accounting_dt = &propValue;
+         Break;
+      When "FF_TIPO_CONSULTA"
+         Local string &Ff_tipo_consulta = &propValue;
+         Break;
+      When "SOURCE"
+         
+         Local string &Source = &propValue;
+         Break;
+      When "INVOICE_ID"
+         Local string &Invoice_Id = &propValue;
+         Break;
+      When "BUSINESS_UNIT"
+         Local string &Bussines_Unit = &propValue;
+         Break;
+      When "NATIONAL_ID_TYPE"
+         Local string &National_Id_Type = &propValue;
+         Break;
+      When "NATIONAL_ID"
+         Local string &National_Id = &propValue;
+         Break;
+      End-Evaluate;
+   End-For;
+   
+   Local array of any &A = CreateArrayAny("");
+   Local SQL &SQL_PAY = CreateSQL(SQL.ETY_CONSULTA_PAGO_REST_SQL, &Invoice_Id, &Accounting_dt);
+   Local SQL &SQL_RECH = CreateSQL(SQL.ETY_CONSULTA_RECHAZO_REST_SQL, &Invoice_Id, &Accounting_dt);
+   rem &SQL_EXEC = CreateSQL(SQL.ETY_CONSULTA_RECHAZO_REST_SQL, &Invoice_Id, &Accounting_dt);
+   
+   &response = CreateMessage(@("Operation." | &MSG.OperationName), %IntBroker_Response);
+   &returnDoc = &response.GetDocument();
+   &returnCom = &returnDoc.DocumentElement;
+   
+   
+   &pr = &returnCom.GetPropertyByName("ACCOUNTING_DT");
+   &pr.Value = &Accounting_dt;
+   &pr = &returnCom.GetPropertyByName("FF_TIPO_CONSULTA");
+   &pr.Value = &Ff_tipo_consulta;
+   &pr = &returnCom.GetPropertyByName("SOURCE");
+   &pr.Value = &Source;
+   &pr = &returnCom.GetPropertyByName("INVOICE_ID");
+   &pr.Value = &Invoice_Id;
+   /*&pr = &returnCom.GetPropertyByName("ESTADO");
+   &pr.Value = "Prueba de Consumo de Servicio";*/
+   &pr = &returnCom.GetPropertyByName("BUSINESS_UNIT");
+   &pr.Value = &Bussines_Unit;
+   &pr = &returnCom.GetPropertyByName("NATIONAL_ID_TYPE");
+   &pr.Value = &National_Id_Type;
+   &pr = &returnCom.GetPropertyByName("NATIONAL_ID");
+   &pr.Value = &National_Id;
+   /*Inicio #001*/
+   /*Cambio If por Evaluate para inicializar la consulta*/
+   
+   Evaluate &Ff_tipo_consulta
+   When "1"
+      &SQL_EXEC = CreateSQL(SQL.ETY_CONSULTA_PAGO_REST_SQL, &Invoice_Id, &Accounting_dt);
+      Break;
+   When "2"
+      &SQL_EXEC = CreateSQL(SQL.ETY_QRY_PAGOS_RECHAZOS_IMS, &Bussines_Unit, &Invoice_Id, &National_Id_Type, &National_Id);
+      REM &SQL_EXEC = CreateSQL(SQL.ETY_CONSULTA_RECHAZO_REST_SQL, &Invoice_Id, &Accounting_dt);
+      Break;
+   When "3"
+      &SQL_EXEC = CreateSQL(SQL.ETY_COMPROBANTES_ERROR_SQL, &Bussines_Unit, &Invoice_Id, &Accounting_dt, &Source);
+      Break;
+   End-Evaluate;
+   
+   If &Ff_tipo_consulta = "1" Then
+      
+      While &SQL_PAY.Fetch(&A)
+         &returnColl = &returnCom.GetPropertyByName("Detalle");
+         /*create a new compound (Detalle) and set the values of each primitive*/
+         &aComLn = &returnColl.CreateItem();
+         &pr = &aComLn.GetPropertyByName("BUSINESS_UNIT");
+         &pr.Value = &A [1];
+         &pr = &aComLn.GetPropertyByName("VOUCHER_ID");
+         &pr.Value = &A [2];
+         &pr = &aComLn.GetPropertyByName("NATIONAL_ID_TYPE2");
+         &pr.Value = &A [3];
+         &pr = &aComLn.GetPropertyByName("NATIONAL_ID");
+         &pr.Value = &A [4];
+         &pr = &aComLn.GetPropertyByName("PYMNT_METHOD2");
+         &pr.Value = &A [5];
+         &pr = &aComLn.GetPropertyByName("BNK_ID_NBR");
+         &pr.Value = &A [6];
+         &pr = &aComLn.GetPropertyByName("BRANCH_NAME");
+         &pr.Value = &A [7];
+         &pr = &aComLn.GetPropertyByName("BANK_ACCT_TYPE2");
+         &pr.Value = &A [8];
+         &pr = &aComLn.GetPropertyByName("BANK_ACCOUNT_NUM");
+         &pr.Value = &A [9];
+         &pr = &aComLn.GetPropertyByName("MONETARY_AMOUNT");
+         &pr.Value = &A [10];
+         &pr = &aComLn.GetPropertyByName("FF_XREF_DET_BENEF");
+         &pr.Value = &A [11];
+         &pr = &aComLn.GetPropertyByName("FF_ESTADO_PAGO_BEN");
+         &pr.Value = &A [12];
+         &pr = &aComLn.GetPropertyByName("FF_FECHA_PAGO_BENE");
+         &pr.Value = &A [13];
+         &pr = &aComLn.GetPropertyByName("FF_MOTIVO_RETENCIO");
+         &pr.Value = &A [14];
+         &pr = &aComLn.GetPropertyByName("FF_FECHA_DEVOLUCIO");
+         &pr.Value = &A [15];
+         &pr = &aComLn.GetPropertyByName("ETY_VCHR_ADJ_ID");
+         &pr.Value = &A [16];
+         &pr = &aComLn.GetPropertyByName("DESCR254_MIXED");
+         &pr.Value = &A [17];
+         &pr = &aComLn.GetPropertyByName("INVOICE_ID");
+         &pr.Value = &A [18];
+         
+         /*&pr = &aComLn.GetPropertyByName("INVOICE_DT");
+         &pr.Value = &A [19];
+         &pr = &aComLn.GetPropertyByName("SOURSE");
+         &pr.Value = &A [20];
+         &pr = &aComLn.GetPropertyByName("VCHR_BLD_STATUS");
+         &pr.Value = &A [21];
+         &pr = &aComLn.GetPropertyByName("DTTM_CREATED");
+         &pr.Value = &A [22];
+         &pr = &aComLn.GetPropertyByName("VCHR_BLD_ERROR_FLG");
+         &pr.Value = &A [23];*/
+         
+         &ret = &returnColl.AppendItem(&aComLn);
+      End-While;
+      
+   Else
+      If &Ff_tipo_consulta = "2" Then
+         
+         While &SQL_EXEC.Fetch(&A)
+            &returnColl = &returnCom.GetPropertyByName("Detalle");
+            /*create a new compound (Detalle) and set the values of each primitive*/
+            &aComLn = &returnColl.CreateItem();
+            &pr = &aComLn.GetPropertyByName("BUSINESS_UNIT");
+            &pr.Value = &A [1];
+            &pr = &aComLn.GetPropertyByName("VOUCHER_ID");
+            &pr.Value = &A [2];
+            &pr = &aComLn.GetPropertyByName("NATIONAL_ID_TYPE2");
+            &pr.Value = &A [3];
+            &pr = &aComLn.GetPropertyByName("NATIONAL_ID");
+            &pr.Value = &A [4];
+            &pr = &aComLn.GetPropertyByName("PYMNT_METHOD2");
+            &pr.Value = &A [5];
+            &pr = &aComLn.GetPropertyByName("BNK_ID_NBR");
+            &pr.Value = &A [6];
+            &pr = &aComLn.GetPropertyByName("BRANCH_NAME");
+            &pr.Value = &A [7];
+            &pr = &aComLn.GetPropertyByName("BANK_ACCT_TYPE2");
+            &pr.Value = &A [8];
+            &pr = &aComLn.GetPropertyByName("BANK_ACCOUNT_NUM");
+            &pr.Value = &A [9];
+            &pr = &aComLn.GetPropertyByName("MONETARY_AMOUNT");
+            &pr.Value = &A [10];
+            &pr = &aComLn.GetPropertyByName("FF_XREF_DET_BENEF");
+            &pr.Value = &A [11];
+            &pr = &aComLn.GetPropertyByName("FF_ESTADO_PAGO_BEN");
+            &pr.Value = &A [12];
+            &pr = &aComLn.GetPropertyByName("FF_FECHA_PAGO_BENE");
+            &pr.Value = &A [13];
+            &pr = &aComLn.GetPropertyByName("FF_MOTIVO_RETENCIO");
+            &pr.Value = &A [14];
+            &pr = &aComLn.GetPropertyByName("FF_FECHA_DEVOLUCIO");
+            &pr.Value = &A [15];
+            &pr = &aComLn.GetPropertyByName("ETY_VCHR_ADJ_ID");
+            &pr.Value = &A [16];
+            &pr = &aComLn.GetPropertyByName("DESCR254_MIXED");
+            &pr.Value = &A [17];
+            &pr = &aComLn.GetPropertyByName("INVOICE_ID");
+            &pr.Value = &A [18];
+            
+            /* &pr = &aComLn.GetPropertyByName("INVOICE_DT");
+            &pr.Value = &A [19];
+            &pr = &aComLn.GetPropertyByName("SOURSE");
+            &pr.Value = &A [20];
+            &pr = &aComLn.GetPropertyByName("VCHR_BLD_STATUS");
+            &pr.Value = &A [21];
+            &pr = &aComLn.GetPropertyByName("DTTM_CREATED");
+            &pr.Value = &A [22];
+            &pr = &aComLn.GetPropertyByName("VCHR_BLD_ERROR_FLG");
+            &pr.Value = &A [23];*/
+            
+            &ret = &returnColl.AppendItem(&aComLn);
+         End-While;
+         
+      End-If;
+   End-If;
+   /*Inicio #001*/
+   If &Ff_tipo_consulta = "3" Then
+      While &SQL_EXEC.Fetch(&A)
+         &returnColl = &returnCom.GetPropertyByName("Detalle");
+         /*create a new compound (Detalle) and set the values of each primitive*/
+         &aComLn = &returnColl.CreateItem();
+         &pr = &aComLn.GetPropertyByName("BUSINESS_UNIT");
+         &pr.Value = &A [1];
+         &pr = &aComLn.GetPropertyByName("VOUCHER_ID");
+         &pr.Value = &A [2];
+         &pr = &aComLn.GetPropertyByName("NATIONAL_ID_TYPE2");
+         &pr.Value = &A [3];
+         &pr = &aComLn.GetPropertyByName("NATIONAL_ID");
+         &pr.Value = &A [4];
+         &pr = &aComLn.GetPropertyByName("PYMNT_METHOD2");
+         &pr.Value = &A [5];
+         &pr = &aComLn.GetPropertyByName("BNK_ID_NBR");
+         &pr.Value = &A [6];
+         &pr = &aComLn.GetPropertyByName("BRANCH_NAME");
+         &pr.Value = &A [7];
+         &pr = &aComLn.GetPropertyByName("BANK_ACCT_TYPE2");
+         &pr.Value = &A [8];
+         &pr = &aComLn.GetPropertyByName("BANK_ACCOUNT_NUM");
+         &pr.Value = &A [9];
+         &pr = &aComLn.GetPropertyByName("MONETARY_AMOUNT");
+         &pr.Value = &A [10];
+         &pr = &aComLn.GetPropertyByName("FF_XREF_DET_BENEF");
+         &pr.Value = &A [11];
+         &pr = &aComLn.GetPropertyByName("FF_ESTADO_PAGO_BEN");
+         &pr.Value = &A [12];
+         &pr = &aComLn.GetPropertyByName("FF_FECHA_PAGO_BENE");
+         &pr.Value = &A [13];
+         &pr = &aComLn.GetPropertyByName("FF_MOTIVO_RETENCIO");
+         &pr.Value = &A [14];
+         &pr = &aComLn.GetPropertyByName("FF_FECHA_DEVOLUCIO");
+         &pr.Value = &A [15];
+         &pr = &aComLn.GetPropertyByName("ETY_VCHR_ADJ_ID");
+         &pr.Value = &A [16];
+         &pr = &aComLn.GetPropertyByName("DESCR254_MIXED");
+         &pr.Value = &A [17];
+         &pr = &aComLn.GetPropertyByName("INVOICE_ID");
+         &pr.Value = &A [18];
+         
+         &pr = &aComLn.GetPropertyByName("INVOICE_DT");
+         &pr.Value = &A [19];
+         &pr = &aComLn.GetPropertyByName("SOURSE");
+         &pr.Value = &A [20];
+         &pr = &aComLn.GetPropertyByName("VCHR_BLD_STATUS");
+         &pr.Value = &A [21];
+         &pr = &aComLn.GetPropertyByName("DTTM_CREATED");
+         &pr.Value = &A [22];
+         &pr = &aComLn.GetPropertyByName("VCHR_BLD_ERROR_FLG");
+         &pr.Value = &A [23];
+         
+         &ret = &returnColl.AppendItem(&aComLn);
+      End-While;
+      /*Fin #001*/
+   End-If;
+   
+   Return &response;
+end-method;
+

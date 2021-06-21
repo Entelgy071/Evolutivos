@@ -1,0 +1,77 @@
+import PS_PT:Integration:IRequestHandler;
+
+class EtyConsultaCuentasTerceroRest implements PS_PT:Integration:IRequestHandler
+   method EtyConsultaCuentasTerceroRest();
+   method OnRequest(&_MSG As Message) Returns Message;
+   
+end-class;
+
+/* constructor */
+method EtyConsultaCuentasTerceroRest
+end-method;
+
+method OnRequest
+   /+ &_MSG as Message +/
+   /+ Returns Message +/
+   /+ Extends/implements PS_PT:Integration:IRequestHandler.OnRequest +/
+   Local Message &request, &response;
+   Local Document &reqDOC, &respDOC, &Doc;
+   Local Compound &Root, &Compo, &compResp, &aComLn;
+   Local Collection &RtrColl;
+   Local XmlDoc &xmlDoc;
+   Local string &NATIONAL_ID_TYPE, &NATIONAL_ID, &strContent, &propName, &propValue, &VNDR_LOC, &DESCR, &FF_CDBNKSFC, &DESCRLONG, &BANK_ACCT_TYPE, &XLATLONGNAME, &BANK_ACCOUNT_NUM;
+   Local Primitive &EmployeeName, &Prim;
+   Local JsonObject &jObjRoot = CreateJsonObject();
+   Local JsonParser &Parser;
+   Local boolean &bRet;
+   Local integer &i;
+   Local SQL &SQL_QRY;
+   Local array of any &A = CreateArrayAny("");
+   Local boolean &ret;
+   
+   
+   &Doc = &_MSG.GetDocument( True);
+   &strContent = &_MSG.GetContentString();
+   &Parser = CreateJsonParser();
+   &bRet = &Parser.Parse(&strContent);
+   &jObjRoot = &Parser.GetRootObject();
+   
+   For &i = 1 To &jObjRoot.GetChildCount()
+      &propName = &jObjRoot.GetPropertyNameAt(&i);
+      &propValue = &jObjRoot.GetProperty(&propName);
+      Evaluate &propName
+      When "NATIONAL_ID_TYPE"
+         &NATIONAL_ID_TYPE = &propValue;
+         Break;
+      When "NATIONAL_ID"
+         &NATIONAL_ID = &propValue;
+         Break;
+      End-Evaluate;
+   End-For;
+   
+   &SQL_QRY = CreateSQL(SQL.ETY_QRY_CTA_TERCERO_REST, &NATIONAL_ID_TYPE, &NATIONAL_ID, &VNDR_LOC, &DESCR, &FF_CDBNKSFC, &DESCRLONG, &BANK_ACCT_TYPE, &XLATLONGNAME, &BANK_ACCOUNT_NUM);
+   
+   &response = CreateMessage(@("Operation." | &_MSG.OperationName), %IntBroker_Response);
+   &respDOC = &response.GetDocument();
+   &compResp = &respDOC.DocumentElement;
+   
+   &compResp.GetPropertyByName("NATIONAL_ID_TYPE").value = &NATIONAL_ID_TYPE;
+   &compResp.GetPropertyByName("NATIONAL_ID").value = &NATIONAL_ID;
+   
+   While &SQL_QRY.Fetch(&A)
+      &RtrColl = &compResp.GetPropertyByName("INFO_CUENTAS_TERCERO");
+      &aComLn = &RtrColl.CreateItem();
+      &aComLn.GetPropertyByName("VNDR_LOC").value = &A [1];
+      &aComLn.GetPropertyByName("DESCR").value = &A [2];
+      &aComLn.GetPropertyByName("FF_CDBNKSFC").Value = &A [3];
+      &aComLn.GetPropertyByName("DESCRLONG").Value = &A [4];
+      &aComLn.GetPropertyByName("BANK_ACCT_TYPE").Value = &A [5];
+      &aComLn.GetPropertyByName("XLATLONGNAME").Value = &A [6];
+      &aComLn.GetPropertyByName("BANK_ACCOUNT_NUM").Value = &A [7];
+      &ret = &RtrColl.AppendItem(&aComLn);
+   End-While;
+   
+   
+   Return &response;
+end-method;
+

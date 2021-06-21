@@ -1,0 +1,82 @@
+import PS_PT:Integration:IRequestHandler;
+
+class EtyQRYTerceroRESTSync implements PS_PT:Integration:IRequestHandler
+   method EtyQRYTerceroRESTSync();
+   method OnRequest(&MSG As Message) Returns Message;
+end-class;
+
+/* constructor */
+method EtyQRYTerceroRESTSync
+end-method;
+
+method OnRequest
+   /+ &MSG as Message +/
+   /+ Returns Message +/
+   /+ Extends/implements PS_PT:Integration:IRequestHandler.OnRequest +/
+   
+   Local Document &DOC1;
+   Local Document &returnDoc, &respDOC;
+   Local Compound &returnCom, &aComLn, &compResp;
+   Local Primitive &pr, &Prim;
+   Local Collection &RtrColl;
+   Local boolean &ret;
+   Local Message &response;
+   Local string &propValue, &value, &content, &propname, &StrTipoDocumento, &StrNroDocumento, &Est, &Ltp, &Cat, &Cns;
+   Local integer &numCnt, &i;
+   Local number &l;
+   Local JsonObject &jsonroot = CreateJsonObject();
+   Local JsonParser &parser;
+   Local array of any &A = CreateArrayAny("");
+   Local SQL &SQL_QRY;
+   Local date &Fac;
+   
+   &DOC1 = &MSG.GetDocument( True);
+   &content = &MSG.GetContentString();
+   &parser = CreateJsonParser();
+   &ret = &parser.Parse(&content);
+   &jsonroot = &parser.GetRootObject();
+   
+   For &i = 1 To &jsonroot.GetChildCount()
+      &propname = &jsonroot.GetPropertyNameAt(&i);
+      &propValue = &jsonroot.GetProperty(&propname);
+      Evaluate &propname
+      When "NATIONAL_ID_TYPE"
+         &StrTipoDocumento = &propValue;
+         Break;
+      When "NATIONAL_ID"
+         &StrNroDocumento = &propValue;
+         Break;
+      End-Evaluate;
+   End-For;
+   
+   REM &SQL_QRY = CreateSQL(SQL.ETY_QRY_TERCERO_REST, &StrTipoDocumento, &StrNroDocumento);
+   &SQL_QRY = CreateSQL(SQL.ETY_TERCEROS_CATEGORIA_CT_SQL, &StrTipoDocumento, &StrNroDocumento, &Est, &Ltp, &Cat, &Fac, &Cns);
+   &response = CreateMessage(@("Operation." | &MSG.OperationName), %IntBroker_Response);
+   &respDOC = &response.GetDocument();
+   &compResp = &respDOC.DocumentElement;
+   
+   &compResp.GetPropertyByName("NATIONAL_ID_TYPE").Value = &StrTipoDocumento;
+   &compResp.GetPropertyByName("NATIONAL_ID").Value = &StrNroDocumento;
+   
+   While &SQL_QRY.Fetch(&A)
+      &RtrColl = &compResp.GetPropertyByName("INFOTERCERO");
+      &aComLn = &RtrColl.CreateItem();
+      &aComLn.GetPropertyByName("ESTADO").value = &A [1];
+      &aComLn.GetPropertyByName("LC_TIPO_PERSONA").value = &A [2];
+      &aComLn.GetPropertyByName("CATEGORY_ID").Value = &A [3];
+      &aComLn.GetPropertyByName("ETY_FECHA_ACT").Value = &A [4];
+      &aComLn.GetPropertyByName("FF_CONSUNION_FLG").Value = &A [5];
+      &aComLn.GetPropertyByName("ETY_NVL_RIESG_LAFT").Value = &A [6];
+      &ret = &RtrColl.AppendItem(&aComLn);
+   End-While;
+   
+   
+   /*&compResp.GetPropertyByName("ESTADO").value = &Est;
+   &compResp.GetPropertyByName("LC_TIPO_PERSONA").value = &Ltp;
+   &compResp.GetPropertyByName("CATEGORY_ID").Value = &Cat;
+   &compResp.GetPropertyByName("ETY_FECHA_ACT").Value = &Fac;
+   &compResp.GetPropertyByName("FF_CONSUNION_FLG").Value = &Cns;*/
+   
+   Return &response;
+end-method;
+
